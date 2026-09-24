@@ -556,7 +556,7 @@ export class ZoneScene extends Phaser.Scene {
             blast.destroy();
           },
         });
-        this.cameras.main.shake(160, 0.006);
+        this.cameras.main.shake(120, 0.002); // a explosão abana só um pouco
       }),
       eventBus.on('enemy:scream', ({ x, y, radius }) => {
         // Grito: um anel que cresce até ao raio do alerta.
@@ -578,7 +578,7 @@ export class ZoneScene extends Phaser.Scene {
         if (preferences().damageNumbers)
           this.floatText(`-${String(amount)}`, Math.round(x), Math.round(y) - 34, 'red');
         this.hurtUntil = this.time.now + 150;
-        this.cameras.main.shake(100, 0.004);
+        // Sem abanar o ecrã: o HUD mostra as bordas avermelhadas (pedido do jogador).
       }),
       eventBus.on('inventory:changed', () => {
         this.renderContainers();

@@ -47,6 +47,10 @@ const BAR_X = 34;
 const BAR_WIDTH = 60;
 const BAR_HEIGHT = 6;
 const BAR_SPACING = 11;
+/** Moldura de dano: faixas de 4 px, da borda para dentro, cada vez mais transparentes. */
+const HURT_BAND = 4;
+const HURT_BANDS = [0.5, 0.32, 0.18, 0.08] as const;
+const HURT_FADE_MS = 450;
 /** Largura da barra do chefe (px de jogo). */
 const BOSS_BAR = 120;
 /** Piscar das barras abaixo de BALANCE.lowStatPct (CLAUDE.md §2: aviso aos 30%). */
@@ -95,6 +99,8 @@ export class UIScene extends Phaser.Scene {
     fill: Phaser.GameObjects.Rectangle;
   } | null = null;
   private pause: PauseUI | null = null;
+  /** Bordas do ecrã avermelhadas ao levar dano (em vez de abanar a câmara). */
+  private hurtEdges: Phaser.GameObjects.Container | null = null;
   /** Dica do tutorial (em cima, ao centro) e o × que a desliga. */
   private hint: { label: Label; close: Button | null; step: string | null; x: number } | null = null;
   /** "A sangrar" (por baixo da barra de XP), a piscar. */
@@ -119,6 +125,7 @@ export class UIScene extends Phaser.Scene {
     uiState.actionHeld = false;
     setupFixedCamera(this.cameras.main);
     this.createBars();
+    this.createHurtEdges();
     const { width, height } = getView();
     this.clock = new Label(
       this,
@@ -242,6 +249,7 @@ export class UIScene extends Phaser.Scene {
       this.bleedLabel = null;
       this.bossBar = null;
       this.hint = null;
+      this.hurtEdges = null;
       this.xpFill = null;
       this.actionButton = [];
       this.buildButton = null;
@@ -310,6 +318,46 @@ export class UIScene extends Phaser.Scene {
     ).setDepth(40);
   }
 
+  /**
+   * Moldura vermelha nas 4 bordas do ecrã, em faixas cada vez mais transparentes para dentro
+   * (degraus, estilo pixel art). Fica invisível até o jogador levar dano.
+   */
+  private createHurtEdges(): void {
+    const { width, height } = getView();
+    const edges = this.add.container(0, 0).setDepth(35).setAlpha(0);
+    const color = paletteNumber('red');
+    HURT_BANDS.forEach((alpha, i) => {
+      const o = i * HURT_BAND;
+      edges.add([
+        this.add.rectangle(o, o, width - 2 * o, HURT_BAND, color, alpha).setOrigin(0),
+        this.add.rectangle(o, height - o - HURT_BAND, width - 2 * o, HURT_BAND, color, alpha).setOrigin(0),
+        this.add
+          .rectangle(o, o + HURT_BAND, HURT_BAND, height - 2 * o - 2 * HURT_BAND, color, alpha)
+          .setOrigin(0),
+        this.add
+          .rectangle(
+            width - o - HURT_BAND,
+            o + HURT_BAND,
+            HURT_BAND,
+            height - 2 * o - 2 * HURT_BAND,
+            color,
+            alpha,
+          )
+          .setOrigin(0),
+      ]);
+    });
+    this.hurtEdges = edges;
+  }
+
+  /** Acende a moldura vermelha e apaga-a depressa. */
+  private flashHurtEdges(): void {
+    const edges = this.hurtEdges;
+    if (!edges) return;
+    this.tweens.killTweensOf(edges);
+    edges.setAlpha(1);
+    this.tweens.add({ targets: edges, alpha: 0, duration: HURT_FADE_MS, ease: 'Quad.easeIn' });
+  }
+
   /** Barra de vida do chefe da zona (escondida sem chefe). */
   private renderBossBar(): void {
     const bar = this.bossBar;
@@ -372,6 +420,7 @@ export class UIScene extends Phaser.Scene {
         this.showNotice(t('msg.boss_defeated'));
       }),
       eventBus.on('player:damaged', () => {
+        this.flashHurtEdges();
         // Vibrar ao levar dano (telemóvel), se o jogador não o desligou.
         if (preferences().vibration && 'vibrate' in navigator) navigator.vibrate(40);
       }),
