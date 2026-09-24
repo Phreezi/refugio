@@ -36,7 +36,27 @@ export interface GameEvents {
   'item:broken': { item: string };
   'player:consumed': { item: string };
   /** A ação não foi possível (a UI mostra o motivo). */
-  'action:blocked': { reason: 'needs_tool' | 'inventory_full' | 'door_blocked' | 'needs_rod'; tool?: string };
+  'action:blocked': {
+    reason:
+      | 'needs_tool'
+      | 'inventory_full'
+      | 'door_blocked'
+      | 'needs_rod'
+      | 'needs_seeds'
+      | 'needs_water'
+      | 'crop_growing'
+      | 'nothing_yet'
+      | 'needs_item';
+    tool?: string;
+    /** needs_item: o item que falta. */
+    item?: string;
+    /** crop_growing: horas de jogo que faltam. */
+    hours?: number;
+  };
+  /** Colheita num canteiro da horta (dá XP). */
+  'crop:harvested': { crop: string };
+  /** Recolheu o que uma peça produziu (coletor, armadilha). */
+  'produce:collected': { uid: number };
   /** Pesca (Fase 7): começou o mini-jogo; acabou (apanhou ou não); encheu uma garrafa no lago. */
   'fishing:started': Record<string, never>;
   'fishing:result': { caught: boolean };

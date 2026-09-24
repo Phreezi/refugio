@@ -49,6 +49,12 @@ export class Progression {
     bus.on('loot:rolled', () => {
       this.gain(BALANCE.xpLoot);
     });
+    bus.on('crop:harvested', () => {
+      this.gain(BALANCE.xpFarm);
+    });
+    bus.on('produce:collected', () => {
+      this.gain(BALANCE.xpProduce);
+    });
     bus.on('fishing:result', ({ caught }) => {
       if (caught) this.gain(BALANCE.xpFish);
     });

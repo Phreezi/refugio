@@ -43,6 +43,10 @@ export interface BaseState {
   structures: StructureRecord[];
   /** Próximo uid de peça (nunca se reutilizam: identificam estações e baús). */
   nextStructureId: number;
+  /** Canteiros com planta, pelo uid: [semente, tick em que fica madura (null = por regar)]. */
+  crops: Record<string, [seed: string, readyAt: number | null]>;
+  /** Peças que produzem sozinhas, pelo uid: tick a partir do qual se conta a produção (pode ser < 0). */
+  produce: Record<string, number>;
 }
 
 /** Mochila no chão: a da morte (§7.12) ou o que não coube ao matar um inimigo. */
@@ -107,7 +111,13 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       xp: 0,
     },
     world: { tick: 0, rng: seed >>> 0 },
-    base: { chests: { [STARTING_CHEST_ID]: startingChest() }, structures: [], nextStructureId: 1 },
+    base: {
+      chests: { [STARTING_CHEST_ID]: startingChest() },
+      structures: [],
+      nextStructureId: 1,
+      crops: {},
+      produce: {},
+    },
     zones: {},
     stations: {},
     unlocks: { recipes: [] },

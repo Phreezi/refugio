@@ -189,5 +189,20 @@
   "enemy.boar": "Javali",
   "zone.road": "Estrada e Bomba de Gasolina",
   "zone.village": "Aldeia Deserta",
-  "zone.deep_forest": "Floresta Profunda"
+  "zone.deep_forest": "Floresta Profunda",
+  "item.carrot_seeds": "Sementes de cenoura",
+  "item.carrot": "Cenoura",
+  "item.tomato_seeds": "Sementes de tomate",
+  "item.tomato": "Tomate",
+  "structure.garden_bed": "Canteiro",
+  "structure.rain_collector": "Coletor de água",
+  "structure.snare": "Armadilha de caça",
+  "build.problem.plot_busy": "Colhe primeiro o que está plantado.",
+  "farm.needs_seeds": "Precisas de sementes para plantar.",
+  "farm.needs_water": "Precisas de água para regar.",
+  "farm.growing": "Ainda a crescer: cerca de {hours} h de jogo.",
+  "farm.nothing_yet": "Ainda não há nada para recolher.",
+  "msg.needs_item": "Precisas de: {item}.",
+  "craft.filter": "Posso fazer",
+  "craft.nothing_to_make": "Não tens o que é preciso para nada desta categoria."
 }

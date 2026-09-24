@@ -24,6 +24,7 @@ export type BuildProblem =
   | 'supports'
   | 'station_busy'
   | 'chest_not_empty'
+  | 'plot_busy'
   | 'inventory_full'
   | 'door_blocked';
 

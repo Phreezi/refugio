@@ -14,6 +14,7 @@ import { zoneState, type GameState } from './GameState';
 import { structureChestId, structureStationKey, type Building } from './Building';
 import type { Combat } from './Combat';
 import type { Fishing } from './Fishing';
+import type { Homestead } from './Homestead';
 import { rollLoot } from '../systems/loot/loot';
 import { stationKey } from './Crafting';
 import type { PlayerActions } from './PlayerActions';
@@ -48,6 +49,8 @@ export type TargetData =
   | { type: 'enemy'; placement: ResourcePlacement; uid: number }
   | { type: 'bag'; placement: ResourcePlacement; index: number }
   | { type: 'loot'; placement: ResourcePlacement }
+  | { type: 'plot'; placement: ResourcePlacement; uid: number }
+  | { type: 'producer'; placement: ResourcePlacement; uid: number }
   | { type: 'fish'; placement: ResourcePlacement };
 /** Os recursos que reaparecem verificam-se uma vez por segundo de jogo. */
 const RESPAWN_CHECK_TICKS = 20;
@@ -64,6 +67,7 @@ export class Interaction {
   private readonly building: Building;
   private readonly combat: Combat;
   private readonly fishing: Fishing;
+  private readonly homestead: Homestead;
   private zone: ZoneContext | null = null;
   /** Vida dos recursos já golpeados (não se grava: ao recarregar voltam a estar inteiros). */
   private readonly nodeHp = new Map<number, number>();
@@ -75,6 +79,7 @@ export class Interaction {
     building: Building,
     combat: Combat,
     fishing: Fishing,
+    homestead: Homestead,
   ) {
     this.state = state;
     this.bus = bus;
@@ -82,6 +87,7 @@ export class Interaction {
     this.building = building;
     this.combat = combat;
     this.fishing = fishing;
+    this.homestead = homestead;
   }
 
   /** O contentor está vazio (já aberto e ainda sem voltar a encher)? */
@@ -210,19 +216,21 @@ export class Interaction {
       }));
   }
 
-  /** Portas, estações e baús construídos. */
+  /** Portas, estações, baús, canteiros e peças que produzem (construídos). */
   private structureTargets(): Target<TargetData>[] {
     const list: Target<TargetData>[] = [];
     const tileSize = this.building.tileSize;
     for (const [uid, id, tx, ty] of this.building.structures()) {
       const def = this.building.def(id);
-      if (!def || !(def.door || def.station || def.chest)) continue;
+      if (!def || !(def.door || def.station || def.chest || def.farm || def.produce)) continue;
       const feet = structureFeet(def, tx, ty, tileSize);
       const placement = { id, objectId: -uid, ...feet };
       const area = def.footprint ? footprintRect(feet, def.footprint) : structureArea(def, tx, ty, tileSize);
       let data: TargetData;
       if (def.station) data = { type: 'station', placement, key: structureStationKey(def.station, uid) };
       else if (def.chest) data = { type: 'chest', placement, chestId: structureChestId(uid) };
+      else if (def.farm) data = { type: 'plot', placement, uid };
+      else if (def.produce) data = { type: 'producer', placement, uid };
       else data = { type: 'door', placement, uid };
       list.push({ kind: 'container', area, data });
     }
@@ -262,6 +270,10 @@ export class Interaction {
       this.openLoot(data.placement);
     } else if (data.type === 'fish') {
       this.fishing.start();
+    } else if (data.type === 'plot') {
+      this.homestead.usePlot(data.uid);
+    } else if (data.type === 'producer') {
+      this.homestead.collect(data.uid);
     } else if (data.type === 'resource') this.gather(data.placement);
     else if (data.type === 'chest') {
       this.bus.emit('player:action', { kind: 'open' });

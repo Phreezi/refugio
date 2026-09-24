@@ -96,6 +96,8 @@ describe('save: migrações', () => {
         [2, 'wood_bench', 20, 15, 0, 0],
       ],
       nextStructureId: 3,
+      crops: {},
+      produce: {},
     });
     expect(parsed.state.zones).toEqual({});
     expect(parsed.state.stations).toEqual({});
@@ -163,6 +165,27 @@ describe('save: migrações', () => {
     const { state } = parseSave(text);
     expect(state.player).toMatchObject({ level: 3, xp: 0 });
     expect(state.unlocks).toEqual({ recipes: [] });
+  });
+
+  it('v7 → v8 (Fase 9): horta e produção vazias', () => {
+    const v7 = structuredClone(STATE) as unknown as { base: Record<string, unknown> };
+    delete v7.base.crops;
+    delete v7.base.produce;
+    const stateJson = JSON.stringify(v7);
+    const text = `{"version":7,"timestamp":5,"checksum":"${checksum(`7|5|${stateJson}`)}","state":${stateJson}}`;
+    const { state } = parseSave(text);
+    expect(state.base.crops).toEqual({});
+    expect(state.base.produce).toEqual({});
+  });
+
+  it('valida a horta', () => {
+    const ok = structuredClone(STATE);
+    ok.base.crops['3'] = ['carrot_seeds', null];
+    ok.base.crops['4'] = ['carrot_seeds', 1200];
+    expect(parseSave(serializeSave(ok, 1)).state.base.crops['3']).toEqual(['carrot_seeds', null]);
+    const bad = structuredClone(STATE);
+    (bad.base.crops as Record<string, unknown>)['3'] = ['carrot_seeds', -1];
+    expect(problemOf(serializeSave(bad, 1))).toBe('state');
   });
 
   it('valida as peças construídas', () => {

@@ -49,5 +49,7 @@
   "xpBuild": 1,
   "xpLoot": 3,
   "xpFish": 4,
+  "xpFarm": 4,
+  "xpProduce": 1,
   "playerLightPx": 44
 }

@@ -189,5 +189,20 @@
   "enemy.boar": "Boar",
   "zone.road": "Road and Gas Station",
   "zone.village": "Deserted Village",
-  "zone.deep_forest": "Deep Forest"
+  "zone.deep_forest": "Deep Forest",
+  "item.carrot_seeds": "Carrot seeds",
+  "item.carrot": "Carrot",
+  "item.tomato_seeds": "Tomato seeds",
+  "item.tomato": "Tomato",
+  "structure.garden_bed": "Garden bed",
+  "structure.rain_collector": "Rain collector",
+  "structure.snare": "Snare trap",
+  "build.problem.plot_busy": "Harvest what is planted first.",
+  "farm.needs_seeds": "You need seeds to plant.",
+  "farm.needs_water": "You need water to water it.",
+  "farm.growing": "Still growing: about {hours} in-game hours.",
+  "farm.nothing_yet": "Nothing to collect yet.",
+  "msg.needs_item": "You need: {item}.",
+  "craft.filter": "Can make",
+  "craft.nothing_to_make": "You don't have what's needed for anything in this category."
 }

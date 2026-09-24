@@ -63,6 +63,11 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     const player = s.player as Record<string, unknown>;
     return { ...s, player: { ...player, level: 3, xp: 0 }, unlocks: { recipes: [] } };
   },
+  // v7 → v8 (Fase 9): canteiros da horta e peças que produzem sozinhas (ainda não havia nenhum).
+  7: (s) => {
+    const base = s.base as Record<string, unknown>;
+    return { ...s, base: { ...base, crops: {}, produce: {} } };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

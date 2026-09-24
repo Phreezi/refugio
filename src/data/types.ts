@@ -100,6 +100,19 @@ export interface ItemDef {
   teaches?: string;
   /** Slots extra (mochilas). */
   slots?: number;
+  /** Sementes: o que dá ao plantar num canteiro (§11 Fase 9). */
+  plant?: PlantDef;
+  /** Serve para regar os canteiros (água; devolve `returns`). */
+  waters?: boolean;
+}
+
+/** Semente: cresce durante `growHours` horas de jogo depois de regada. */
+export interface PlantDef {
+  crop: string;
+  growHours: number;
+  /** Colheita: quantidades [mín, máx] do fruto e de sementes. */
+  yield: readonly [number, number];
+  seeds: readonly [number, number];
 }
 
 export type ItemDefs = Readonly<Record<string, ItemDef>>;
@@ -276,6 +289,8 @@ const ITEM_KEYS = new Set([
   'attackSec',
   'reach',
   'teaches',
+  'plant',
+  'waters',
 ]);
 const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
 const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach'] as const;
@@ -369,10 +384,49 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
     }
     if (def.durability !== undefined && def.stack !== 1)
       problems.push(`"${id}": itens com durabilidade têm stack 1`);
+    if (raw.waters !== undefined) {
+      if (raw.waters === true) def.waters = true;
+      else problems.push(`"${id}": waters tem de ser true`);
+    }
+    if (raw.plant !== undefined) {
+      const plant = parsePlant(raw.plant, ids);
+      if (typeof plant === 'string') problems.push(`"${id}": plant ${plant}`);
+      else {
+        def.plant = plant;
+        if (!icons.has(cropSprite(plant.crop)))
+          problems.push(`"${id}": falta o sprite "${cropSprite(plant.crop)}" no manifest`);
+      }
+    }
     defs[id] = def;
   }
   if (problems.length > 0) throw new DataError('items.json', problems);
   return defs;
+}
+
+const isRange = (value: unknown, min: number): value is [number, number] =>
+  Array.isArray(value) &&
+  value.length === 2 &&
+  value.every((n) => typeof n === 'number' && Number.isInteger(n) && n >= min) &&
+  (value[0] as number) <= (value[1] as number);
+
+/** Sprite da planta madura num canteiro. */
+export function cropSprite(crop: string): string {
+  return `crop_${crop}`;
+}
+
+/** Sprite da planta a crescer (igual para todas). */
+export const CROP_SPROUT_SPRITE = 'crop_sprout';
+
+/** `{ crop, growHours, yield: [mín, máx], seeds: [mín, máx] }` ou a descrição do problema. */
+function parsePlant(raw: unknown, itemIds: ReadonlySet<string>): PlantDef | string {
+  if (!isObject(raw)) return 'tem de ser { crop, growHours, yield, seeds }';
+  if (typeof raw.crop !== 'string' || !itemIds.has(raw.crop))
+    return `com fruto desconhecido ${describe(raw.crop)}`;
+  if (typeof raw.growHours !== 'number' || raw.growHours <= 0 || raw.growHours > 240)
+    return 'growHours tem de ser um número de horas entre 0 e 240';
+  if (!isRange(raw.yield, 1)) return 'yield tem de ser [mín ≥ 1, máx]';
+  if (!isRange(raw.seeds, 0)) return 'seeds tem de ser [mín ≥ 0, máx]';
+  return { crop: raw.crop, growHours: raw.growHours, yield: raw.yield, seeds: raw.seeds };
 }
 
 /** Estação de crafting colocada no mundo (fogueira, bancada…). */
@@ -541,6 +595,20 @@ export interface StructureDef {
   unlockLevel: number;
   /** Raio (px) da luz que dá à noite (fogueiras, tochas). */
   light?: number;
+  /** Canteiro da horta: planta-se uma semente, rega-se e colhe-se (sprite `<sprite>_wet` regado). */
+  farm: boolean;
+  /** Produz sozinha com o tempo (coletor de água, armadilha de caça); sprite `<sprite>_full`. */
+  produce?: ProduceDef;
+}
+
+/** O que uma peça produz sozinha: uma unidade a cada `everyHours` horas de jogo, até `max`. */
+export interface ProduceDef {
+  everyHours: number;
+  max: number;
+  /** O que dá cada unidade (min pode ser 0). */
+  drops: readonly Drop[];
+  /** Item gasto por unidade ao recolher (ex.: garrafa vazia para a água). */
+  needs?: string;
 }
 
 export type StructureDefs = Readonly<Record<string, StructureDef>>;
@@ -550,6 +618,8 @@ export function structureSpriteKeys(def: StructureDef): string[] {
   const keys = [def.sprite];
   if (def.rotatable) keys.push(`${def.sprite}_v`);
   if (def.door) keys.push(...keys.map((key) => `${key}_open`));
+  if (def.farm) keys.push(`${def.sprite}_wet`);
+  if (def.produce) keys.push(`${def.sprite}_full`);
   return keys;
 }
 
@@ -573,6 +643,8 @@ const STRUCTURE_KEYS = new Set([
   'needsFoundation',
   'unlockLevel',
   'light',
+  'farm',
+  'produce',
 ]);
 const MAX_STRUCTURE_TILES = 4;
 
@@ -644,7 +716,13 @@ export function parseStructures(
       chest: flag(id, raw, 'chest'),
       needsFoundation: flag(id, raw, 'needsFoundation'),
       unlockLevel: isPositiveInt(raw.unlockLevel) ? raw.unlockLevel : 1,
+      farm: flag(id, raw, 'farm'),
     };
+    if (raw.produce !== undefined) {
+      const produce = parseProduce(raw.produce, items);
+      if (typeof produce === 'string') problems.push(`"${id}": produce ${produce}`);
+      else def.produce = produce;
+    }
     if (raw.unlockLevel !== undefined && !isPositiveInt(raw.unlockLevel))
       problems.push(`"${id}": unlockLevel tem de ser um inteiro > 0`);
     if (raw.light !== undefined) {
@@ -669,12 +747,40 @@ export function parseStructures(
     if (def.solid && def.footprint) problems.push(`"${id}": solid e footprint são alternativos`);
     if (def.door && !def.solid) problems.push(`"${id}": uma porta tem de ser solid (quando fechada)`);
     if (def.chest && def.station) problems.push(`"${id}": não pode ser baú e estação`);
+    const roles = [def.chest, def.station !== undefined, def.door, def.farm, def.produce !== undefined];
+    if (roles.filter(Boolean).length > 1)
+      problems.push(`"${id}": só pode ter um papel (baú, estação, porta, canteiro ou produção)`);
     if ((def.rotatable || def.door) && (size.width !== 1 || size.height !== 1))
       problems.push(`"${id}": peças rodáveis e portas têm 1×1 tiles`);
     defs[id] = def;
   }
   if (problems.length > 0) throw new DataError('structures.json', problems);
   return defs;
+}
+
+/** `{ everyHours, max, drops: [[item, mín, máx]], needs? }` ou a descrição do problema. */
+function parseProduce(raw: unknown, items: ReadonlySet<string>): ProduceDef | string {
+  if (!isObject(raw)) return 'tem de ser { everyHours, max, drops, needs? }';
+  for (const key of Object.keys(raw)) {
+    if (!['everyHours', 'max', 'drops', 'needs'].includes(key)) return `com campo desconhecido "${key}"`;
+  }
+  if (typeof raw.everyHours !== 'number' || raw.everyHours <= 0 || raw.everyHours > 240)
+    return 'everyHours tem de ser um número de horas entre 0 e 240';
+  if (!isPositiveInt(raw.max) || raw.max > 20) return 'max tem de ser um inteiro entre 1 e 20';
+  if (!Array.isArray(raw.drops) || raw.drops.length === 0) return 'drops tem de ser [[item, mín, máx], …]';
+  const drops: Drop[] = [];
+  for (const entry of raw.drops as unknown[]) {
+    const [item, min, max] = Array.isArray(entry) ? (entry as unknown[]) : [];
+    if (typeof item !== 'string' || !items.has(item)) return `com item desconhecido ${describe(item)}`;
+    if (!isRange([min, max], 0) || max === 0) return `com mín/máx inválidos em ${item}`;
+    drops.push({ item, min: min as number, max: max as number });
+  }
+  const produce: ProduceDef = { everyHours: raw.everyHours, max: raw.max, drops };
+  if (raw.needs !== undefined) {
+    if (typeof raw.needs === 'string' && items.has(raw.needs)) produce.needs = raw.needs;
+    else return `needs com item desconhecido ${describe(raw.needs)}`;
+  }
+  return produce;
 }
 
 /** Comportamento: `hostile` persegue e ataca; `flee` foge do jogador (presas). */

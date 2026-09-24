@@ -1,5 +1,5 @@
 {
-  "$comment": "Peças de construção da base (CLAUDE.md §7.7), pela ordem da paleta do modo construção. layer: floor (fundação) ou top. size: [largura, altura] em tiles. solid: bloqueia os tiles inteiros; footprint: caixa sólida nos pés. rotatable: sprites <sprite> e <sprite>_v; door: também <sprite>_open. needsFoundation: só sobre fundação (ou chão da casa em ruínas).",
+  "$comment": "Peças de construção da base (CLAUDE.md §7.7), pela ordem da paleta do modo construção. layer: floor (fundação) ou top. size: [largura, altura] em tiles. solid: bloqueia os tiles inteiros; footprint: caixa sólida nos pés. rotatable: sprites <sprite> e <sprite>_v; door: também <sprite>_open. needsFoundation: só sobre fundação (ou chão da casa em ruínas). farm: canteiro da horta (sprite _wet regado). produce: produz sozinha a cada everyHours horas de jogo, até max; drops por unidade; needs = item gasto por unidade (sprite _full com algo para recolher).",
   "foundation_wood": {
     "sprite": "foundation_wood",
     "layer": "floor",
@@ -127,6 +127,53 @@
     "cost": [
       ["stone", 12],
       ["clay", 6]
+    ]
+  },
+  "garden_bed": {
+    "sprite": "garden_bed",
+    "layer": "top",
+    "farm": true,
+    "unlockLevel": 3,
+    "cost": [
+      ["wood", 4],
+      ["fiber", 2]
+    ]
+  },
+  "rain_collector": {
+    "sprite": "rain_collector",
+    "layer": "top",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "unlockLevel": 4,
+    "produce": {
+      "everyHours": 6,
+      "max": 4,
+      "drops": [["water_clean", 1, 1]],
+      "needs": "empty_bottle"
+    },
+    "cost": [
+      ["wood_plank", 4],
+      ["cloth", 3],
+      ["rope", 1]
+    ]
+  },
+  "snare": {
+    "sprite": "snare",
+    "layer": "top",
+    "unlockLevel": 3,
+    "produce": {
+      "everyHours": 10,
+      "max": 2,
+      "drops": [
+        ["raw_meat", 1, 2],
+        ["leather", 0, 1]
+      ]
+    },
+    "cost": [
+      ["wood", 2],
+      ["rope", 2]
     ]
   }
 }
