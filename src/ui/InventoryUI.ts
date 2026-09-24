@@ -407,9 +407,9 @@ export class InventoryUI {
       );
       let bx = x + small.width / 2;
       const by = y + 20;
-      if (def.type === 'consumable') {
+      if (def.type === 'consumable' || def.type === 'note') {
         add(
-          new Button(scene, bx, by, t('inv.use'), small, () => {
+          new Button(scene, bx, by, t(def.type === 'note' ? 'inv.read' : 'inv.use'), small, () => {
             this.actions.use(selected);
             this.rebuildSoon();
           }),

@@ -17,7 +17,8 @@
     "drops": [
       ["cloth", 0, 2],
       ["nails", 0, 2]
-    ]
+    ],
+    "xp": 10
   },
   "zombie_runner": {
     "sprite": "zombie_runner",
@@ -36,7 +37,8 @@
     "drops": [
       ["cloth", 0, 1],
       ["scrap_metal", 1, 2]
-    ]
+    ],
+    "xp": 12
   },
   "deer": {
     "sprite": "deer",
@@ -55,7 +57,8 @@
     "drops": [
       ["raw_meat", 2, 3],
       ["leather", 1, 1]
-    ]
+    ],
+    "xp": 6
   },
   "wolf": {
     "sprite": "wolf",
@@ -74,6 +77,7 @@
     "drops": [
       ["raw_meat", 1, 2],
       ["leather", 1, 2]
-    ]
+    ],
+    "xp": 15
   }
 }

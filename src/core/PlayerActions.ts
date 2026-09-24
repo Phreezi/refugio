@@ -27,6 +27,8 @@ export class PlayerActions {
   private readonly state: GameState;
   private readonly bus: EventBus<GameEvents>;
   private readonly items: () => ItemDefs;
+  /** Ler uma nota: aprende a receita (ligado à progressão pela Simulation). */
+  readNote: (recipe: string) => 'learned' | 'known' | 'unknown' = () => 'unknown';
 
   constructor(state: GameState, bus: EventBus<GameEvents>, items: () => ItemDefs) {
     this.state = state;
@@ -61,6 +63,18 @@ export class PlayerActions {
     const container = this.container(ref.container);
     const slot = container[ref.index];
     const def = slot ? this.items()[slot[0]] : undefined;
+    if (slot && def?.type === 'note' && def.teaches) {
+      // Nota: ensina a receita e desaparece (se já se sabia, fica).
+      const result = this.readNote(def.teaches);
+      if (result !== 'learned') {
+        this.bus.emit('note:known', { recipe: def.teaches });
+        return false;
+      }
+      slot[1] -= 1;
+      if (slot[1] === 0) container[ref.index] = null;
+      this.changed();
+      return true;
+    }
     if (!slot || def?.type !== 'consumable' || !def.effects) return false;
 
     const player = this.state.data.player;

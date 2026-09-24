@@ -39,6 +39,8 @@ export class Crafting {
   private readonly bus: EventBus<GameEvents>;
   private readonly content: () => CraftingContent;
   private readonly actions: PlayerActions;
+  /** A receita está desbloqueada (nível ou nota)? Por omissão, todas. */
+  isUnlocked: (recipe: Recipe) => boolean = () => true;
 
   constructor(
     state: GameState,
@@ -62,11 +64,13 @@ export class Crafting {
     const { recipes, items, stations } = this.content();
     const recipe = recipes.find((r) => r.id === recipeId);
     if (!recipe) return 'missing';
+    if (!this.isUnlocked(recipe)) return 'locked';
     const containers = this.actions.pickupContainers();
     let result: CraftResult;
     if (recipe.station === HANDS) {
       result = craftInstant(containers, recipe, items);
-      if (result === 'ok') this.bus.emit('craft:finished', { stationKey: HANDS, item: recipe.output });
+      if (result === 'ok')
+        this.bus.emit('craft:finished', { stationKey: HANDS, item: recipe.output, recipe: recipe.id });
     } else {
       if (!key || stationType(key) !== recipe.station) return 'missing';
       const max = stations[recipe.station]?.queue ?? 1;
@@ -135,7 +139,7 @@ export class Crafting {
       for (const recipeId of advanceStation(station, ticks, recipes, items)) {
         finished++;
         const output = recipes.find((r) => r.id === recipeId)?.output ?? recipeId;
-        this.bus.emit('craft:finished', { stationKey: key, item: output });
+        this.bus.emit('craft:finished', { stationKey: key, item: output, recipe: recipeId });
       }
     }
     if (finished > 0) this.changed();

@@ -23,7 +23,7 @@ export interface GameEvents {
   /** O jogador fez a ação contextual (para a animação de ataque/recolha). */
   'player:action': { kind: 'gather' | 'use' | 'open' | 'swing' | 'attack' };
   /** Um recurso levou um golpe (hp restante; 0 = apanhado). */
-  'resource:hit': { zoneId: string; objectId: number; hp: number; maxHp: number };
+  'resource:hit': { zoneId: string; objectId: number; resource: string; hp: number; maxHp: number };
   'resource:respawned': { zoneId: string; objectId: number };
   /** Itens ganhos num sítio do mundo (texto flutuante). */
   'item:gained': { item: string; qty: number; x: number; y: number };
@@ -49,7 +49,16 @@ export interface GameEvents {
   /** Abrir o painel de crafting de uma estação (`<tipo>_<id do objeto>`). */
   'station:open': { stationKey: string };
   /** Um craft terminou (mãos: já está no inventário; estação: à espera de ser recolhido). */
-  'craft:finished': { stationKey: string; item: string };
+  'craft:finished': { stationKey: string; item: string; recipe: string };
+  /** Um contentor sorteou loot (aberto pela primeira vez, ou depois de voltar a encher). */
+  'loot:rolled': { table: string };
+  /** XP ganho e subida de nível (com o que ficou desbloqueado). */
+  'xp:gained': { amount: number };
+  'player:levelUp': { level: number; unlocked: { recipes: string[]; structures: string[]; zones: string[] } };
+  /** Receita aprendida numa nota. */
+  'recipe:learned': { recipe: string };
+  /** Leu uma nota de uma receita que já sabia. */
+  'note:known': { recipe: string };
 }
 
 /** Emissor de eventos tipado e sem dependências do Phaser (testável com Vitest). */

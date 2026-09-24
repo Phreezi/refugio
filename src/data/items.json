@@ -273,5 +273,29 @@
     "stack": 1,
     "rarity": "uncommon",
     "slots": 10
+  },
+  "note_machete": {
+    "name": "item.note_machete",
+    "icon": "icon_note",
+    "type": "note",
+    "stack": 1,
+    "rarity": "rare",
+    "teaches": "r_machete"
+  },
+  "note_fishing_rod": {
+    "name": "item.note_fishing_rod",
+    "icon": "icon_note",
+    "type": "note",
+    "stack": 1,
+    "rarity": "uncommon",
+    "teaches": "r_fishing_rod"
+  },
+  "note_spiked_club": {
+    "name": "item.note_spiked_club",
+    "icon": "icon_note",
+    "type": "note",
+    "stack": 1,
+    "rarity": "uncommon",
+    "teaches": "r_spiked_club"
   }
 }

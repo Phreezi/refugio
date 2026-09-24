@@ -9,7 +9,8 @@
     "hp": 6,
     "tool": "axe",
     "drops": [["wood", 2, 3]],
-    "respawnSec": 1200
+    "respawnSec": 1200,
+    "xp": 3
   },
   "tree_large": {
     "sprite": "tree_large",
@@ -21,7 +22,8 @@
     "tool": "axe",
     "toolRequired": true,
     "drops": [["wood", 4, 6]],
-    "respawnSec": 1800
+    "respawnSec": 1800,
+    "xp": 6
   },
   "rock": {
     "sprite": "rock",
@@ -32,7 +34,8 @@
     "hp": 6,
     "tool": "pickaxe",
     "drops": [["stone", 2, 3]],
-    "respawnSec": 1200
+    "respawnSec": 1200,
+    "xp": 3
   },
   "bush_berries": {
     "sprite": "bush_berries",
@@ -42,13 +45,15 @@
     },
     "hp": 1,
     "drops": [["berries", 2, 4]],
-    "respawnSec": 600
+    "respawnSec": 600,
+    "xp": 1
   },
   "tall_grass": {
     "sprite": "tall_grass",
     "hp": 1,
     "drops": [["fiber", 1, 2]],
-    "respawnSec": 300
+    "respawnSec": 300,
+    "xp": 1
   },
   "iron_vein": {
     "sprite": "iron_vein",
@@ -60,7 +65,8 @@
     "tool": "pickaxe",
     "toolRequired": true,
     "drops": [["iron_ore", 2, 3]],
-    "respawnSec": 2400
+    "respawnSec": 2400,
+    "xp": 6
   },
   "clay_pit": {
     "sprite": "clay_pit",
@@ -72,6 +78,7 @@
     "tool": "pickaxe",
     "toolRequired": false,
     "drops": [["clay", 2, 3]],
-    "respawnSec": 600
+    "respawnSec": 600,
+    "xp": 2
   }
 }

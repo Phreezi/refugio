@@ -153,6 +153,18 @@ describe('save: migrações', () => {
     expect(parseSave(text).state.zones).toEqual({ zone_pine_forest: { depleted: {}, bags: [], loot: {} } });
   });
 
+  it('v6 → v7 (Fase 8): nível e XP (quem já jogava começa no nível 3), receitas aprendidas', () => {
+    const v6 = structuredClone(STATE) as unknown as { player: Record<string, unknown>; unlocks?: unknown };
+    delete v6.player.level;
+    delete v6.player.xp;
+    delete v6.unlocks;
+    const stateJson = JSON.stringify(v6);
+    const text = `{"version":6,"timestamp":4,"checksum":"${checksum(`6|4|${stateJson}`)}","state":${stateJson}}`;
+    const { state } = parseSave(text);
+    expect(state.player).toMatchObject({ level: 3, xp: 0 });
+    expect(state.unlocks).toEqual({ recipes: [] });
+  });
+
   it('valida as peças construídas', () => {
     const bad = structuredClone(STATE);
     bad.base.structures.push([1, 'wall_wood', 3, 4, 2, 0]);

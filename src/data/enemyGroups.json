@@ -4,5 +4,9 @@
   "walker": [["zombie_walker", 1, 1]],
   "runners": [["zombie_runner", 1, 2]],
   "deer": [["deer", 1, 2]],
-  "wolf": [["wolf", 1, 1]]
+  "wolf": [["wolf", 1, 1]],
+  "wolf_night": {
+    "night": true,
+    "members": [["wolf", 1, 2]]
+  }
 }

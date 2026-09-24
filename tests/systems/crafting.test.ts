@@ -193,6 +193,7 @@ describe('Fase 4 — aceitação: madeira → machado → cortar mais depressa �
       () => content.items,
       () => content,
       () => content,
+      () => content,
     );
     const collision = CollisionWorld.fromZone(map, content.resources, content.props, content.stations);
     sim.setZone({ zoneId: 'z', map, collision, ...content });

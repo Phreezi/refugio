@@ -61,6 +61,8 @@ for (const [group, x, y] of [
   ['walker', 18, 12],
   ['deer', 44, 56],
   ['deer', 56, 26],
+  ['wolf_night', 52, 54],
+  ['wolf_night', 58, 18],
 ] as const) {
   m.point(`enemy_spawn:${group}`, x, y);
 }

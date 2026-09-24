@@ -1307,6 +1307,42 @@ const FOOD_ICONS: Sprite[] = [
   },
 ];
 
+/** Fase 8: tocha (luz à noite) e ícone das notas de receita. */
+const PHASE8: Sprite[] = [
+  {
+    file: 'torch',
+    width: 16,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 22.5, 3, 1);
+      img.fill(7, 9, 2, 14, c('bark'));
+      img.fill(7, 9, 1, 14, c('wood'));
+      img.fill(6, 8, 4, 2, c('bark_dark'));
+      img.ellipse(8, 5, 2.5, 3.5, c('orange'));
+      img.ellipse(8, 6, 1.5, 2, c('amber'));
+      img.set(8, 6, c('gold'));
+      img.set(8, 1, c('orange'));
+    },
+  },
+];
+
+const NOTE_ICONS: Sprite[] = [
+  {
+    file: 'note',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(3, 2, 10, 12, c('parchment'));
+      img.fill(3, 2, 10, 1, c('cream'));
+      for (const y of [5, 7, 9]) img.fill(5, y, 6, 1, c('stone'));
+      img.fill(5, 11, 3, 1, c('stone'));
+      img.fill(10, 10, 2, 3, c('red')); // selo
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -1316,9 +1352,11 @@ for (const [dir, list] of [
   [outDir, STRUCTURES],
   [outDir, CREATURES],
   [outDir, ZONE_OBJECTS],
+  [outDir, PHASE8],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
   [iconDir, FOOD_ICONS],
+  [iconDir, NOTE_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -1329,7 +1367,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

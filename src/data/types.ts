@@ -34,6 +34,8 @@ export interface ResourceDef extends WorldObjectDef {
   drops: readonly Drop[];
   /** Segundos de jogo até reaparecer depois de recolhido. */
   respawnSec: number;
+  /** XP ao apanhar (omisso = `xpGather`). */
+  xp?: number;
 }
 
 export type ResourceDefs = Readonly<Record<string, ResourceDef>>;
@@ -48,7 +50,7 @@ export interface PropDef extends WorldObjectDef {
 /** Obstáculos e decoração (`props.json`): troncos, caixotes, carros abandonados… */
 export type PropDefs = Readonly<Record<string, PropDef>>;
 
-export type ItemType = 'resource' | 'consumable' | 'tool' | 'weapon' | 'armor' | 'backpack' | 'key';
+export type ItemType = 'resource' | 'consumable' | 'tool' | 'weapon' | 'armor' | 'backpack' | 'key' | 'note';
 const ITEM_TYPES: readonly ItemType[] = [
   'resource',
   'consumable',
@@ -57,6 +59,7 @@ const ITEM_TYPES: readonly ItemType[] = [
   'armor',
   'backpack',
   'key',
+  'note',
 ];
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
 const RARITIES: readonly Rarity[] = ['common', 'uncommon', 'rare', 'epic'];
@@ -93,6 +96,8 @@ export interface ItemDef {
   attackSec?: number;
   /** Armas: alcance do golpe em px (omisso = `weaponReachPx`). */
   reach?: number;
+  /** Notas: receita que ensina ao ler (desbloqueio alternativo, §11 Fase 8). */
+  teaches?: string;
   /** Slots extra (mochilas). */
   slots?: number;
 }
@@ -171,7 +176,7 @@ export function parseResources(
     input,
     spriteKeys,
     'resources.json',
-    ['hp', 'tool', 'toolRequired', 'drops', 'respawnSec'],
+    ['hp', 'tool', 'toolRequired', 'drops', 'respawnSec', 'xp'],
     (id, raw, problems) => {
       if (!isPositiveInt(raw.hp))
         problems.push(`"${id}": hp tem de ser um inteiro > 0 (${describe(raw.hp)})`);
@@ -206,6 +211,7 @@ export function parseResources(
         toolRequired,
         drops,
         respawnSec: isPositiveInt(raw.respawnSec) ? raw.respawnSec : 1,
+        ...optionalXp(id, raw, problems),
       };
     },
   );
@@ -269,6 +275,7 @@ const ITEM_KEYS = new Set([
   'equip',
   'attackSec',
   'reach',
+  'teaches',
 ]);
 const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
 const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach'] as const;
@@ -343,6 +350,12 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
     }
     if (def.type === 'armor' && raw.equip === undefined) problems.push(`"${id}": armadura sem equip`);
     if (raw.equip !== undefined && def.type !== 'armor') problems.push(`"${id}": só armaduras têm equip`);
+    if (raw.teaches !== undefined) {
+      if (typeof raw.teaches === 'string' && raw.teaches !== '') def.teaches = raw.teaches;
+      else problems.push(`"${id}": teaches tem de ser o id de uma receita`);
+    }
+    if ((def.type === 'note') !== (def.teaches !== undefined))
+      problems.push(`"${id}": as notas (type note) e só elas têm teaches`);
     if (raw.attackSec !== undefined) {
       if (typeof raw.attackSec === 'number' && raw.attackSec > 0 && raw.attackSec <= 5)
         def.attackSec = raw.attackSec;
@@ -395,6 +408,8 @@ export interface Recipe {
   /** 0 nas mãos (instantâneo); 5–60 s nas estações (tempo de jogo). */
   timeSec: number;
   unlockLevel: number;
+  /** XP ao fabricar (omisso = calculado pelo tempo). */
+  xp?: number;
 }
 
 export type Recipes = readonly Recipe[];
@@ -419,6 +434,7 @@ const RECIPE_KEYS = new Set([
   'qty',
   'timeSec',
   'unlockLevel',
+  'xp',
 ]);
 
 /**
@@ -485,6 +501,7 @@ export function parseRecipes(
       qty: isPositiveInt(raw.qty) ? raw.qty : 1,
       timeSec: typeof timeSec === 'number' ? timeSec : 0,
       unlockLevel: isPositiveInt(raw.unlockLevel) ? raw.unlockLevel : 1,
+      ...optionalXp(where, raw, problems),
     });
   }
   if (problems.length > 0) throw new DataError('recipes.json', problems);
@@ -520,6 +537,10 @@ export interface StructureDef {
   chest: boolean;
   /** Só pode ser colocada sobre fundação (estações e baús, §7.7). */
   needsFoundation: boolean;
+  /** Nível do jogador para se poder construir. */
+  unlockLevel: number;
+  /** Raio (px) da luz que dá à noite (fogueiras, tochas). */
+  light?: number;
 }
 
 export type StructureDefs = Readonly<Record<string, StructureDef>>;
@@ -550,6 +571,8 @@ const STRUCTURE_KEYS = new Set([
   'station',
   'chest',
   'needsFoundation',
+  'unlockLevel',
+  'light',
 ]);
 const MAX_STRUCTURE_TILES = 4;
 
@@ -620,7 +643,14 @@ export function parseStructures(
       door: flag(id, raw, 'door'),
       chest: flag(id, raw, 'chest'),
       needsFoundation: flag(id, raw, 'needsFoundation'),
+      unlockLevel: isPositiveInt(raw.unlockLevel) ? raw.unlockLevel : 1,
     };
+    if (raw.unlockLevel !== undefined && !isPositiveInt(raw.unlockLevel))
+      problems.push(`"${id}": unlockLevel tem de ser um inteiro > 0`);
+    if (raw.light !== undefined) {
+      if (isPositiveInt(raw.light) && raw.light <= 160) def.light = raw.light;
+      else problems.push(`"${id}": light tem de ser um raio (px) entre 1 e 160`);
+    }
     if (raw.footprint !== undefined) {
       const fp = raw.footprint;
       if (isObject(fp) && isSize(fp.width) && isSize(fp.height))
@@ -671,6 +701,8 @@ export interface EnemyDef {
   attackSec: number;
   /** Drops ao morrer: quantidade entre min e max (min pode ser 0). */
   drops: readonly Drop[];
+  /** XP ao derrotar. */
+  xp: number;
 }
 
 export type EnemyDefs = Readonly<Record<string, EnemyDef>>;
@@ -687,6 +719,7 @@ const ENEMY_KEYS = new Set([
   'attackRange',
   'attackSec',
   'drops',
+  'xp',
 ]);
 
 function isNonNegativeInt(value: unknown): value is number {
@@ -753,6 +786,7 @@ export function parseEnemies(
       attackRange: num('attackRange', positive, 'um número > 0'),
       attackSec: num('attackSec', positive, 'um número > 0'),
       drops,
+      xp: raw.xp === undefined ? 0 : num('xp', isNonNegativeInt, 'um inteiro ≥ 0'),
     };
     const def = defs[id];
     if (def.leashRadius < def.detectRadius) problems.push(`"${id}": leashRadius tem de ser ≥ detectRadius`);
@@ -761,8 +795,14 @@ export function parseEnemies(
   return defs;
 }
 
-/** Grupo de inimigos de um ponto `enemy_spawn:<grupo>`: [inimigo, mín, máx] de cada tipo. */
-export type EnemyGroups = Readonly<Record<string, readonly { enemy: string; min: number; max: number }[]>>;
+export interface EnemyGroup {
+  members: readonly { enemy: string; min: number; max: number }[];
+  /** Só aparece de noite (ex.: lobos no lago). */
+  night: boolean;
+}
+
+/** Grupos dos pontos `enemy_spawn:<grupo>`: [[inimigo, mín, máx], …] ou { night, members }. */
+export type EnemyGroups = Readonly<Record<string, EnemyGroup>>;
 
 /** Valida `enemyGroups.json`. */
 export function parseEnemyGroups(input: unknown, enemyIds: Iterable<string>): EnemyGroups {
@@ -770,22 +810,25 @@ export function parseEnemyGroups(input: unknown, enemyIds: Iterable<string>): En
     throw new DataError('enemyGroups.json', ['tem de ser um objeto id → [[inimigo, mín, máx]]']);
   const enemies = new Set(enemyIds);
   const problems: string[] = [];
-  const groups: Record<string, { enemy: string; min: number; max: number }[]> = {};
-  for (const [id, raw] of Object.entries(input)) {
+  const groups: Record<string, EnemyGroup> = {};
+  for (const [id, value] of Object.entries(input)) {
     if (id === '$comment') continue;
     if (!ID_PATTERN.test(id)) problems.push(`"${id}": o id tem de estar em snake_case`);
+    const raw = isObject(value) ? value.members : value;
+    const night = isObject(value) && value.night === true;
     if (!Array.isArray(raw) || raw.length === 0) {
-      problems.push(`"${id}": tem de ser uma lista [[inimigo, mín, máx], …]`);
+      problems.push(`"${id}": tem de ser uma lista [[inimigo, mín, máx], …] (ou { night, members })`);
       continue;
     }
-    groups[id] = [];
+    const members: { enemy: string; min: number; max: number }[] = [];
+    groups[id] = { members, night };
     for (const entry of raw as unknown[]) {
       const [enemy, min, max] = Array.isArray(entry) ? (entry as unknown[]) : [];
       if (typeof enemy !== 'string' || !enemies.has(enemy))
         problems.push(`"${id}": inimigo desconhecido ${describe(enemy)}`);
       else if (!isPositiveInt(min) || !isPositiveInt(max) || max < min)
         problems.push(`"${id}": ${enemy} com mín/máx inválidos`);
-      else groups[id].push({ enemy, min, max });
+      else members.push({ enemy, min, max });
     }
   }
   if (problems.length > 0) throw new DataError('enemyGroups.json', problems);
@@ -806,8 +849,10 @@ export interface ZoneDef {
   travelCost: { hunger: number; thirst: number };
   /** Dias de jogo até os contentores voltarem a ter loot. */
   respawnDays: number;
-  /** Nível do jogador para desbloquear (a verificar a partir da Fase 8). */
+  /** Nível do jogador para desbloquear. */
   unlockLevel: number;
+  /** Mais inimigos à noite (§7.11): multiplica as quantidades dos grupos. */
+  nightEnemyMultiplier: number;
 }
 
 export type ZoneDefs = Readonly<Record<string, ZoneDef>>;
@@ -825,7 +870,18 @@ export function parseZones(input: unknown): ZoneDefs {
       continue;
     }
     for (const key of Object.keys(raw)) {
-      if (!['name', 'map', 'danger', 'worldMapPos', 'travelCost', 'respawnDays', 'unlockLevel'].includes(key))
+      if (
+        ![
+          'name',
+          'map',
+          'danger',
+          'worldMapPos',
+          'travelCost',
+          'respawnDays',
+          'unlockLevel',
+          'nightEnemyMultiplier',
+        ].includes(key)
+      )
         problems.push(`"${id}": campo desconhecido "${key}"`);
     }
     const name = typeof raw.name === 'string' ? raw.name : '';
@@ -859,7 +915,16 @@ export function parseZones(input: unknown): ZoneDefs {
       },
       respawnDays: typeof respawnDays === 'number' && respawnDays > 0 ? respawnDays : 1,
       unlockLevel: isPositiveInt(unlockLevel) ? unlockLevel : 1,
+      nightEnemyMultiplier:
+        typeof raw.nightEnemyMultiplier === 'number' && raw.nightEnemyMultiplier > 0
+          ? raw.nightEnemyMultiplier
+          : 1,
     };
+    if (
+      raw.nightEnemyMultiplier !== undefined &&
+      !(typeof raw.nightEnemyMultiplier === 'number' && raw.nightEnemyMultiplier > 0)
+    )
+      problems.push(`"${id}": nightEnemyMultiplier tem de ser > 0`);
   }
   if (problems.length > 0) throw new DataError('zones.json', problems);
   return defs;
@@ -928,4 +993,12 @@ export function parseLootTables(
       };
     },
   );
+}
+
+/** Campo `xp` opcional (inteiro ≥ 0). */
+function optionalXp(where: string, raw: Record<string, unknown>, problems: string[]): { xp?: number } {
+  if (raw.xp === undefined) return {};
+  if (typeof raw.xp === 'number' && Number.isInteger(raw.xp) && raw.xp >= 0) return { xp: raw.xp };
+  problems.push(`${where}: xp tem de ser um inteiro ≥ 0`);
+  return {};
 }

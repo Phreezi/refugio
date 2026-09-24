@@ -45,6 +45,8 @@ export class Building {
   private zone: ZoneContext | null = null;
   /** Recursos do mapa por tile: onde estão por apanhar não se constrói. */
   private resourceTiles = new Map<number, number[]>();
+  /** A peça está desbloqueada (nível)? Por omissão, todas. */
+  isUnlocked: (id: string) => boolean = () => true;
   /** Peças colocadas nesta sessão, para o Desfazer (não se grava). */
   private recent: { uid: number; tick: number }[] = [];
 
@@ -125,6 +127,7 @@ export class Building {
     const grid = this.grid;
     const def = this.def(id);
     if (!grid || !def) return 'unknown';
+    if (!this.isUnlocked(id)) return 'locked';
     const depleted = zoneState(this.state.data, BASE_ZONE_ID).depleted;
     const resourceHere = (tile: number): boolean =>
       this.resourceTiles.get(tile)?.some((objectId) => depleted[String(objectId)] === undefined) ?? false;

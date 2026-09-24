@@ -155,6 +155,8 @@ refugio/
 │   │   ├── Building.ts       # construção: colocar, desfazer, demolir, portas (§7.7)
 │   │   ├── Combat.ts         # inimigos da zona, golpes, dano/armadura, mochilas no chão (§7.8–§7.12)
 │   │   ├── Fishing.ts        # pesca (mini-jogo de 1 botão) e encher garrafas no lago
+│   │   ├── Progression.ts    # XP (ouve os eventos), níveis, desbloqueios, notas de receitas
+│   │   ├── DayNight.ts       # hora do dia, escuridão, é noite?
 │   │   ├── offline.ts        # tempo offline (§7.6)
 │   │   ├── Clock.ts          # tempo de jogo, dia/noite
 │   │   └── Rng.ts            # RNG com seed
@@ -169,10 +171,10 @@ refugio/
 │   │   ├── combat/           # arma/punhos, armadura, desgaste, drops de inimigos
 │   │   ├── loot/             # sorteio do loot (pesos, quantidades, "pity")
 │   │   ├── ai/               # IA dos inimigos (idle/wander/chase/windup/recover/return; flee)
-│   │   ├── progression/
+│   │   ├── progression/      # curva de XP, subir de nível
 │   │   └── travel/           # ponto de chegada a uma zona, custo da viagem
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
-│   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, BuildUI (+ buildMode), FishingUI, gameSpeed, uiState, fileTransfer, fatalError
+│   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, BuildUI (+ buildMode), FishingUI, LevelUpUI, gameSpeed, uiState, fileTransfer, fatalError
 │   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
 │   ├── save/
 │   │   ├── index.ts          # instâncias (saves, autosave) + gravar ao esconder a página
@@ -322,7 +324,9 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 - Fome desce 1 ponto a cada 18 s de jogo; sede 1 ponto a cada 12 s (valores em `balance.json`).
 - Fome ou sede a 0 → perde 1 de vida a cada 3 s (nunca instantâneo).
 - Regeneração: +1 vida a cada 5 s se fome e sede > 50%.
-- Nível do jogador (XP por recolher, craftar, matar) → desbloqueia receitas. Nível máximo v1: 30.
+- Nível do jogador (XP por recolher, craftar, matar, construir, abrir contentores, pescar) → desbloqueia receitas, peças de construção e zonas (`unlockLevel` em recipes/structures/zones). Nível máximo v1: 30. XP para passar do nível n: `xpCurve.base × growth^(n−1)` (50, 63, 78…; ~1300 XP até ao nível 10). Valores: `xp` em resources/enemies/recipes (omisso: `xpGather`; receitas pelo tempo) e `xpBuild`, `xpLoot`, `xpFish` em `balance.json`.
+- **Notas** (itens `type: "note"`, campo `teaches`) encontradas em contentores ensinam uma receita antes do nível ("Ler" na mochila); ficam em `unlocks.recipes`.
+- Ao subir de nível aparece "Subiste de nível!" no topo, com o que ficou desbloqueado (não pausa o jogo). O HUD mostra o nível e uma barra de XP.
 - Movimento 8 direções. Velocidade base 80 px/s; mais lento com inventário > 90% cheio (opcional).
 
 ### 7.2 Controlos
@@ -429,9 +433,9 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 
 ### 7.11 Dia e noite
 
-- Ciclo de 20 min reais. Noite = 25% do ciclo.
-- À noite: mais zombies nas zonas, visão reduzida (overlay escuro + luz à volta do jogador/tochas).
-- Na base: fogueiras e tochas iluminam; sem ataques à noite a menos que "Hordas" esteja ativo.
+- Ciclo de 20 min reais. Noite = 25% do ciclo, centrada na meia-noite (21h–3h), com 1 h de crepúsculo e de madrugada (`core/DayNight.ts`). Escuridão máxima `nightDarkness`.
+- À noite: mais zombies nas zonas (`nightEnemyMultiplier` da zona; grupos `{ "night": true }` só aparecem de noite, ex.: lobos no lago), avaliado ao entrar na zona; visão reduzida (véu escuro numa RenderTexture com círculos de luz em degraus à volta do jogador — `playerLightPx` — e das peças com `light`).
+- Na base: fogueiras e tochas (peça `torch`, sem fundação) iluminam; sem ataques à noite a menos que "Hordas" esteja ativo.
 
 ### 7.12 Morte
 
@@ -455,7 +459,7 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 
 - Ecrã próprio (`WorldMapScene`) com a base ao centro e zonas à volta. Abre-se ao pisar uma saída `exit` (sem destino); o tempo de jogo fica parado enquanto está aberto; "Voltar" regressa pela mesma saída.
 - Viajar custa comida e água (`zones.json` → `travelCost`, valores baixos; o Pinhal é gratuito). Não se viaja se isso deixasse a fome ou a sede a 0.
-- Zonas bloqueadas mostram cadeado + requisito (nível do jogador ou item, ex.: "precisa de mapa da estrada"). *(Até haver níveis — Fase 8 — o nível pedido aparece só como informação e todas as zonas estão abertas.)*
+- Zonas bloqueadas (nível abaixo de `unlockLevel`) aparecem a cinzento com o nível pedido e não se pode viajar para lá (a zona onde se está fica sempre acessível).
 - Ícones de estado: zona segura/perigosa, recursos disponíveis, mochila caída, evento ativo.
 - Cada zona tem **nível de perigo** T1–T4 (cor verde, amarelo, laranja, vermelho).
 
@@ -780,11 +784,11 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** razão para continuar a jogar.
 
-- [ ] Ciclo dia/noite com iluminação (overlay + luzes).
-- [ ] Mais inimigos à noite; tochas e fogueiras iluminam.
-- [ ] XP e níveis; receitas e zonas desbloqueadas por nível.
-- [ ] Ecrã "Subiste de nível!" com lista do que desbloqueou.
-- [ ] Notas/receitas encontradas em loot (desbloqueio alternativo).
+- [x] Ciclo dia/noite com iluminação (overlay + luzes).
+- [x] Mais inimigos à noite; tochas e fogueiras iluminam.
+- [x] XP e níveis; receitas, peças e zonas desbloqueadas por nível.
+- [x] Ecrã "Subiste de nível!" com lista do que desbloqueou.
+- [x] Notas/receitas encontradas em loot (desbloqueio alternativo).
 - [ ] Zonas T2: **Estrada e Bomba de Gasolina**, **Aldeia Deserta**, **Floresta Profunda**.
 - [ ] Novos inimigos: bloated, lobos, javalis.
 - [ ] Fornalha, ferro, ferramentas de ferro, tier de pedra nas estruturas.
@@ -989,3 +993,7 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Save v6: `zones.<zona>.loot` | Migração v5 → v6 com teste |
 | 2026-09-24 | Pesca: mini-jogo de 1 botão (marcador que vai e volta, zona verde aleatória); o botão de ação normal "puxa" | Funciona igual com teclado, rato e toque; sem cana, o cais serve para encher garrafas |
 | 2026-09-24 | Desbloqueio das zonas por nível adiado para a Fase 8 | Ainda não há níveis: bloquear a Quinta (nível 2) e o Lago (nível 3) deixava-os inacessíveis |
+| 2026-09-24 | Save v7: `player.level`, `player.xp`, `unlocks.recipes`; saves antigos começam no nível 3 | A Quinta (nível 2) e o Lago (nível 3), que já se podiam visitar, continuam abertos |
+| 2026-09-24 | XP atribuída pela `Progression` a ouvir os eventos (recurso apanhado, inimigo derrotado, craft acabado, peça colocada, loot sorteado, peixe) | Os sistemas não precisam de saber da progressão; os valores vêm dos JSON e do balance |
+| 2026-09-24 | "Subiste de nível!" não pausa o jogo e fecha sozinho | O jogo nunca pausa (inimigos continuam); um painel modal podia custar vidas |
+| 2026-09-24 | Noite como RenderTexture escura com luzes "apagadas" (stamp com blend ERASE), em degraus | Pixel art (sem gradientes suaves), barato, e funciona com qualquer zoom |

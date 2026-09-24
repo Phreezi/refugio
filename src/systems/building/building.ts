@@ -14,6 +14,7 @@ export type StructureRecord = [uid: number, id: string, tx: number, ty: number, 
 /** Porque é que uma peça não pode ser colocada (ou demolida) ali. */
 export type BuildProblem =
   | 'unknown'
+  | 'locked'
   | 'out_of_bounds'
   | 'blocked'
   | 'occupied'

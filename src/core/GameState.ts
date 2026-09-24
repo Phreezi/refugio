@@ -24,6 +24,9 @@ export interface PlayerState {
   hotbar: Container;
   /** Equipamento, pela ordem de EQUIP_SLOTS (arma, cabeça, corpo, pernas, pés, mochila). */
   equipment: Container;
+  /** Nível (1–maxLevel) e XP dentro do nível (CLAUDE.md §7.1). */
+  level: number;
+  xp: number;
 }
 
 export interface WorldState {
@@ -72,6 +75,8 @@ export interface GameStateData {
   zones: Record<string, ZoneState>;
   /** Filas e saídas das estações de crafting, pela chave `<tipo>_<id do objeto>` (§10.5). */
   stations: Record<string, StationState>;
+  /** Receitas aprendidas em notas (antes do nível que as desbloqueia). */
+  unlocks: { recipes: string[] };
 }
 
 /** Baú da base num jogo novo: mantimentos para os primeiros minutos (e testar a fogueira). */
@@ -98,11 +103,14 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       inventory: createContainer(BALANCE.inventorySlots),
       hotbar,
       equipment: createContainer(EQUIP_SLOTS.length),
+      level: 1,
+      xp: 0,
     },
     world: { tick: 0, rng: seed >>> 0 },
     base: { chests: { [STARTING_CHEST_ID]: startingChest() }, structures: [], nextStructureId: 1 },
     zones: {},
     stations: {},
+    unlocks: { recipes: [] },
   };
 }
 

@@ -37,6 +37,7 @@ function setup(data?: GameStateData, map: ZoneMap = MAP) {
   const state = new GameState();
   if (data) state.load(data);
   else state.newGame(feetAt(9, 9), 7);
+  state.data.player.level = 10; // peças desbloqueadas (os bloqueios têm teste próprio)
   const bus = new EventBus<GameEvents>();
   const events: string[] = [];
   bus.on('structure:placed', ({ uid }) => events.push(`placed:${String(uid)}`));
@@ -48,6 +49,7 @@ function setup(data?: GameStateData, map: ZoneMap = MAP) {
     state,
     bus,
     () => content.items,
+    () => content,
     () => content,
     () => content,
   );
