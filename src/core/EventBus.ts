@@ -9,6 +9,8 @@ export interface GameEvents {
   'game:started': { zoneId: string };
   /** A lógica avançou um tick de passo fixo. */
   'world:tick': { tick: number };
+  /** A vida chegou a 0; o jogador já reapareceu na base (CLAUDE.md §7.12). */
+  'player:died': { zoneId: string };
 }
 
 /** Emissor de eventos tipado e sem dependências do Phaser (testável com Vitest). */

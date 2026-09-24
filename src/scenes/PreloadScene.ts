@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import type { AssetManifest } from '../assets/manifest';
-import { PALETTE, paletteNumber } from '../assets/palette';
+import { paletteNumber } from '../assets/palette';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
 import { BASE_MAP_FILE, BASE_MAP_KEY, TILE_SIZE } from '../config';
 import { BASE_ZONE_ID } from '../core/GameState';
 import resourcesJson from '../data/resources.json';
 import { parseResources } from '../data/types';
+import { getView, setupFixedCamera } from '../display/view';
 import { t } from '../i18n';
+import { Label } from '../ui/text';
 import { content } from '../world/content';
 import { BASE_TILES, BASE_TILESET_NAME } from '../world/tileset';
 import { parseZoneMap } from '../world/zoneMap';
@@ -36,16 +38,18 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   preload(): void {
-    const { width, height } = this.scale;
+    setupFixedCamera(this.cameras.main);
+    const { width, height } = getView();
     const x = Math.round((width - BAR_WIDTH) / 2);
     const y = Math.round(height / 2);
-    this.add
-      .text(Math.round(width / 2), y - 16, t('boot.loading'), {
-        fontFamily: 'monospace',
-        fontSize: 8,
-        color: PALETTE.parchment,
-      })
-      .setOrigin(0.5, 0);
+    new Label(
+      this,
+      Math.round(width / 2),
+      y - 16,
+      t('boot.loading'),
+      { size: 8, color: 'parchment' },
+      [0.5, 0],
+    );
     this.add.rectangle(x, y, BAR_WIDTH, BAR_HEIGHT, paletteNumber('shadow')).setOrigin(0);
     const bar = this.add.rectangle(x, y, 0, BAR_HEIGHT, paletteNumber('amber')).setOrigin(0);
     this.load.on(Phaser.Loader.Events.PROGRESS, (progress: number) => {

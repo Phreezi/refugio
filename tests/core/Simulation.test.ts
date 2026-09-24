@@ -18,7 +18,7 @@ function setup() {
   const bus = new EventBus<GameEvents>();
   const ticks: number[] = [];
   bus.on('world:tick', ({ tick }) => ticks.push(tick));
-  return { state, sim: new Simulation(state, bus), ticks };
+  return { state, sim: new Simulation(state, bus), ticks, bus };
 }
 
 describe('Simulation', () => {
@@ -93,5 +93,26 @@ describe('Simulation', () => {
     expect(sim.previousPlayerPosition).toEqual({ x: state.data.player.x, y: 40 });
     sim.update(FIXED_STEP_MS);
     expect(sim.playerMoved).toBe(false);
+  });
+});
+
+describe('Simulation: sobrevivência e morte', () => {
+  it('a fome desce com o tempo de jogo', () => {
+    const { state, sim } = setup();
+    for (let i = 0; i < 360; i++) sim.update(FIXED_STEP_MS); // 18 s
+    expect(state.data.player.hunger).toBe(99);
+    expect(state.dirty).toBe(true);
+  });
+
+  it('ao morrer reaparece no ponto de respawn, com 50% de vida, e emite player:died', () => {
+    const { state, sim, bus } = setup();
+    const died: string[] = [];
+    bus.on('player:died', ({ zoneId }) => died.push(zoneId));
+    sim.setRespawnPoint({ x: 100, y: 120 });
+    Object.assign(state.data.player, { hp: 1, hunger: 0, thirst: 0, x: 10, y: 10 });
+    for (let i = 0; i < 60; i++) sim.update(FIXED_STEP_MS); // 3 s
+    expect(died).toEqual(['zone_base']);
+    expect(state.data.player).toMatchObject({ hp: 50, hunger: 50, thirst: 50, x: 100, y: 120 });
+    expect(sim.previousPlayerPosition).toEqual({ x: 100, y: 120 });
   });
 });

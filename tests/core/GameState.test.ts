@@ -7,7 +7,7 @@ describe('GameState', () => {
   it('um jogo novo começa na base, no ponto de spawn, virado para baixo, no tick 0', () => {
     const state = createNewGameState(SPAWN);
     expect(state).toEqual({
-      player: { x: 392, y: 392, facing: 'down', zoneId: BASE_ZONE_ID },
+      player: { x: 392, y: 392, facing: 'down', zoneId: BASE_ZONE_ID, hp: 100, hunger: 100, thirst: 100 },
       world: { tick: 0 },
     });
   });
@@ -39,5 +39,18 @@ describe('GameState', () => {
     expect(gs.data.world.tick).toBe(0);
     gs.clear();
     expect(gs.hasGame).toBe(false);
+  });
+
+  it('dirty: jogo novo tem alterações; load() e markSaved() limpam; markDirty() volta a marcar', () => {
+    const gs = new GameState();
+    expect(gs.dirty).toBe(false);
+    const data = gs.newGame(SPAWN);
+    expect(gs.dirty).toBe(true);
+    gs.markSaved();
+    expect(gs.dirty).toBe(false);
+    gs.markDirty();
+    expect(gs.dirty).toBe(true);
+    gs.load(data);
+    expect(gs.dirty).toBe(false);
   });
 });

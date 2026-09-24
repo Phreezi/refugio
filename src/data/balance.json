@@ -1,11 +1,14 @@
 {
   "dayLengthSec": 1200,
+  "dayStartHour": 6,
   "nightFraction": 0.25,
+  "statMax": 100,
   "hungerDecaySec": 18,
   "thirstDecaySec": 12,
   "starvationDamageEverySec": 3,
   "regenEverySec": 5,
   "regenThreshold": 50,
+  "lowStatPct": 30,
   "playerSpeed": 80,
   "sneakMultiplier": 0.5,
   "autosaveSec": 15,
@@ -15,5 +18,8 @@
   "demolishRefundPct": 50,
   "hordeEveryDays": 3,
   "maxArmorReductionPct": 60,
-  "xpCurve": { "base": 50, "growth": 1.25 }
+  "xpCurve": {
+    "base": 50,
+    "growth": 1.25
+  }
 }

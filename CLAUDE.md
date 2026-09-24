@@ -91,10 +91,11 @@ Base (casa) → escolher zona no mapa-mundo → viajar (custa um pouco de comida
 
 - Tamanho de tile: **16×16 px**.
 - Personagens: **16×32 px** (estilo Stardew).
-- Resolução interna **adaptável ao ecrã**, escalada por inteiros (×2, ×3, ×4…) com `pixelArt: true` e `roundPixels: true`: escolhe-se o zoom inteiro (em píxeis do dispositivo) cuja altura de jogo fica mais perto de **400 px** (≈ 25 tiles; **320 px** em ecrãs táteis), e a largura enche o ecrã (proporção entre 4:3 e 21:9; fora disso, barras). Ex.: 1920×1080 → 640×360 ×3; janela 1600×830 → 800×415 ×2; telemóvel 2400×1080 físicos → 800×360 ×3. Mínimo 240 px de altura (abaixo disso, zoom fracionário). Valores em `DISPLAY` (`src/config.ts`).
-  - Implementação (`src/display/`): o Phaser 4 não tem modo de escala inteira nem usa o `devicePixelRatio`. Usa-se `Scale.NONE` + `scale.resize(w, h)` (resolução) + `scale.setZoom(zoomDispositivo / dpr)`, com a posição do canvas alinhada a píxeis físicos. Assim cada píxel de jogo ocupa exatamente N×N píxeis reais, também com DPR 1,25 ou 2,625.
-  - Consequência: **nenhuma cena pode assumir um tamanho fixo**. Usar `this.scale.width/height` e reagir a `Phaser.Scale.Events.RESIZE` (removendo o listener no SHUTDOWN).
-  - A câmara fica **sempre com zoom 1** (zoom ≠ 1 desliga o arredondamento ao píxel).
+- Resolução **adaptável ao ecrã** com escala inteira (×2, ×3, ×4…) e `pixelArt: true`: escolhe-se o zoom inteiro (píxeis do dispositivo por píxel de jogo) cuja altura de jogo fica mais perto de **270 px** (≈ 17 tiles, o "zoom" estilo Stardew), e a largura enche o ecrã (proporção entre 4:3 e 21:9; fora disso, barras). A vista tem sempre dimensões **pares**. Ex.: 1920×1080 → 480×270 ×4; janela 1530×790 → 510×262 ×3. Mínimo 216 px (abaixo disso, zoom fracionário). Valores em `DISPLAY` (`src/config.ts`).
+  - O **canvas tem a resolução do dispositivo** e cada câmara amplia o mundo pelo zoom inteiro (`src/display/view.ts`: `getView()`, `setupFixedCamera()`). Assim a pixel art fica exata e o **texto é desenhado à resolução real** (nítido; usar sempre `Label` de `src/ui/text.ts`).
+  - Implementação (`src/display/`): `Scale.NONE` + `scale.resize(canvas)` + `scale.setZoom(1 / dpr)`, com a posição do canvas alinhada a píxeis físicos (também com DPR 1,25 ou 2,625).
+  - Com zoom na câmara o Phaser **não arredonda** posições: tudo o que se desenha tem de estar em coordenadas **inteiras** de jogo (o jogador interpolado é arredondado em `BaseScene`).
+  - **Nenhuma cena pode assumir um tamanho fixo**: usar `getView()` (não `this.scale.width`, que está em píxeis do dispositivo) e reagir a `Phaser.Scale.Events.RESIZE` (removendo o listener no SHUTDOWN). Ponteiros: converter com `camera.getWorldPoint`.
 - Em mobile retrato: mostrar aviso "roda o ecrã" (o jogo é só landscape).
 - 60 FPS alvo; lógica de jogo com passo fixo (ver 5.2).
 
@@ -131,7 +132,7 @@ refugio/
 │   │   ├── palette.json/.ts  # paleta de 32 cores (fonte de verdade)
 │   │   ├── characterSheet.ts # layout das spritesheets de personagem + desenho do placeholder
 │   │   └── placeholders.ts   # texturas placeholder geradas por código
-│   ├── display/              # escala inteira em píxeis do dispositivo + aviso "roda o ecrã"
+│   ├── display/              # escala inteira + vista (view.ts) + aviso "roda o ecrã"
 │   ├── world/                # mapas: tileset.ts, zoneMap.ts (validação Tiled, puro), content.ts
 │   ├── debug/                # overlay F3 (DOM)
 │   ├── scenes/
@@ -162,15 +163,19 @@ refugio/
 │   │   ├── progression/
 │   │   └── travel/
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
-│   ├── ui/                   # componentes de HUD e menus
+│   ├── ui/                   # Label (texto nítido), Button, fileTransfer (exportar/importar), fatalError
 │   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
 │   ├── save/
-│   │   ├── SaveManager.ts
+│   │   ├── index.ts          # instâncias (saves, autosave) + gravar ao esconder a página
+│   │   ├── Autosave.ts       # quando gravar (15 s, eventos, flush/flushSync)
+│   │   ├── SaveManager.ts    # slots A/B + cópia de emergência síncrona
 │   │   ├── schema.ts         # tipos + versão do save
 │   │   ├── migrations.ts
 │   │   └── adapters/
 │   │       ├── IndexedDbAdapter.ts
 │   │       ├── LocalStorageAdapter.ts
+│   │       ├── FallbackAdapter.ts        # IndexedDB → localStorage → memória
+│   │       ├── MemoryAdapter.ts
 │   │       ├── CapacitorAdapter.ts      # Fase 13
 │   │       └── YouTubePlayablesAdapter.ts # Fase 14
 │   ├── data/                 # JSON data-driven
@@ -248,8 +253,9 @@ Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?
 ### 5.6 Armadilhas do Phaser 4 (verificadas na 4.2.1)
 
 - `camera.startFollow(alvo, true)`: o 2.º argumento **tem** de ser `true`, senão sobrepõe `camera.roundPixels` com `false`.
-- Zoom da câmara ≠ 1, escala ou rotação de um objeto desligam o arredondamento ao píxel. Escalar o jogo só por CSS (ver 3.1).
+- Com zoom na câmara (usamos sempre zoom inteiro, ver 3.1), escala ou rotação, o Phaser não arredonda os vértices ao píxel (`vertexRoundMode` 'safeAuto' só arredonda objetos apenas transladados): posições inteiras de jogo são obrigatórias.
 - Shapes, Graphics e BitmapText **não** são arredondados: usar posições inteiras e tamanhos pares (ou origem 0). Evitar `setStrokeStyle` de 1 px; usar dois retângulos.
+- Texto: `Text.setText`/`setColor` redesenham a textura; não chamar em todos os frames sem verificar se mudou (o `Label` já o faz). Origem 0,5 com largura ímpar deixa o texto a meio píxel (esbatido): o `Label` alinha o canto a píxeis inteiros.
 - `init`/`preload`/`create` **sem** `override`; `update` **com** `override` (o `noImplicitOverride` está ligado).
 - `scene.start(key)` sem dados reutiliza os dados da execução anterior: passar sempre um objeto (`{}` se não houver dados).
 - Listeners em `this.events`, `game.events`, no `EventBus` ou em `window` sobrevivem ao shutdown da cena: removê-los em `this.events.once(Phaser.Scenes.Events.SHUTDOWN, …)`.
@@ -561,7 +567,8 @@ Chaves: road_map, bunker_key, military_keycard
 
 ### 10.3 Robustez
 
-- **Dois slots rotativos** (A/B): grava no mais antigo; ao carregar escolhe o mais recente válido.
+- **Dois slots rotativos** (A/B): grava no mais antigo; ao carregar escolhe o mais recente válido (entre A, B e a cópia de emergência síncrona feita ao esconder/fechar a página).
+- Chaves: `refugio.save.<slot>.a`, `.b` (IndexedDB, base `refugio`, store `saves`) e `.x` (emergência, localStorage).
 - Cada save inclui `version`, `timestamp` e `checksum` (hash simples do JSON).
 - Se o checksum falhar, usar o outro slot e avisar discretamente.
 - Botões nas definições: **Exportar save** (download JSON) e **Importar save**. Útil para testes e para migrar para o APK.
@@ -643,12 +650,12 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** o jogo lembra-se de tudo desde cedo (fazer isto cedo evita dor depois).
 
-- [ ] `SaveManager` com adaptadores IndexedDB/localStorage, slots A/B, checksum, versão, migrações.
-- [ ] Autosave (15 s + eventos + `visibilitychange`/`pagehide`).
-- [ ] Vida, fome, sede com decaimento a partir de `balance.json`.
-- [ ] HUD: três barras + relógio do dia.
-- [ ] Botões Exportar/Importar save e "Apagar save" (com confirmação).
-- [ ] Testes: gravar → carregar → estado idêntico; save corrompido → recupera do outro slot.
+- [x] `SaveManager` com adaptadores IndexedDB/localStorage, slots A/B, checksum, versão, migrações.
+- [x] Autosave (15 s + eventos + `visibilitychange`/`pagehide`). Ao esconder/fechar a página grava uma **cópia de emergência síncrona** no localStorage (o browser corta escritas assíncronas ao recarregar).
+- [x] Vida, fome, sede com decaimento a partir de `balance.json` (ritmos como múltiplos do tick; morte → reaparece na base a 50%).
+- [x] HUD: três barras + relógio do dia (barras piscam abaixo de 30%).
+- [x] Botões Exportar/Importar save e "Apagar save" (com confirmação), no menu inicial.
+- [x] Testes: gravar → carregar → estado idêntico; save corrompido → recupera do outro slot.
 
 **Aceitação:** fechar o separador a meio e reabrir coloca o jogador na mesma posição com os mesmos stats (±15 s).
 
@@ -911,5 +918,8 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Colisões próprias (`systems/movement`) em vez da física Arcade do Phaser | O movimento corre no passo fixo de 50 ms, sem Phaser, testável em Vitest e determinista. Caixa dos pés (10×6 px) contra tiles `collision` + footprints; eixo X depois Y (desliza nas paredes); o render interpola entre ticks |
 | 2026-09-24 | Mapa da base gerado por script uma vez, depois editado no Tiled | Não há Tiled no ambiente do agente; o script descreve o layout em código e produz JSON do Tiled válido. Não reescreve sem `--force` |
 | 2026-09-24 | Jogador como spritesheet 7×4 (parado, andar ×4, atacar ×2 por direção) com placeholder desenhado por código (`style: "character"`) | Animação visível desde já; trocar pela arte final = pôr o PNG com o mesmo layout e `file` no manifest |
-| 2026-09-24 | Resolução interna adaptável (alvo 400 px de altura; 320 com toque) em vez de 480×270 fixo | Pedido do jogador: com 480×270 os tiles pareciam enormes ("Minecraft"). Agora cabem ~2–2,5× mais tiles, sem barras pretas e com píxeis exatos. O alvo pode vir a ser uma definição ("tamanho", Fase 11) |
+| 2026-09-24 | Resolução interna adaptável (largura enche o ecrã, sem barras) com alvo de **270 px** de altura | O jogador experimentou 400 px (mais tiles, tudo mais pequeno) e preferiu o "zoom" de ~30×17 tiles. O alvo pode vir a ser uma definição ("tamanho", Fase 11) |
+| 2026-09-24 | Canvas à resolução do dispositivo + zoom inteiro nas câmaras (em vez de canvas pequeno ampliado por CSS) | O texto ficava esbatido (desenhado a 8 px e ampliado). Agora é desenhado à resolução real; a pixel art continua exata porque tudo fica em posições inteiras |
+| 2026-09-24 | Realismo com obstáculos livres (objetos de qualquer tamanho, fora da grelha) em vez de tiles mais pequenos | Uma grelha 2× mais fina obrigava a arte com o dobro dos píxeis (≈ 4× trabalho) ou deixava o boneco minúsculo |
+| 2026-09-24 | Cópia de emergência síncrona (localStorage) ao esconder/fechar a página | Testado: ao recarregar, o Chrome corta a escrita assíncrona no IndexedDB e perdiam-se os últimos segundos |
 | 2026-09-24 | Joystick virtual flutuante na metade esquerda (só toque), 8 direções, zona morta 25% | Metade direita fica livre para o botão de ação (Fase 3). O teclado tem prioridade sobre o joystick |

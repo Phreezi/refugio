@@ -9,6 +9,8 @@ describe('computePixelScale', () => {
     expect(computePixelScale(1920, 1080, 1, OPTIONS)).toEqual({
       gameWidth: 640,
       gameHeight: 360,
+      canvasWidth: 1920,
+      canvasHeight: 1080,
       deviceZoom: 3,
       cssWidth: 1920,
       cssHeight: 1080,
@@ -20,7 +22,7 @@ describe('computePixelScale', () => {
   it('a largura acompanha o formato do ecrã (sem barras laterais)', () => {
     const s = computePixelScale(1600, 830, 1, OPTIONS);
     expect(s.deviceZoom).toBe(2);
-    expect(s.gameHeight).toBe(415);
+    expect(s.gameHeight).toBe(414); // sempre par: o centro da vista cai num píxel inteiro
     expect(s.gameWidth).toBe(800);
     expect(s.offsetX).toBe(0);
   });
@@ -56,6 +58,26 @@ describe('computePixelScale', () => {
       expect(s.offsetX + s.cssWidth).toBeLessThanOrEqual(w + 1e-6);
       expect(s.offsetY + s.cssHeight).toBeLessThanOrEqual(h + 1e-6);
       expect(Number.isInteger(s.gameWidth) && Number.isInteger(s.gameHeight)).toBe(true);
+    }
+  });
+
+  it('com o alvo de 270 px (≈ 17 tiles), 1920×1080 → zoom 4, 480×270 → 480×270 par', () => {
+    const s = computePixelScale(1920, 1080, 1, { ...OPTIONS, targetHeight: 270, minHeight: 216 });
+    expect(s.deviceZoom).toBe(4);
+    expect([s.gameWidth, s.gameHeight]).toEqual([480, 270]);
+    expect([s.canvasWidth, s.canvasHeight]).toEqual([1920, 1080]);
+  });
+
+  it('dimensões do jogo sempre pares e canvas = jogo × zoom', () => {
+    for (const [w, h, dpr] of [
+      [1537, 865, 1.25],
+      [915, 412, 2.625],
+      [1601, 833, 1],
+    ] as const) {
+      const s = computePixelScale(w, h, dpr, OPTIONS);
+      expect(s.gameWidth % 2).toBe(0);
+      expect(s.gameHeight % 2).toBe(0);
+      expect(s.canvasWidth).toBe(s.gameWidth * s.deviceZoom);
     }
   });
 
