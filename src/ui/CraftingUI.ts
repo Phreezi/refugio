@@ -20,6 +20,8 @@ const DEPTH = { dim: 50, panel: 60, content: 62 } as const;
 const PAD = 8;
 const ROW_H = 30;
 const TAB_H = 16;
+/** Altura da linha de páginas (‹ 1/2 ›) quando a lista não cabe. */
+const PAGER_H = 18;
 const BAR_W = 70;
 const MAX_WIDTH = 320;
 
@@ -52,6 +54,9 @@ export class CraftingUI {
   private tab: Tab = 'tools';
   /** Filtro "Posso fazer": só as receitas desbloqueadas com todos os ingredientes. */
   private canMakeOnly = false;
+  /** Página da lista (quando as receitas não cabem no ecrã) e quantas cabem por página. */
+  private page = 0;
+  private perPage = Number.POSITIVE_INFINITY;
   private readonly unsubscribe: (() => void)[];
 
   constructor(scene: Phaser.Scene, sim: Simulation) {
@@ -81,6 +86,7 @@ export class CraftingUI {
   /** Abre as mãos (`null`) ou uma estação; ao abrir uma estação recolhe logo o que estiver pronto. */
   open(station: string | null): void {
     this.station = station;
+    this.page = 0;
     const tabs = this.tabs();
     if (!tabs.includes(this.tab)) this.tab = tabs[0] ?? 'tools';
     if (station) this.sim.crafting.collect(station);
@@ -179,11 +185,17 @@ export class CraftingUI {
     const type = this.station ? stationType(this.station) : HANDS;
     const w = Math.min(MAX_WIDTH, width - 8);
     const rows = this.tab === 'repair' ? this.repairables().length : this.recipes().length;
-    const queueH = this.station && this.tab !== 'repair' ? 22 + 3 * 18 + 22 : 0;
+    const queueH = this.hasQueue() ? 22 + 3 * 18 + 22 : 0;
     const h = Math.min(hotbarTop - 8, PAD * 2 + 14 + TAB_H + 6 + Math.max(1, rows) * ROW_H + queueH);
     const x = Math.round((width - w) / 2);
     const y = Math.max(4, Math.round((hotbarTop - 4 - h) / 2));
     this.rect = { x, y, w, h };
+    // Se não couberem todas, a lista divide-se em páginas (com ‹ › por baixo).
+    const listSpace = h - (PAD * 2 + 14 + TAB_H + 6) - queueH;
+    const fits = Math.max(1, Math.floor(listSpace / ROW_H));
+    this.perPage = rows > fits ? Math.max(1, Math.floor((listSpace - PAGER_H) / ROW_H)) : fits;
+    const pages = Math.max(1, Math.ceil(rows / this.perPage));
+    this.page = Math.min(this.page, pages - 1);
 
     this.add(
       scene.add.rectangle(0, 0, width, height, paletteNumber('ink'), 0.6).setOrigin(0).setDepth(DEPTH.dim),
@@ -211,6 +223,7 @@ export class CraftingUI {
         fw,
         () => {
           this.canMakeOnly = !this.canMakeOnly;
+          this.page = 0;
           this.build();
         },
         this.canMakeOnly,
@@ -230,6 +243,7 @@ export class CraftingUI {
         tw,
         () => {
           this.tab = tab;
+          this.page = 0;
           this.build();
         },
         tab === this.tab,
@@ -240,7 +254,26 @@ export class CraftingUI {
     const listY = ty + TAB_H + 6;
     if (this.tab === 'repair') this.buildRepair(x, listY, w);
     else this.buildRecipes(x, listY, w);
-    if (this.station && this.tab !== 'repair') this.buildQueue(x, y + h - queueH, w);
+    if (pages > 1 && this.tab !== 'repair') {
+      const py = listY + this.perPage * ROW_H + PAGER_H / 2;
+      const cx = x + Math.round(w / 2);
+      this.button(cx - 30, py, '‹', 20, () => {
+        this.page = (this.page + pages - 1) % pages;
+        this.build();
+      });
+      this.label(cx - 8, py - 5, `${String(this.page + 1)}/${String(pages)}`, { size: 8, color: 'cream' });
+      this.button(cx + 30, py, '›', 20, () => {
+        this.page = (this.page + 1) % pages;
+        this.build();
+      });
+    }
+    if (this.hasQueue()) this.buildQueue(x, y + h - queueH, w);
+  }
+
+  /** A estação tem fila (o comerciante não: as trocas são logo). */
+  private hasQueue(): boolean {
+    if (!this.station || this.tab === 'repair') return false;
+    return content.stations[stationType(this.station)]?.trade !== true;
   }
 
   private recipes(): Recipe[] {
@@ -260,53 +293,62 @@ export class CraftingUI {
     const containers = this.sim.actions.pickupContainers();
     if (this.canMakeOnly && this.recipes().length === 0)
       this.label(x + PAD, y + 4, t('craft.nothing_to_make'), { size: 8, color: 'stone_light' });
-    this.recipes().forEach((recipe, i) => {
-      const ry = y + i * ROW_H;
-      const def = content.items[recipe.output];
-      if (def)
-        this.add(
-          this.scene.add
-            .image(x + PAD, ry + 2, def.icon)
-            .setOrigin(0)
-            .setDepth(DEPTH.content),
+    const start = this.page * this.perPage;
+    this.recipes()
+      .slice(start, start + this.perPage)
+      .forEach((recipe, i) => {
+        const ry = y + i * ROW_H;
+        const def = content.items[recipe.output];
+        if (def)
+          this.add(
+            this.scene.add
+              .image(x + PAD, ry + 2, def.icon)
+              .setOrigin(0)
+              .setDepth(DEPTH.content),
+          );
+        const qty = recipe.qty > 1 ? ` ×${String(recipe.qty)}` : '';
+        const time = recipe.timeSec > 0 ? ` · ${t('craft.seconds', { s: recipe.timeSec })}` : '';
+        this.label(x + PAD + 20, ry + 1, `${itemName(recipe.output)}${qty}${time}`, {
+          size: 8,
+          bold: true,
+          color: 'cream',
+        });
+        // Ingredientes: "tem/precisa nome", a vermelho se faltar.
+        let ix = x + PAD + 20;
+        for (const { item, qty: need } of recipe.inputs) {
+          const have = countItem(containers, item);
+          const text = `${String(Math.min(have, need))}/${String(need)} ${itemName(item)}`;
+          const lbl = this.label(ix, ry + 12, text, { size: 7, color: have >= need ? 'lime' : 'red' });
+          ix += lbl.text.width + 8;
+        }
+        const unlocked = this.sim.progression.isRecipeUnlocked(recipe);
+        const ok = unlocked && missingInputs(containers, recipe).length === 0;
+        this.button(
+          x + w - PAD - 22,
+          ry + 9,
+          !unlocked
+            ? t('craft.locked', { level: recipe.unlockLevel })
+            : recipe.category === 'trade'
+              ? t('craft.trade')
+              : t('craft.make'),
+          44,
+          () => {
+            const result = this.sim.crafting.craft(recipe.id, this.station);
+            if (result === 'locked') this.message(t('craft.locked_msg', { level: recipe.unlockLevel }));
+            else if (result === 'missing') this.message(t('craft.missing'));
+            else if (result === 'no_space') this.message(t('msg.inventory_full'));
+            else if (result === 'queue_full') {
+              const max = content.stations[recipe.station]?.queue ?? 1;
+              this.message(t('craft.queue_full', { max }));
+            } else if (recipe.category === 'trade')
+              this.message(t('craft.traded', { item: itemName(recipe.output) }));
+            else if (recipe.station === HANDS)
+              this.message(t('craft.crafted', { item: itemName(recipe.output) }));
+            this.build();
+          },
+          ok,
         );
-      const qty = recipe.qty > 1 ? ` ×${String(recipe.qty)}` : '';
-      const time = recipe.timeSec > 0 ? ` · ${t('craft.seconds', { s: recipe.timeSec })}` : '';
-      this.label(x + PAD + 20, ry + 1, `${itemName(recipe.output)}${qty}${time}`, {
-        size: 8,
-        bold: true,
-        color: 'cream',
       });
-      // Ingredientes: "tem/precisa nome", a vermelho se faltar.
-      let ix = x + PAD + 20;
-      for (const { item, qty: need } of recipe.inputs) {
-        const have = countItem(containers, item);
-        const text = `${String(Math.min(have, need))}/${String(need)} ${itemName(item)}`;
-        const lbl = this.label(ix, ry + 12, text, { size: 7, color: have >= need ? 'lime' : 'red' });
-        ix += lbl.text.width + 8;
-      }
-      const unlocked = this.sim.progression.isRecipeUnlocked(recipe);
-      const ok = unlocked && missingInputs(containers, recipe).length === 0;
-      this.button(
-        x + w - PAD - 22,
-        ry + 9,
-        unlocked ? t('craft.make') : t('craft.locked', { level: recipe.unlockLevel }),
-        44,
-        () => {
-          const result = this.sim.crafting.craft(recipe.id, this.station);
-          if (result === 'locked') this.message(t('craft.locked_msg', { level: recipe.unlockLevel }));
-          else if (result === 'missing') this.message(t('craft.missing'));
-          else if (result === 'no_space') this.message(t('msg.inventory_full'));
-          else if (result === 'queue_full') {
-            const max = content.stations[recipe.station]?.queue ?? 1;
-            this.message(t('craft.queue_full', { max }));
-          } else if (recipe.station === HANDS)
-            this.message(t('craft.crafted', { item: itemName(recipe.output) }));
-          this.build();
-        },
-        ok,
-      );
-    });
   }
 
   private buildQueue(x: number, y: number, w: number): void {

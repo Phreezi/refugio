@@ -251,5 +251,17 @@
   "item.large_backpack": "Large backpack",
   "zone.military": "Military Base",
   "zone.city": "Ruined City",
-  "map.military_hint": "The Bunker Warden carried an access card."
+  "map.military_hint": "The Bunker Warden carried an access card.",
+  "craft.cat.trade": "Trades",
+  "craft.trade": "Trade",
+  "craft.traded": "You traded for {item}.",
+  "station.trader": "Trader",
+  "item.moto_engine": "Motorbike engine",
+  "item.moto_frame": "Motorbike frame",
+  "item.moto_wheel": "Motorbike wheel",
+  "structure.motorcycle": "Motorbike",
+  "zone.plane_crash": "Plane Crash",
+  "zone.train": "Stopped Train",
+  "zone.camp": "Survivor Camp",
+  "map.event": "Event: ends in {hours} in-game h."
 }

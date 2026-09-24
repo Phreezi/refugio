@@ -517,5 +517,26 @@
     "stack": 1,
     "rarity": "rare",
     "slots": 20
+  },
+  "moto_engine": {
+    "name": "item.moto_engine",
+    "icon": "icon_moto_engine",
+    "type": "resource",
+    "stack": 5,
+    "rarity": "rare"
+  },
+  "moto_frame": {
+    "name": "item.moto_frame",
+    "icon": "icon_moto_frame",
+    "type": "resource",
+    "stack": 5,
+    "rarity": "rare"
+  },
+  "moto_wheel": {
+    "name": "item.moto_wheel",
+    "icon": "icon_moto_wheel",
+    "type": "resource",
+    "stack": 5,
+    "rarity": "uncommon"
   }
 }

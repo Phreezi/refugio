@@ -270,6 +270,7 @@ npm run map:t2     # gera maps/road.json, village.json, deep_forest.json (idem)
 npm run map:t3     # gera maps/industrial.json, hospital.json (idem)
 npm run map:bunker # gera maps/bunker_1..4.json (idem)
 npm run map:t4     # gera maps/military.json, city.json (idem)
+npm run map:events # gera maps/plane_crash.json, train.json, camp.json (idem)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -380,7 +381,7 @@ Os nós de recurso reaparecem (ver zonas).
 ### 7.5 Crafting
 
 - Receitas em `recipes.json`: `{ id, station, inputs[], output, qty, timeSec, unlockLevel }`.
-- Estações: **Mãos** (inventário), **Bancada de madeira**, **Fogueira**, **Bancada de trabalho**, **Fornalha**, **Bancada de armas** (tardia), **Bancada química/medicina** (tardia).
+- Estações: **Mãos** (inventário), **Bancada de madeira**, **Fogueira**, **Bancada de trabalho** (armas à distância, munições, peças da moto), **Fornalha**; o **Comerciante** do acampamento usa o mesmo painel para trocas. *(Bancadas de armas e química ficaram na de trabalho e na de madeira.)* Listas longas dividem-se em páginas.
 - Tempos curtos: 0 s (mãos) a 60 s (itens avançados). Craft continua em segundo plano enquanto o jogador sai.
 - Fila de craft por estação (máx. 3).
 
@@ -505,10 +506,12 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 
 | Evento | Duração | Frequência | Conteúdo |
 |---|---|---|---|
-| Queda de avião de carga | 1 dia de jogo | a cada ~5 dias | 3 caixas com loot garantido raro, alguns zombies |
-| Comboio parado | 1 dia | a cada ~7 dias | Vagões com loot por categoria (comida, armas, materiais) |
-| Acampamento de sobreviventes | 2 dias | aleatório | Comerciante: troca itens (sem moeda) |
-| Nevoeiro tóxico | — | raro | Zona temporária, precisa de máscara, loot químico |
+| Queda de avião de carga | 1 dia de jogo | a cada 5 dias (a partir do dia 2) | 3 caixas de carga (loot bom garantido), alguns zombies |
+| Comboio parado | 1 dia | a cada 7 dias (a partir do dia 4) | Vagões com loot por categoria (comida, armas, materiais) |
+| Acampamento de sobreviventes | 2 dias | a cada 6 dias (a partir do dia 1) | Comerciante (estação `trader`): trocas instantâneas, sem moeda (receitas `category: "trade"`, `timeSec: 0`) |
+| Nevoeiro tóxico | — | raro | *(não implementado: fica para depois)* |
+
+Os eventos não se gravam: `event: { everyDays, durationDays, offsetDays }` em `zones.json` e o dia de jogo dizem se a zona existe (`systems/travel/events.ts`). O painel do mapa-mundo diz quanto falta para acabar.
 
 ### 8.4 Regras de desenho de mapas (Tiled)
 
@@ -842,8 +845,8 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [x] Armas à distância (besta, pistola) e munição craftável (virotes, pólvora, balas) na **bancada de trabalho** (nova estação, nível 12).
 - [x] **Bunker**: 4 pisos (`npm run map:bunker`), checkpoint por piso, chefe final (Guarda do Bunker, dá o cartão de acesso militar), chave num cofre da Zona Industrial (pista no mapa-mundo).
 - [x] Zona T4: **Base Militar** (cartão de acesso do chefe do bunker; arsenal com pistolas, capacetes e coletes militares), depois **Cidade em Ruínas** (16 prédios com lojas; nível 25). Mapas: `npm run map:t4`. Mochila grande como loot.
-- [ ] Zonas-evento: queda de avião, comboio, acampamento com comerciante (troca).
-- [ ] Veículo (moto): craft em várias peças, reduz custo de viagem.
+- [x] Zonas-evento: queda de avião, comboio, acampamento com comerciante (troca). Aparecem no mapa-mundo só nos seus dias (`event` em `zones.json`); mapas: `npm run map:events`.
+- [x] Veículo (moto): motor, quadro e 2 rodas (bancada de trabalho, nível 22); montada na base (peça `motorcycle`), corta 50% do custo das viagens (`travelDiscountPct`).
 - [x] Medicina: ligaduras (craft nas mãos), kits médicos, estado "sangrar" (`bleedPct` dos inimigos; uma ligadura estanca). *(Infeção fica de fora: era opcional.)* Casaco e calças de couro.
 
 **Aceitação:** é possível "acabar" o conteúdo (chefe do bunker + Cidade) em ~15–20 h.
@@ -1054,3 +1057,6 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Tiles novos (chão escuro, escadas) acrescentados no fim do tileset; o tileset embebido de todos os mapas atualizado | Como pede §8.4 (não baralhar gids); é a mesma edição que o Tiled faria |
 | 2026-09-24 | Save v11: `dungeons`, `bosses` | Checkpoint do bunker e respawn semanal do chefe |
 | 2026-09-24 | "Quest" da chave: cofre na Zona Industrial + pista no mapa-mundo; o chefe dá o cartão militar | Simples e sem NPCs (§14); encadeia T3 → bunker → Base Militar |
+| 2026-09-24 | Zonas-evento calculadas a partir do dia de jogo (sem save) | Determinístico e sem estado a migrar; o loot das caixas volta com o `respawnDays` da zona |
+| 2026-09-24 | Comerciante = estação com receitas de troca instantâneas | Reaproveita o painel de fabrico (ingredientes a vermelho, "Posso fazer"); sem moeda (§8.3) |
+| 2026-09-24 | Moto como peça construída na base que dá desconto nas viagens | Sem gestão de combustível; o custo é pagar as peças |

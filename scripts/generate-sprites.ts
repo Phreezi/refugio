@@ -2147,6 +2147,169 @@ const PHASE10D_ICONS: Sprite[] = [
   },
 ];
 
+/** Fase 10 (parte E): zonas-evento, comerciante e moto. */
+const PHASE10E: Sprite[] = [
+  {
+    file: 'plane_wreck',
+    width: 64,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 32, 29, 30, 2.5);
+      // Fuselagem partida ao meio, de lado.
+      img.fill(4, 14, 26, 12, c('stone_light'));
+      img.fill(34, 12, 26, 12, c('stone_light'));
+      img.fill(4, 22, 26, 4, c('stone'));
+      img.fill(34, 20, 26, 4, c('stone'));
+      img.fill(30, 13, 4, 12, c('ink')); // a fratura
+      for (const x of [8, 14, 20, 40, 46, 52]) img.fill(x, 16, 3, 3, c('sky'));
+      img.fill(56, 4, 6, 10, c('stone')); // cauda
+      img.fill(56, 4, 6, 2, c('red'));
+      img.fill(10, 24, 16, 3, c('stone_dark')); // asa
+      img.fill(2, 18, 3, 6, c('stone_dark'));
+      img.set(32, 11, c('shadow'));
+      img.set(33, 9, c('stone'));
+    },
+  },
+  {
+    file: 'locomotive',
+    width: 48,
+    height: 28,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 24, 26, 22, 2);
+      img.fill(2, 10, 44, 12, c('blood'));
+      img.fill(2, 10, 44, 2, c('red'));
+      img.fill(30, 2, 14, 10, c('blood'));
+      img.fill(32, 4, 4, 4, c('sky'));
+      img.fill(38, 4, 4, 4, c('sky'));
+      img.fill(6, 4, 4, 6, c('shadow')); // chaminé
+      for (const x of [6, 16, 26, 36]) img.ellipse(x + 3, 23, 3, 3, c('stone_dark'));
+      img.fill(0, 18, 2, 4, c('stone'));
+    },
+  },
+  {
+    file: 'wagon',
+    width: 32,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 16, 22, 15, 1.5);
+      img.fill(1, 4, 30, 14, c('wood'));
+      img.fill(1, 4, 30, 2, c('wood_light'));
+      for (const x of [8, 16, 24]) img.fill(x, 6, 1, 12, c('bark'));
+      img.fill(12, 8, 8, 8, c('bark_dark')); // porta
+      for (const x of [5, 25]) img.ellipse(x, 20, 2.5, 2.5, c('stone_dark'));
+    },
+  },
+  {
+    file: 'tent',
+    width: 32,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 16, 22, 15, 1.5);
+      for (let y = 0; y < 18; y++) {
+        const half = Math.round((y * 14) / 18);
+        img.fill(16 - half, 3 + y, half * 2, 1, c(y % 5 === 0 ? 'forest' : 'grass'));
+      }
+      for (let y = 8; y < 21; y++) {
+        const half = Math.round(((y - 8) * 4) / 12);
+        img.fill(16 - half, y, half * 2, 1, c('forest_dark'));
+      }
+      img.fill(15, 1, 2, 3, c('bark'));
+    },
+  },
+  {
+    file: 'trader',
+    width: 16,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 30.5, 5.5, 1.5);
+      img.fill(5, 22, 3, 8, c('bark'));
+      img.fill(9, 22, 3, 8, c('bark'));
+      img.fill(5, 29, 3, 1, c('ink'));
+      img.fill(9, 29, 3, 1, c('ink'));
+      // Casaco comprido com mochila grande.
+      img.fill(4, 12, 9, 11, c('teal'));
+      img.fill(4, 12, 9, 1, c('sky'));
+      img.fill(12, 12, 1, 11, c('forest_dark'));
+      img.fill(2, 13, 2, 7, c('peach'));
+      img.fill(13, 13, 2, 7, c('rose'));
+      img.fill(6, 16, 5, 1, c('gold'));
+      // Cabeça com chapéu de abas.
+      img.fill(5, 5, 7, 7, c('peach'));
+      img.fill(3, 4, 11, 2, c('wood'));
+      img.fill(5, 2, 7, 3, c('wood_light'));
+      img.set(7, 8, c('ink'));
+      img.set(10, 8, c('ink'));
+      img.fill(7, 10, 4, 1, c('bark')); // barba
+    },
+  },
+  {
+    file: 'motorcycle',
+    width: 32,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 16, 22, 14, 1.5);
+      for (const x of [6, 26]) {
+        img.ellipse(x, 17, 5, 5, c('ink'));
+        img.ellipse(x, 17, 2.5, 2.5, c('stone'));
+      }
+      img.fill(8, 11, 16, 4, c('red'));
+      img.fill(8, 11, 16, 1, c('rose'));
+      img.fill(12, 15, 7, 4, c('stone_dark')); // motor
+      img.fill(10, 8, 8, 3, c('ink')); // assento
+      img.fill(23, 5, 2, 8, c('stone'));
+      img.fill(21, 4, 6, 1, c('stone_light')); // guiador
+      img.fill(26, 8, 2, 2, c('gold'));
+    },
+  },
+];
+
+const PHASE10E_ICONS: Sprite[] = [
+  {
+    file: 'moto_engine',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(3, 5, 10, 8, c('stone_dark'));
+      img.fill(3, 5, 10, 1, c('stone'));
+      for (const y of [7, 9, 11]) img.fill(2, y, 12, 1, c('stone'));
+      img.fill(6, 2, 4, 3, c('stone_light'));
+      img.set(12, 12, c('gold'));
+    },
+  },
+  {
+    file: 'moto_frame',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 10; i++) img.set(3 + i, 12 - Math.floor(i / 2), c('red'));
+      for (let i = 0; i < 8; i++) img.set(3 + i, 12, c('red'));
+      for (let i = 0; i < 6; i++) img.set(12, 7 - i, c('stone_light'));
+      img.fill(10, 2, 5, 1, c('stone'));
+    },
+  },
+  {
+    file: 'moto_wheel',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 8, 6, 6, c('ink'));
+      img.ellipse(8, 8, 4, 4, c('stone_dark'));
+      img.ellipse(8, 8, 1.5, 1.5, c('stone_light'));
+      img.fill(8, 3, 1, 10, c('stone'));
+      img.fill(3, 8, 10, 1, c('stone'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -2162,6 +2325,7 @@ for (const [dir, list] of [
   [outDir, PHASE10A],
   [outDir, PHASE10B],
   [outDir, PHASE10C],
+  [outDir, PHASE10E],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
   [iconDir, FOOD_ICONS],
@@ -2172,6 +2336,7 @@ for (const [dir, list] of [
   [iconDir, PHASE10B_ICONS],
   [iconDir, PHASE10C_ICONS],
   [iconDir, PHASE10D_ICONS],
+  [iconDir, PHASE10E_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -2182,7 +2347,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length + PHASE10D_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length + PHASE10E.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length + PHASE10D_ICONS.length + PHASE10E_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

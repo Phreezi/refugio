@@ -1,5 +1,5 @@
 {
-  "$comment": "Zonas (CLAUDE.md §8.2, §9.4). danger: 0 = segura (base), 1–4 = T1–T4. worldMapPos: posição no mapa-mundo (0–100). travelCost: fome/sede para lá chegar. respawnDays: dias de jogo até os contentores voltarem a ter loot. unlockLevel: verificado a partir da Fase 8 (níveis). requiresItem: item que é preciso levar (não se gasta). dungeon { id, floor }: masmorra com pisos (só o piso 1 no mapa-mundo; os outros hidden). darkness: sempre escuro.",
+  "$comment": "Zonas (CLAUDE.md §8.2, §9.4). danger: 0 = segura (base), 1–4 = T1–T4. worldMapPos: posição no mapa-mundo (0–100). travelCost: fome/sede para lá chegar. respawnDays: dias de jogo até os contentores voltarem a ter loot. unlockLevel: verificado a partir da Fase 8 (níveis). requiresItem: item que é preciso levar (não se gasta). dungeon { id, floor }: masmorra com pisos (só o piso 1 no mapa-mundo; os outros hidden). darkness: sempre escuro. event { everyDays, durationDays, offsetDays }: zona-evento, só existe durante o evento.",
   "zone_base": {
     "name": "zone.base",
     "map": "maps/base.json",
@@ -213,5 +213,59 @@
     "respawnDays": 4,
     "unlockLevel": 25,
     "nightEnemyMultiplier": 1.5
+  },
+  "zone_plane_crash": {
+    "name": "zone.plane_crash",
+    "map": "maps/plane_crash.json",
+    "danger": 3,
+    "worldMapPos": [74, 58],
+    "travelCost": {
+      "hunger": 6,
+      "thirst": 6
+    },
+    "respawnDays": 5,
+    "unlockLevel": 12,
+    "nightEnemyMultiplier": 1.5,
+    "event": {
+      "everyDays": 5,
+      "durationDays": 1,
+      "offsetDays": 2
+    }
+  },
+  "zone_train": {
+    "name": "zone.train",
+    "map": "maps/train.json",
+    "danger": 3,
+    "worldMapPos": [40, 92],
+    "travelCost": {
+      "hunger": 7,
+      "thirst": 7
+    },
+    "respawnDays": 7,
+    "unlockLevel": 14,
+    "nightEnemyMultiplier": 1.5,
+    "event": {
+      "everyDays": 7,
+      "durationDays": 1,
+      "offsetDays": 4
+    }
+  },
+  "zone_camp": {
+    "name": "zone.camp",
+    "map": "maps/camp.json",
+    "danger": 1,
+    "worldMapPos": [26, 62],
+    "travelCost": {
+      "hunger": 4,
+      "thirst": 4
+    },
+    "respawnDays": 6,
+    "unlockLevel": 5,
+    "nightEnemyMultiplier": 1,
+    "event": {
+      "everyDays": 6,
+      "durationDays": 2,
+      "offsetDays": 1
+    }
   }
 }

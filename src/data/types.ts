@@ -482,6 +482,8 @@ export interface StationDef extends WorldObjectDef {
   queue: number;
   /** A bancada repara ferramentas (§2: reparação barata). */
   repair: boolean;
+  /** Comerciante (Fase 10): as "receitas" são trocas instantâneas (categoria trade), sem fila. */
+  trade: boolean;
 }
 
 export type StationDefs = Readonly<Record<string, StationDef>>;
@@ -489,13 +491,14 @@ export type StationDefs = Readonly<Record<string, StationDef>>;
 /** Estação especial: craft instantâneo no próprio inventário. */
 export const HANDS = 'hands';
 
-export type RecipeCategory = 'tools' | 'materials' | 'weapons' | 'armor' | 'food';
+export type RecipeCategory = 'tools' | 'materials' | 'weapons' | 'armor' | 'food' | 'trade';
 export const RECIPE_CATEGORIES: readonly RecipeCategory[] = [
   'tools',
   'materials',
   'weapons',
   'armor',
   'food',
+  'trade',
 ];
 
 export interface Recipe {
@@ -517,13 +520,24 @@ export type Recipes = readonly Recipe[];
 
 /** Valida `stations.json`. */
 export function parseStations(input: unknown, spriteKeys: Iterable<string>): StationDefs {
-  return parseWorldObjects(input, spriteKeys, 'stations.json', ['queue', 'repair'], (id, raw, problems) => {
-    if (!isPositiveInt(raw.queue)) problems.push(`"${id}": queue tem de ser um inteiro > 0`);
-    if (raw.repair !== undefined && typeof raw.repair !== 'boolean') {
-      problems.push(`"${id}": repair tem de ser true/false`);
-    }
-    return { queue: isPositiveInt(raw.queue) ? raw.queue : 1, repair: raw.repair === true };
-  });
+  return parseWorldObjects(
+    input,
+    spriteKeys,
+    'stations.json',
+    ['queue', 'repair', 'trade'],
+    (id, raw, problems) => {
+      if (!isPositiveInt(raw.queue)) problems.push(`"${id}": queue tem de ser um inteiro > 0`);
+      for (const key of ['repair', 'trade'] as const) {
+        if (raw[key] !== undefined && typeof raw[key] !== 'boolean')
+          problems.push(`"${id}": ${key} tem de ser true/false`);
+      }
+      return {
+        queue: isPositiveInt(raw.queue) ? raw.queue : 1,
+        repair: raw.repair === true,
+        trade: raw.trade === true,
+      };
+    },
+  );
 }
 
 const RECIPE_KEYS = new Set([
@@ -579,8 +593,8 @@ export function parseRecipes(
     const timeOk =
       typeof timeSec === 'number' &&
       Number.isInteger(timeSec) &&
-      (station === HANDS ? timeSec === 0 : timeSec > 0 && timeSec <= 60);
-    if (!timeOk) problems.push(`${where}: timeSec tem de ser 0 nas mãos e 1–60 nas estações`);
+      (station === HANDS || raw.category === 'trade' ? timeSec === 0 : timeSec > 0 && timeSec <= 60);
+    if (!timeOk) problems.push(`${where}: timeSec tem de ser 0 nas mãos e nas trocas, e 1–60 nas estações`);
     const inputs: { item: string; qty: number }[] = [];
     if (!Array.isArray(raw.inputs) || raw.inputs.length === 0) {
       problems.push(`${where}: inputs tem de ser [[item, qtd], …]`);
@@ -650,6 +664,8 @@ export interface StructureDef {
   hp?: number;
   /** Armadilha de estacas: fere os inimigos que a pisam; gasta-se ao fim de `uses` golpes. */
   trap?: TrapDef;
+  /** Veículo (moto): construído na base, baixa o custo das viagens nesta %. */
+  travelDiscountPct?: number;
 }
 
 export interface TrapDef {
@@ -705,6 +721,7 @@ const STRUCTURE_KEYS = new Set([
   'produce',
   'hp',
   'trap',
+  'travelDiscountPct',
 ]);
 const MAX_STRUCTURE_TILES = 4;
 
@@ -781,6 +798,11 @@ export function parseStructures(
     if (raw.hp !== undefined) {
       if (isPositiveInt(raw.hp)) def.hp = raw.hp;
       else problems.push(`"${id}": hp tem de ser um inteiro > 0`);
+    }
+    if (raw.travelDiscountPct !== undefined) {
+      if (isPositiveInt(raw.travelDiscountPct) && raw.travelDiscountPct <= 90)
+        def.travelDiscountPct = raw.travelDiscountPct;
+      else problems.push(`"${id}": travelDiscountPct tem de ser um inteiro de 1 a 90`);
     }
     if (raw.trap !== undefined) {
       const trap = raw.trap;
@@ -1118,6 +1140,17 @@ export interface ZoneDef {
   hidden: boolean;
   /** Sempre escura (debaixo de terra): `darkness` do véu, em vez do dia/noite. */
   darkness?: number;
+  /**
+   * Zona-evento (§8.3): só existe durante `durationDays` dias de jogo, a cada `everyDays`, a
+   * começar no dia `offsetDays` (calculado a partir do relógio; não se grava).
+   */
+  event?: WorldEventDef;
+}
+
+export interface WorldEventDef {
+  everyDays: number;
+  durationDays: number;
+  offsetDays: number;
 }
 
 export type ZoneDefs = Readonly<Record<string, ZoneDef>>;
@@ -1150,6 +1183,7 @@ export function parseZones(input: unknown): ZoneDefs {
           'dungeon',
           'hidden',
           'darkness',
+          'event',
         ].includes(key)
       )
         problems.push(`"${id}": campo desconhecido "${key}"`);
@@ -1213,6 +1247,18 @@ export function parseZones(input: unknown): ZoneDefs {
       if (isObject(d) && typeof d.id === 'string' && isPositiveInt(d.floor))
         def.dungeon = { id: d.id, floor: d.floor };
       else problems.push(`"${id}": dungeon tem de ser { id, floor }`);
+    }
+    if (raw.event !== undefined) {
+      const e = raw.event;
+      if (
+        isObject(e) &&
+        isPositiveInt(e.everyDays) &&
+        isPositiveInt(e.durationDays) &&
+        isNonNegativeInt(e.offsetDays) &&
+        e.durationDays < e.everyDays
+      )
+        def.event = { everyDays: e.everyDays, durationDays: e.durationDays, offsetDays: e.offsetDays };
+      else problems.push(`"${id}": event tem de ser { everyDays, durationDays < everyDays, offsetDays }`);
     }
     if (raw.darkness !== undefined) {
       if (typeof raw.darkness === 'number' && raw.darkness > 0 && raw.darkness <= 1)
