@@ -671,8 +671,8 @@ export class ZoneScene extends Phaser.Scene {
         };
         this.enemyViews.set(enemy.uid, view);
       }
-      const x = Math.round(enemy.px + (enemy.x - enemy.px) * alpha);
-      const y = Math.round(enemy.py + (enemy.y - enemy.py) * alpha);
+      const x = this.toScreenGrid(enemy.px + (enemy.x - enemy.px) * alpha);
+      const y = this.toScreenGrid(enemy.py + (enemy.y - enemy.py) * alpha);
       const moving = enemy.px !== enemy.x || enemy.py !== enemy.y;
       const bob = moving && Math.floor(now / 160) % 2 === 1 ? 1 : 0;
       view.sprite
@@ -942,15 +942,26 @@ export class ZoneScene extends Phaser.Scene {
   }
 
   /** Posição interpolada entre os dois últimos ticks (a lógica corre a 20 ticks/s, o ecrã a 60). */
+  /**
+   * Arredonda uma coordenada do mundo à grelha de píxeis do ecrã (múltiplos de 1/zoom da
+   * câmara). Com zoom inteiro, isto mantém a pixel art exata e deixa o movimento suave.
+   */
+  private toScreenGrid(value: number): number {
+    const zoom = this.cameras.main.zoom;
+    return Math.round(value * zoom) / zoom;
+  }
+
   private renderPlayer(): void {
     const player = this.player;
     if (!player) return;
     const state = gameState.data.player;
     const previous = simulation.previousPlayerPosition;
     const alpha = simulation.alpha;
-    // Arredondado a píxeis de jogo: com zoom na câmara, o Phaser desenharia a meio píxel.
-    const x = Math.round(previous.x + (state.x - previous.x) * alpha);
-    const y = Math.round(previous.y + (state.y - previous.y) * alpha);
+    // Na grelha de píxeis do ECRÃ (múltiplos de 1/zoom), não de jogo: cada píxel de jogo continua
+    // a cair em píxeis inteiros do ecrã (pixel art exata), mas o movimento fica zoom× mais fino.
+    // A câmara segue o boneco, por isso o mundo inteiro também fica alinhado.
+    const x = this.toScreenGrid(previous.x + (state.x - previous.x) * alpha);
+    const y = this.toScreenGrid(previous.y + (state.y - previous.y) * alpha);
     player.setPosition(x, y).setDepth(y);
 
     if (this.time.now < this.attackUntil) {
