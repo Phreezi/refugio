@@ -10,6 +10,7 @@ import zonesJson from '../../src/data/zones.json';
 import { parseZones } from '../../src/data/types';
 import { countItem } from '../../src/systems/inventory/inventory';
 import { rollLoot } from '../../src/systems/loot/loot';
+import { discountedCost, eventActive, eventTicksLeft } from '../../src/systems/travel/events';
 import { CollisionWorld } from '../../src/systems/movement/CollisionWorld';
 import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../../src/world/tileset';
 import { parseZoneMap, type ZoneMap } from '../../src/world/zoneMap';
@@ -146,5 +147,62 @@ describe('Zonas T4 (Fase 10)', () => {
     const city = realMap('zone_city');
     expect(city.containers.filter((c) => c.id === 'city_store')).toHaveLength(16);
     expect(city.enemySpawns.length).toBeGreaterThanOrEqual(10);
+  });
+});
+
+describe('Eventos, comerciante e moto (Fase 10)', () => {
+  const dayTicks = secondsToTicks(BALANCE.dayLengthSec);
+
+  it('as zonas-evento só existem nos seus dias', () => {
+    const camp = content.zones.zone_camp?.event;
+    if (!camp) throw new Error('sem acampamento');
+    const active = (day: number) => eventActive(camp, day * dayTicks + 10, dayTicks);
+    // offset 1, a cada 6 dias, dura 2: dias 1–2, 7–8, 13–14…
+    expect([0, 1, 2, 3, 6, 7, 8, 9].map(active)).toEqual([
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+    ]);
+    expect(eventTicksLeft(camp, 1 * dayTicks, dayTicks)).toBe(2 * dayTicks);
+    const { state, sim } = setup();
+    state.data.world.tick = 1 * dayTicks + 5;
+    expect(sim.progression.isZoneAvailable('zone_camp')).toBe(true);
+    expect(sim.progression.isZoneAvailable('zone_farm')).toBe(true);
+    state.data.world.tick = 4 * dayTicks;
+    expect(sim.progression.isZoneAvailable('zone_camp')).toBe(false);
+  });
+
+  it('o comerciante troca na hora (sem fila e sem XP)', () => {
+    const { state, sim, enter } = setup();
+    const map = enter('zone_camp');
+    const trader = map.stations.find((s) => s.id === 'trader');
+    if (!trader) throw new Error('sem comerciante');
+    const key = `trader_${String(trader.objectId)}`;
+    const player = state.data.player;
+    player.inventory.fill(null);
+    player.hotbar.fill(null);
+    player.inventory[0] = ['scrap_metal', 6];
+    const xp = player.xp;
+    expect(sim.crafting.craft('t_nails', key)).toBe('ok');
+    expect(countItem([player.inventory], 'nails')).toBe(10);
+    expect(countItem([player.inventory], 'scrap_metal')).toBe(0);
+    expect(player.xp).toBe(xp);
+    // Longe dele não se troca.
+    player.inventory[0] = ['scrap_metal', 6];
+    expect(sim.crafting.craft('t_nails', null)).toBe('missing');
+  });
+
+  it('a moto na base corta para metade o custo das viagens', () => {
+    const { state, sim } = setup();
+    expect(sim.progression.travelCost('zone_city')).toEqual({ hunger: 10, thirst: 12 });
+    state.data.base.structures.push([1, 'motorcycle', 5, 5, 0, 0]);
+    expect(sim.progression.travelDiscount()).toBe(50);
+    expect(sim.progression.travelCost('zone_city')).toEqual({ hunger: 5, thirst: 6 });
+    expect(discountedCost({ hunger: 5, thirst: 3 }, 50)).toEqual({ hunger: 2, thirst: 1 });
   });
 });

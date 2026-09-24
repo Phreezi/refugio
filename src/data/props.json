@@ -63,5 +63,26 @@
   "dock": {
     "sprite": "dock",
     "action": "fish"
+  },
+  "plane_wreck": {
+    "sprite": "plane_wreck",
+    "footprint": {
+      "width": 56,
+      "height": 10
+    }
+  },
+  "locomotive": {
+    "sprite": "locomotive",
+    "footprint": {
+      "width": 44,
+      "height": 10
+    }
+  },
+  "tent": {
+    "sprite": "tent",
+    "footprint": {
+      "width": 28,
+      "height": 8
+    }
   }
 }

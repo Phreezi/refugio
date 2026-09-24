@@ -251,5 +251,17 @@
   "item.large_backpack": "Mochila grande",
   "zone.military": "Base Militar",
   "zone.city": "Cidade em Ruínas",
-  "map.military_hint": "O Guarda do Bunker tinha um cartão de acesso."
+  "map.military_hint": "O Guarda do Bunker tinha um cartão de acesso.",
+  "craft.cat.trade": "Trocas",
+  "craft.trade": "Trocar",
+  "craft.traded": "Trocaste por {item}.",
+  "station.trader": "Comerciante",
+  "item.moto_engine": "Motor de moto",
+  "item.moto_frame": "Quadro de moto",
+  "item.moto_wheel": "Roda de moto",
+  "structure.motorcycle": "Moto",
+  "zone.plane_crash": "Queda de Avião",
+  "zone.train": "Comboio Parado",
+  "zone.camp": "Acampamento",
+  "map.event": "Evento: acaba daqui a {hours} h de jogo."
 }

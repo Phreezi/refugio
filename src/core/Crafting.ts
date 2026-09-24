@@ -71,6 +71,11 @@ export class Crafting {
       result = craftInstant(containers, recipe, items);
       if (result === 'ok')
         this.bus.emit('craft:finished', { stationKey: HANDS, item: recipe.output, recipe: recipe.id });
+    } else if (recipe.category === 'trade') {
+      // Troca com o comerciante: instantânea, mas só junto dele.
+      if (!key || stationType(key) !== recipe.station) return 'missing';
+      result = craftInstant(containers, recipe, items);
+      if (result === 'ok') this.bus.emit('traded', { item: recipe.output });
     } else {
       if (!key || stationType(key) !== recipe.station) return 'missing';
       const max = stations[recipe.station]?.queue ?? 1;

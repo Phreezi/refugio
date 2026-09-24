@@ -80,6 +80,8 @@ export interface GameEvents {
   'dungeon:checkpoint': { floor: number };
   /** Um chefe foi derrotado (só volta daqui a uns dias). */
   'boss:defeated': { enemy: string };
+  /** Troca feita com o comerciante (não dá XP). */
+  traded: { item: string };
   /** Hordas (§7.13). */
   'horde:started': { size: number };
   'horde:ended': { won: boolean };

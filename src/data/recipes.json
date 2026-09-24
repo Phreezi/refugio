@@ -312,5 +312,140 @@
     "qty": 1,
     "timeSec": 60,
     "unlockLevel": 20
+  },
+  {
+    "id": "r_moto_wheel",
+    "station": "workbench",
+    "category": "materials",
+    "inputs": [
+      ["leather", 3],
+      ["scrap_metal", 4],
+      ["iron_ingot", 1]
+    ],
+    "output": "moto_wheel",
+    "qty": 1,
+    "timeSec": 30,
+    "unlockLevel": 22
+  },
+  {
+    "id": "r_moto_frame",
+    "station": "workbench",
+    "category": "materials",
+    "inputs": [
+      ["iron_ingot", 8],
+      ["scrap_metal", 6]
+    ],
+    "output": "moto_frame",
+    "qty": 1,
+    "timeSec": 45,
+    "unlockLevel": 22
+  },
+  {
+    "id": "r_moto_engine",
+    "station": "workbench",
+    "category": "materials",
+    "inputs": [
+      ["iron_ingot", 6],
+      ["electronics", 4],
+      ["chemicals", 2]
+    ],
+    "output": "moto_engine",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 22
+  },
+  {
+    "id": "t_nails",
+    "station": "trader",
+    "category": "trade",
+    "inputs": [["scrap_metal", 6]],
+    "output": "nails",
+    "qty": 10,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
+  },
+  {
+    "id": "t_pistol_ammo",
+    "station": "trader",
+    "category": "trade",
+    "inputs": [["leather", 4]],
+    "output": "pistol_ammo",
+    "qty": 6,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
+  },
+  {
+    "id": "t_canned_food",
+    "station": "trader",
+    "category": "trade",
+    "inputs": [["fish", 4]],
+    "output": "canned_food",
+    "qty": 2,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
+  },
+  {
+    "id": "t_iron_ingot",
+    "station": "trader",
+    "category": "trade",
+    "inputs": [["electronics", 2]],
+    "output": "iron_ingot",
+    "qty": 3,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
+  },
+  {
+    "id": "t_water",
+    "station": "trader",
+    "category": "trade",
+    "inputs": [["carrot", 4]],
+    "output": "water_clean",
+    "qty": 3,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
+  },
+  {
+    "id": "t_medkit",
+    "station": "trader",
+    "category": "trade",
+    "inputs": [["gunpowder", 3]],
+    "output": "medkit",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
+  },
+  {
+    "id": "t_small_backpack",
+    "station": "trader",
+    "category": "trade",
+    "inputs": [
+      ["wood_plank", 10],
+      ["rope", 3]
+    ],
+    "output": "small_backpack",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
+  },
+  {
+    "id": "t_large_backpack",
+    "station": "trader",
+    "category": "trade",
+    "inputs": [
+      ["iron_ingot", 6],
+      ["electronics", 3]
+    ],
+    "output": "large_backpack",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
   }
 ]

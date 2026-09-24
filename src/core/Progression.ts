@@ -2,6 +2,8 @@ import { BALANCE } from '../data/balance';
 import type { EnemyDefs, Recipe, Recipes, ResourceDefs, StructureDefs, ZoneDefs } from '../data/types';
 import { countItem } from '../systems/inventory/inventory';
 import { addXp } from '../systems/progression/progression';
+import { discountedCost, eventActive, eventTicksLeft } from '../systems/travel/events';
+import { secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
 import type { GameState } from './GameState';
 
@@ -75,6 +77,35 @@ export class Progression {
 
   isZoneUnlocked(zoneId: string): boolean {
     return (this.content().zones[zoneId]?.unlockLevel ?? 1) <= this.level;
+  }
+
+  /** A zona existe agora? (as zonas-evento só durante o evento, §8.3) */
+  isZoneAvailable(zoneId: string): boolean {
+    const event = this.content().zones[zoneId]?.event;
+    return !event || eventActive(event, this.state.data.world.tick, secondsToTicks(BALANCE.dayLengthSec));
+  }
+
+  /** Horas de jogo até a zona-evento desaparecer (0 se não for um evento a decorrer). */
+  eventHoursLeft(zoneId: string): number {
+    const event = this.content().zones[zoneId]?.event;
+    if (!event) return 0;
+    const ticks = eventTicksLeft(event, this.state.data.world.tick, secondsToTicks(BALANCE.dayLengthSec));
+    return Math.ceil(ticks / secondsToTicks(BALANCE.dayLengthSec / 24));
+  }
+
+  /** Desconto (%) nas viagens dado pelo melhor veículo construído na base (a moto). */
+  travelDiscount(): number {
+    const structures = this.content().structures;
+    return Math.max(
+      0,
+      ...this.state.data.base.structures.map((r) => structures[r[1]]?.travelDiscountPct ?? 0),
+    );
+  }
+
+  /** Custo de viajar até à zona, já com o desconto do veículo. */
+  travelCost(zoneId: string): { hunger: number; thirst: number } {
+    const cost = this.content().zones[zoneId]?.travelCost ?? { hunger: 0, thirst: 0 };
+    return discountedCost(cost, this.travelDiscount());
   }
 
   /** Item que falta levar para poder viajar para a zona (ex.: a chave do bunker), ou null. */

@@ -108,7 +108,7 @@ export class WorldMapScene extends Phaser.Scene {
     const base = this.screenPos(BASE_ZONE_ID);
     g.fillStyle(paletteNumber('stone'));
     for (const [zoneId, zone] of Object.entries(content.zones)) {
-      if (zoneId === BASE_ZONE_ID || zone.hidden) continue;
+      if (zoneId === BASE_ZONE_ID || zone.hidden || !simulation.progression.isZoneAvailable(zoneId)) continue;
       const to = this.screenPos(zoneId);
       const steps = Math.round(Math.hypot(to.x - base.x, to.y - base.y) / 6);
       for (let i = 1; i < steps; i += 1) {
@@ -120,7 +120,8 @@ export class WorldMapScene extends Phaser.Scene {
 
     const data = gameState.data;
     for (const [zoneId, zone] of Object.entries(content.zones)) {
-      if (zone.hidden) continue; // pisos de baixo das masmorras
+      // Pisos de baixo das masmorras e eventos que não estão a decorrer.
+      if (zone.hidden || !simulation.progression.isZoneAvailable(zoneId)) continue;
       const { x, y } = this.screenPos(zoneId);
       const here = zoneId === this.surface();
       if (here) this.add.circle(x, y, NODE_R + 3, paletteNumber('gold'));
@@ -184,7 +185,8 @@ export class WorldMapScene extends Phaser.Scene {
       zone.danger === 0 ? t('map.safe') : t('map.danger', { tier: `T${String(zone.danger)}` }),
     ];
     const here = zoneId === this.surface();
-    const cost = here ? { hunger: 0, thirst: 0 } : zone.travelCost;
+    const cost = here ? { hunger: 0, thirst: 0 } : simulation.progression.travelCost(zoneId);
+    if (zone.event) lines.push(t('map.event', { hours: simulation.progression.eventHoursLeft(zoneId) }));
     if (here) lines.push(t('map.here'));
     else if (cost.hunger + cost.thirst === 0) lines.push(t('map.free'));
     else lines.push(t('map.cost', { hunger: cost.hunger, thirst: cost.thirst }));
@@ -259,12 +261,13 @@ export class WorldMapScene extends Phaser.Scene {
     // Numa masmorra, vai-se direto ao checkpoint (piso mais fundo já alcançado).
     const target = simulation.progression.dungeonEntry(zoneId);
     const player = gameState.data.player;
-    if (!canTravel(player, zone.travelCost)) {
-      this.flash(t('map.too_tired', { hunger: zone.travelCost.hunger, thirst: zone.travelCost.thirst }));
+    const cost = simulation.progression.travelCost(zoneId);
+    if (!canTravel(player, cost)) {
+      this.flash(t('map.too_tired', { hunger: cost.hunger, thirst: cost.thirst }));
       return;
     }
     this.busy = true;
-    simulation.travel(target, content.zoneMap(target), zone.travelCost, target !== zoneId);
+    simulation.travel(target, content.zoneMap(target), cost, target !== zoneId);
     uiState.pendingNotice = tKey(content.zones[target]?.name ?? zone.name);
     this.go(target);
   }

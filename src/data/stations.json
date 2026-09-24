@@ -33,5 +33,14 @@
     },
     "queue": 3,
     "repair": true
+  },
+  "trader": {
+    "sprite": "trader",
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "queue": 1,
+    "trade": true
   }
 }

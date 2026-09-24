@@ -28,7 +28,8 @@
     "map:t2": "node scripts/generate-t2.ts",
     "map:t3": "node scripts/generate-t3.ts",
     "map:bunker": "node scripts/generate-bunker.ts",
-    "map:t4": "node scripts/generate-t4.ts"
+    "map:t4": "node scripts/generate-t4.ts",
+    "map:events": "node scripts/generate-events.ts"
   },
   "dependencies": {
     "phaser": "^4.2.1"

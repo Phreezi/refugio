@@ -1266,6 +1266,105 @@
         "border": "ink",
         "letter": "C"
       }
+    },
+    "plane_wreck": {
+      "type": "image",
+      "file": "sprites/plane_wreck.png",
+      "placeholder": {
+        "width": 64,
+        "height": 32,
+        "color": "stone_light",
+        "border": "ink",
+        "letter": "A"
+      }
+    },
+    "locomotive": {
+      "type": "image",
+      "file": "sprites/locomotive.png",
+      "placeholder": {
+        "width": 48,
+        "height": 28,
+        "color": "blood",
+        "border": "ink",
+        "letter": "L"
+      }
+    },
+    "wagon": {
+      "type": "image",
+      "file": "sprites/wagon.png",
+      "placeholder": {
+        "width": 32,
+        "height": 24,
+        "color": "wood",
+        "border": "ink",
+        "letter": "V"
+      }
+    },
+    "tent": {
+      "type": "image",
+      "file": "sprites/tent.png",
+      "placeholder": {
+        "width": 32,
+        "height": 24,
+        "color": "grass",
+        "border": "ink",
+        "letter": "T"
+      }
+    },
+    "trader": {
+      "type": "image",
+      "file": "sprites/trader.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "teal",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "motorcycle": {
+      "type": "image",
+      "file": "sprites/motorcycle.png",
+      "placeholder": {
+        "width": 32,
+        "height": 24,
+        "color": "red",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_moto_engine": {
+      "type": "image",
+      "file": "sprites/icons/moto_engine.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_dark",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_moto_frame": {
+      "type": "image",
+      "file": "sprites/icons/moto_frame.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "red",
+        "border": "ink",
+        "letter": "Q"
+      }
+    },
+    "icon_moto_wheel": {
+      "type": "image",
+      "file": "sprites/icons/moto_wheel.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "ink",
+        "border": "ink",
+        "letter": "R"
+      }
     }
   }
 }

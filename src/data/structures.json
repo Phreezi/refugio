@@ -1,5 +1,5 @@
 {
-  "$comment": "Peças de construção da base (CLAUDE.md §7.7), pela ordem da paleta do modo construção. layer: floor (fundação) ou top. size: [largura, altura] em tiles. solid: bloqueia os tiles inteiros; footprint: caixa sólida nos pés. rotatable: sprites <sprite> e <sprite>_v; door: também <sprite>_open. needsFoundation: só sobre fundação (ou chão da casa em ruínas). farm: canteiro da horta (sprite _wet regado). produce: produz sozinha a cada everyHours horas de jogo, até max; drops por unidade; needs = item gasto por unidade (sprite _full com algo para recolher). hp: vida contra as hordas (só peças sólidas). trap: armadilha de estacas { damage, everySec, uses }.",
+  "$comment": "Peças de construção da base (CLAUDE.md §7.7), pela ordem da paleta do modo construção. layer: floor (fundação) ou top. size: [largura, altura] em tiles. solid: bloqueia os tiles inteiros; footprint: caixa sólida nos pés. rotatable: sprites <sprite> e <sprite>_v; door: também <sprite>_open. needsFoundation: só sobre fundação (ou chão da casa em ruínas). farm: canteiro da horta (sprite _wet regado). produce: produz sozinha a cada everyHours horas de jogo, até max; drops por unidade; needs = item gasto por unidade (sprite _full com algo para recolher). hp: vida contra as hordas (só peças sólidas). trap: armadilha de estacas { damage, everySec, uses }. travelDiscountPct: veículo (moto) que baixa o custo das viagens.",
   "foundation_wood": {
     "sprite": "foundation_wood",
     "layer": "floor",
@@ -210,6 +210,22 @@
       ["iron_ingot", 4],
       ["wood_plank", 6],
       ["nails", 6]
+    ]
+  },
+  "motorcycle": {
+    "sprite": "motorcycle",
+    "layer": "top",
+    "size": [2, 1],
+    "footprint": {
+      "width": 26,
+      "height": 6
+    },
+    "unlockLevel": 22,
+    "travelDiscountPct": 50,
+    "cost": [
+      ["moto_engine", 1],
+      ["moto_frame", 1],
+      ["moto_wheel", 2]
     ]
   }
 }
