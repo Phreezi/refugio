@@ -8,6 +8,7 @@ import { respawnVitals, survivalRules, tickSurvival } from '../systems/survival/
 import { eventBus, type EventBus, type GameEvents } from './EventBus';
 import { FixedStep } from './FixedStep';
 import { gameState, type GameState } from './GameState';
+import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
 import { PlayerActions } from './PlayerActions';
 import { secondsToTicks } from './Clock';
@@ -25,6 +26,7 @@ export class Simulation {
   private readonly actionCooldownTicks = secondsToTicks(BALANCE.actionCooldownSec);
   readonly actions: PlayerActions;
   readonly interaction: Interaction;
+  readonly crafting: Crafting;
   private actionHeld = false;
   private actionQueued = false;
   private nextActionTick = 0;
@@ -35,12 +37,25 @@ export class Simulation {
   private previous: Vec2 = ZERO;
   private moved = false;
 
-  /** @param items definições dos itens (lidas quando são precisas: carregam depois do arranque). */
-  constructor(state: GameState, bus: EventBus<GameEvents>, items: () => ItemDefs = () => content.items) {
+  /**
+   * @param items definições dos itens (lidas quando são precisas: carregam depois do arranque).
+   * @param crafting receitas e estações (idem).
+   */
+  constructor(
+    state: GameState,
+    bus: EventBus<GameEvents>,
+    items: () => ItemDefs = () => content.items,
+    crafting: () => CraftingContent = () => ({
+      items: content.items,
+      recipes: content.recipes,
+      stations: content.stations,
+    }),
+  ) {
     this.state = state;
     this.bus = bus;
     this.actions = new PlayerActions(state, bus, items);
     this.interaction = new Interaction(state, bus, this.actions);
+    this.crafting = new Crafting(state, bus, crafting, this.actions);
   }
 
   /** Zona onde o jogador está: colisões, recursos, baús… (null = fora de uma cena de jogo). */
@@ -125,6 +140,7 @@ export class Simulation {
     this.movePlayer();
     this.runAction(world.tick);
     this.interaction.tick(world.tick);
+    this.crafting.advance(1);
     if (tickSurvival(this.state.data.player, world.tick, this.survival)) this.respawn();
     this.bus.emit('world:tick', { tick: world.tick });
   }

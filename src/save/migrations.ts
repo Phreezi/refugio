@@ -18,6 +18,8 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
       zones: {},
     };
   },
+  // v2 → v3 (Fase 4): filas e saídas das estações de crafting.
+  2: (s) => ({ ...s, stations: {} }),
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

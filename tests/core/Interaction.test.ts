@@ -22,6 +22,7 @@ function setup() {
     resources: [{ id: 'tree_small', x: 80, y: 92, objectId: 7 }],
     props: [{ id: 'well', x: 104, y: 78, objectId: 8 }],
     chests: [{ id: 'base_1', x: 62, y: 78, objectId: 9 }],
+    stations: [],
     containers: [],
     enemySpawns: [],
   };
@@ -34,7 +35,12 @@ function setup() {
   bus.on('action:blocked', ({ reason }) => events.push(`blocked:${reason}`));
   bus.on('container:open', ({ chestId }) => events.push(`open:${chestId}`));
   bus.on('resource:respawned', () => events.push('respawned'));
-  const sim = new Simulation(state, bus, () => content.items);
+  const sim = new Simulation(
+    state,
+    bus,
+    () => content.items,
+    () => content,
+  );
   const collision = CollisionWorld.fromZone(map, content.resources, content.props);
   sim.setZone({ zoneId: 'zone_test', map, collision, ...content });
   sim.reset();
@@ -143,10 +149,11 @@ describe('PlayerActions', () => {
     const { state, sim } = setup();
     state.data.player.inventory[0] = ['wood', 10];
     state.data.player.inventory[1] = ['wood', 5];
+    state.data.base.chests.base_1 = new Array<null>(BALANCE.chestSlots).fill(null);
     sim.actions.move({ container: 'inventory', index: 0 }, { container: 'chest:base_1', index: 3 });
-    expect(state.data.base.chests.base_1?.[3]).toEqual(['wood', 10]);
+    expect(state.data.base.chests.base_1[3]).toEqual(['wood', 10]);
     expect(sim.actions.storeSimilar('base_1')).toBe(5);
-    expect(state.data.base.chests.base_1?.[3]).toEqual(['wood', 15]);
+    expect(state.data.base.chests.base_1[3]).toEqual(['wood', 15]);
     expect(state.data.base.chests.base_1).toHaveLength(BALANCE.chestSlots);
   });
 });

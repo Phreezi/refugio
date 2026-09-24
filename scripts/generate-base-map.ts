@@ -181,8 +181,11 @@ place('fence_broken', 5, 21, 2, 1);
 place('fence_broken', 29, 40, 2, 1);
 place('fence_broken', 42, 20, 2, 1);
 
-// Baú dentro da casa (quarto de betão, junto à parede norte).
+// Baú dentro da casa (quarto de betão, junto à parede norte), fogueira à porta e bancada no
+// quarto de madeira. (No mapa atual foram acrescentadas como edição, com ids novos.)
 placements.push({ name: 'chest:base_1', x: 28 * TILE + TILE / 2, y: 16 * TILE - 2 });
+placements.push({ name: 'station:campfire', x: 28 * TILE + TILE / 2, y: 25 * TILE - 2 });
+placements.push({ name: 'station:wood_bench', x: 21 * TILE + TILE / 2, y: 16 * TILE - 2 });
 
 scatter('resource', 'tree_large', 8, 2, 3);
 scatter('resource', 'tree_small', 22, 1, 2);

@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 import { PALETTE } from '../assets/palette';
 import { clockAt } from '../core/Clock';
+import { FIXED_STEP_MS } from '../config';
 import { eventBus } from '../core/EventBus';
+import { advanceRespawns, offlineTicks } from '../core/offline';
+import { simulation } from '../core/Simulation';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
 import { BALANCE } from '../data/balance';
 import { getView, setupFixedCamera } from '../display/view';
@@ -12,6 +15,7 @@ import { SaveError } from '../save/schema';
 import { Button } from '../ui/Button';
 import { downloadText, pickTextFile, saveFileName } from '../ui/fileTransfer';
 import { Label } from '../ui/text';
+import { uiState } from '../ui/uiState';
 import { content } from '../world/content';
 import { SceneKey } from './keys';
 
@@ -215,6 +219,13 @@ export class MainMenuScene extends Phaser.Scene {
     if (this.busy) return; // Enter com a tecla presa repete o evento
     this.busy = true;
     const state = gameState.load(save.state);
+    // Tempo em que o jogo esteve fechado: crafts e reaparecimento de recursos avançam (§7.6).
+    const ticks = offlineTicks(save.timestamp, Date.now(), BALANCE.offlineCapHours, FIXED_STEP_MS);
+    if (ticks > 0) {
+      advanceRespawns(state, ticks);
+      const finished = simulation.crafting.advance(ticks);
+      if (finished > 0) uiState.pendingNotice = t('craft.offline', { n: finished });
+    }
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
     this.scene.start(SceneKey.Base, {});
   }

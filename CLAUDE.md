@@ -152,6 +152,8 @@ refugio/
 │   │   ├── Simulation.ts     # corre os ticks de lógica (sistemas entram aqui)
 │   │   ├── Interaction.ts    # ação contextual, recolha, respawn de recursos (ZoneContext)
 │   │   ├── PlayerActions.ts  # usar/mover/dividir/guardar semelhantes/beber
+│   │   ├── Crafting.ts       # craft nas mãos/estações, fila, recolher, reparar
+│   │   ├── offline.ts        # tempo offline (§7.6)
 │   │   ├── Clock.ts          # tempo de jogo, dia/noite
 │   │   └── Rng.ts            # RNG com seed
 │   ├── systems/              # lógica pura, SEM dependências do Phaser sempre que possível
@@ -185,7 +187,8 @@ refugio/
 │   │       └── YouTubePlayablesAdapter.ts # Fase 14
 │   ├── data/                 # JSON data-driven
 │   │   ├── types.ts          # tipos + validação (puro; também usado por scripts/)
-│   │   ├── resources.json    # nós de recurso (Fase 1: sprite + footprint)
+│   │   ├── resources.json    # nós de recurso (vida, ferramenta, drops, respawn)
+│   │   ├── stations.json     # estações de crafting (sprite, footprint, fila, reparação)
 │   │   ├── props.json        # obstáculos/decoração livres no mapa (sprite + footprint)
 │   │   ├── items.json
 │   │   ├── recipes.json
@@ -326,7 +329,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Velocidade do jogo x1/x2/x3 | Botão por baixo do relógio | Idem |
 | Ação contextual (bater, recolher, abrir, atacar) | Espaço / clique | Botão grande (lado direito) |
 | Inventário | I / Tab | Botão mochila |
-| Craft | C | Botão martelo |
+| Craft | C | Botão "Fabricar" (à esquerda da hotbar) |
 | Modo construção | B | Botão planta (só na base) |
 | Comer/beber rápido | 1–4 (hotbar) | Hotbar de 4 slots |
 
@@ -467,7 +470,8 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 ### 8.4 Regras de desenho de mapas (Tiled)
 
 - Camadas: `ground`, `decor_low`, `collision`, `decor_high` (por cima do jogador), `objects`.
-- Camada `objects` contém pontos de spawn: `player_spawn`, `exit`, `resource:<id>`, `prop:<id>`, `chest:<id>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
+- Camada `objects` contém pontos de spawn: `player_spawn`, `exit`, `resource:<id>`, `prop:<id>`, `chest:<id>`, `station:<tipo>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
+- Estado de uma estação no save: `stations["<tipo>_<id do objeto>"] = { queue: [[receita, ticks que faltam]], output: Slot[] }`.
 - O **id do objeto no Tiled** identifica cada recurso no save (`zones.<zona>.depleted`): não reutilizar ids (o Tiled nunca o faz).
 - **Obstáculos livres** (`prop:<id>`, definidos em `props.json`): troncos, cepos, caixotes, barris, vedação partida, carros abandonados, poço, pedrinhas… Colocam-se em **qualquer posição** (fora da grelha) e bloqueiam com o seu `footprint` (ou são decoração atravessável sem ele). É assim que se dá realismo ao mapa sem mudar a escala.
 - Cada zona tem **pelo menos 2 saídas** para o mapa-mundo e uma área segura perto da entrada.
@@ -693,12 +697,12 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** transformar recursos em ferramentas e comida.
 
-- [ ] `recipes.json` e sistema de crafting puro (verificar ingredientes, consumir, produzir) com testes.
-- [ ] Craft nas mãos (instantâneo) e em estações (com tempo e fila).
-- [ ] Estações iniciais: fogueira, bancada de madeira.
-- [ ] Ferramentas com durabilidade e bónus de recolha; reparação na bancada.
-- [ ] UI de crafting: separadores por categoria, ingredientes em falta a vermelho, barra de progresso.
-- [ ] Timers de craft a avançar offline (máx. 8 h).
+- [x] `recipes.json` e sistema de crafting puro (verificar ingredientes, consumir, produzir) com testes.
+- [x] Craft nas mãos (instantâneo) e em estações (com tempo de jogo e fila de 3; o resultado espera na estação até ser recolhido — ao abrir a estação é recolhido logo).
+- [x] Estações iniciais: fogueira (à porta da casa) e bancada de madeira (quarto de madeira), colocadas no mapa (`station:<tipo>`; `stations.json`). Na Fase 5 passam a ser construídas.
+- [x] Ferramentas com durabilidade e bónus de recolha; reparação na bancada (`repairCostPct`% dos ingredientes, proporcional ao desgaste).
+- [x] UI de crafting (C / botão "Fabricar"; ação junto da estação): separadores por categoria, ingredientes em falta a vermelho, fila com barra de progresso, cancelar, recolher.
+- [x] Timers de craft (e respawn de recursos) a avançar offline (máx. 8 h) ao carregar "Continuar".
 
 **Aceitação:** cadeia completa madeira → machado de pedra → cortar mais rápido → tábuas na bancada → carne cozinhada na fogueira.
 
@@ -943,6 +947,9 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Zoom no PC só com Ctrl + roda (preventDefault para o browser não ampliar a página) | Pedido do jogador; a roda sozinha fica livre |
 | 2026-09-24 | Botão de velocidade x1/x2/x3 | Pedido do jogador: acelera todo o tempo de jogo (útil para testar e para esperas) |
 | 2026-09-24 | Andar agachado com Shift / joystick pouco empurrado (pedido do jogador) | Antecipa a furtividade da Fase 6; spritesheet da personagem passa a 10 colunas (frames agachados) |
+| 2026-09-24 | Estações da Fase 4 colocadas no mapa (acrescentadas ao `base.json` como edição, com ids novos) | Os ids dos objetos existentes não mudam, por isso os saves com recursos apanhados continuam certos |
+| 2026-09-24 | O resultado dos crafts em estação fica na estação até ser recolhido | Como no original; o craft continua enquanto o jogador está fora e nada se perde se a mochila estiver cheia |
+| 2026-09-24 | Save v3: `stations`; baú inicial de jogos novos com carne crua, água suja e trapos | Migração v2 → v3 com teste; os mantimentos permitem testar a fogueira antes de haver animais (Fase 6) |
 | 2026-09-24 | Cópia de emergência síncrona (localStorage) ao esconder/fechar a página | Testado: ao recarregar, o Chrome corta a escrita assíncrona no IndexedDB e perdiam-se os últimos segundos |
 | 2026-09-24 | Joystick virtual flutuante (só toque), 8 direções, zona morta 25% | Primeiro só na metade esquerda; o jogador preferiu poder tocar em qualquer lado (fora dos botões/hotbar), sem joystick parado no canto. O teclado tem prioridade |
 | 2026-09-24 | Ficheiros de `public/` pedidos com `?v=<build>` (`versioned()` em config.ts) | O browser juntou JS novo com um manifest antigo em cache (GitHub Pages: 10 min) e o arranque falhou |

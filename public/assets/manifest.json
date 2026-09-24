@@ -134,6 +134,7 @@
     },
     "campfire": {
       "type": "image",
+      "file": "sprites/campfire.png",
       "placeholder": {
         "width": 16,
         "height": 16,
@@ -144,9 +145,10 @@
     },
     "wood_bench": {
       "type": "image",
+      "file": "sprites/wood_bench.png",
       "placeholder": {
-        "width": 16,
-        "height": 16,
+        "width": 32,
+        "height": 20,
         "color": "wood_light",
         "border": "bark",
         "letter": "T"

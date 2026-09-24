@@ -47,6 +47,10 @@ export class Autosave {
       this.bus.on('player:died', () => {
         this.request();
       }),
+      // CLAUDE.md §10.2: gravar logo no fim de um craft.
+      this.bus.on('craft:finished', () => {
+        this.request();
+      }),
     ];
   }
 

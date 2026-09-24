@@ -12,6 +12,7 @@ import { readJoystick } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
 import { Button } from '../ui/Button';
 import { gameSpeed, nextGameSpeed } from '../ui/gameSpeed';
+import { CraftingUI } from '../ui/CraftingUI';
 import { InventoryUI } from '../ui/InventoryUI';
 import { Label } from '../ui/text';
 import { uiState } from '../ui/uiState';
@@ -67,6 +68,7 @@ export class UIScene extends Phaser.Scene {
   private notice: Label | null = null;
   private noticeTimer: Phaser.Time.TimerEvent | null = null;
   private inventory: InventoryUI | null = null;
+  private crafting: CraftingUI | null = null;
   /** Ponteiro que está a segurar a ação (botão de toque ou clique no mundo). */
   private actionPointer: number | null = null;
 
@@ -99,11 +101,16 @@ export class UIScene extends Phaser.Scene {
     ).setDepth(90);
 
     this.inventory = new InventoryUI(this, simulation.actions);
+    this.crafting = new CraftingUI(this, simulation);
     this.createButtons();
     this.createSpeedButton();
     this.createJoystick();
     this.createKeys();
     const offEvents = this.listenForMessages();
+    if (uiState.pendingNotice) {
+      this.showNotice(uiState.pendingNotice);
+      uiState.pendingNotice = null;
+    }
 
     // Mudou a resolução ou o zoom: refazer o HUD com a vista nova.
     const onResize = (): void => {
@@ -117,6 +124,8 @@ export class UIScene extends Phaser.Scene {
       uiState.actionHeld = false;
       this.inventory?.destroy();
       this.inventory = null;
+      this.crafting?.destroy();
+      this.crafting = null;
       this.joystickBase = null;
       this.joystickKnob = null;
       this.bars = [];
@@ -127,6 +136,7 @@ export class UIScene extends Phaser.Scene {
 
   override update(time: number): void {
     if (!gameState.hasGame) return;
+    this.crafting?.update();
     const { player, world } = gameState.data;
     const low = (BALANCE.statMax * BALANCE.lowStatPct) / 100;
     const blinkOff = Math.floor(time / BLINK_MS) % 2 === 1;
@@ -216,6 +226,17 @@ export class UIScene extends Phaser.Scene {
     const hotbar = this.inventory?.hotbarRect();
     if (!hotbar) return;
     const bagWidth = 44;
+    // Crafting nas mãos: à esquerda da hotbar (a mochila fica à direita).
+    new Button(
+      this,
+      Math.max(bagWidth / 2 + 4, hotbar.x - 6 - bagWidth / 2),
+      hotbar.y + hotbar.h / 2,
+      t('craft.title'),
+      { width: bagWidth, height: hotbar.h, fontSize: 8, style: 'secondary' },
+      () => {
+        this.toggleCrafting();
+      },
+    ).setDepth(70);
     const bagX = Math.min(width - bagWidth / 2 - 4, hotbar.x + hotbar.w + 6 + bagWidth / 2);
     new Button(
       this,
@@ -224,7 +245,7 @@ export class UIScene extends Phaser.Scene {
       t('hud.bag'),
       { width: bagWidth, height: hotbar.h, fontSize: 8, style: 'secondary' },
       () => {
-        this.inventory?.toggle();
+        this.toggleInventory();
       },
     ).setDepth(70);
 
@@ -251,18 +272,33 @@ export class UIScene extends Phaser.Scene {
     if (!keyboard) return;
     const toggle = (event: KeyboardEvent): void => {
       event.preventDefault(); // Tab mudaria o foco do browser
-      this.inventory?.toggle();
+      this.toggleInventory();
     };
     keyboard.on('keydown-I', toggle);
     keyboard.on('keydown-TAB', toggle);
+    keyboard.on('keydown-C', () => {
+      this.toggleCrafting();
+    });
     keyboard.on('keydown-ESC', () => {
       if (this.inventory?.isOpen) this.inventory.close();
+      if (this.crafting?.isOpen) this.crafting.close();
     });
     ['ONE', 'TWO', 'THREE', 'FOUR'].forEach((key, index) => {
       keyboard.on(`keydown-${key}`, () => {
         if (!uiState.modalOpen) this.inventory?.useHotbar(index);
       });
     });
+  }
+
+  /** Só um painel aberto de cada vez (mochila/baú ou crafting). */
+  private toggleInventory(): void {
+    if (this.crafting?.isOpen) this.crafting.close();
+    this.inventory?.toggle();
+  }
+
+  private toggleCrafting(): void {
+    if (this.inventory?.isOpen) this.inventory.close();
+    this.crafting?.toggleHands();
   }
 
   private releaseAction(pointerId: number): void {
@@ -294,7 +330,8 @@ export class UIScene extends Phaser.Scene {
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       const p = this.toGame(pointer);
-      // 1) Interface: hotbar, painel, botões.
+      // 1) Interface: painéis, hotbar, botões.
+      if (this.crafting?.pointerDown(p.x, p.y)) return;
       if (this.inventory?.pointerDown(p.x, p.y, pointer.id)) return;
       if (this.input.hitTestPointer(pointer).length > 0 || uiState.modalOpen) return;
 

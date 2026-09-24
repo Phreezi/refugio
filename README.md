@@ -43,6 +43,7 @@ Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
   telemóvel. A seta indica o alvo. Manter premido repete golpes.
 - **Mochila:** I ou Tab (ou o botão "Mochila"); arrastar para mover, tocar para selecionar.
   Hotbar: teclas 1–4 ou tocar para comer/beber.
+- **Crafting:** C ou o botão "Fabricar" (nas mãos); Ação junto da fogueira ou da bancada.
 - **Velocidade do jogo:** botão x1/x2/x3 por baixo do relógio.
 
 ## Gravação

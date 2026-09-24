@@ -1,4 +1,5 @@
 import { BALANCE } from '../data/balance';
+import { createStationState, type StationState } from '../systems/crafting/crafting';
 import { createContainer, type Container } from '../systems/inventory/inventory';
 import type { Facing } from '../systems/movement/movement';
 
@@ -47,7 +48,12 @@ export interface GameStateData {
   world: WorldState;
   base: BaseState;
   zones: Record<string, ZoneState>;
+  /** Filas e saídas das estações de crafting, pela chave `<tipo>_<id do objeto>` (§10.5). */
+  stations: Record<string, StationState>;
 }
+
+/** Baú da base num jogo novo: mantimentos para os primeiros minutos (e testar a fogueira). */
+export const STARTING_CHEST_ID = 'base_1';
 
 /**
  * @param spawn posição inicial dos pés do jogador (o `player_spawn` do mapa da base).
@@ -71,9 +77,24 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       hotbar,
     },
     world: { tick: 0, rng: seed >>> 0 },
-    base: { chests: {} },
+    base: { chests: { [STARTING_CHEST_ID]: startingChest() } },
     zones: {},
+    stations: {},
   };
+}
+
+function startingChest(): Container {
+  const chest = createContainer(BALANCE.chestSlots);
+  chest[0] = ['raw_meat', 3];
+  chest[1] = ['water_dirty', 2];
+  chest[2] = ['cloth', 4];
+  return chest;
+}
+
+/** Estado de uma estação (criado vazio na primeira vez). */
+export function stationState(data: GameStateData, key: string): StationState {
+  data.stations[key] ??= createStationState();
+  return data.stations[key];
 }
 
 /** Estado de uma zona (criado se ainda não existir). */

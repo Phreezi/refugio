@@ -6,8 +6,10 @@ import { BASE_MAP_FILE, BASE_MAP_KEY, TILE_SIZE, versioned } from '../config';
 import { BASE_ZONE_ID } from '../core/GameState';
 import itemsJson from '../data/items.json';
 import propsJson from '../data/props.json';
+import recipesJson from '../data/recipes.json';
+import stationsJson from '../data/stations.json';
 import resourcesJson from '../data/resources.json';
-import { parseItems, parseProps, parseResources } from '../data/types';
+import { parseItems, parseProps, parseRecipes, parseResources, parseStations } from '../data/types';
 import { getView, setupFixedCamera } from '../display/view';
 import { t } from '../i18n';
 import { Label } from '../ui/text';
@@ -97,6 +99,8 @@ export class PreloadScene extends Phaser.Scene {
     content.setResources(resources);
     const props = parseProps(propsJson, Object.keys(manifest.assets));
     content.setProps(props);
+    const stations = parseStations(stationsJson, Object.keys(manifest.assets));
+    content.setCrafting(stations, parseRecipes(recipesJson, Object.keys(items), Object.keys(stations)));
 
     const cached: unknown = this.cache.tilemap.get(BASE_MAP_KEY);
     const data = typeof cached === 'object' && cached !== null && 'data' in cached ? cached.data : undefined;
@@ -108,6 +112,7 @@ export class PreloadScene extends Phaser.Scene {
         tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
         resourceIds: Object.keys(resources),
         propIds: Object.keys(props),
+        stationIds: Object.keys(stations),
       },
       BASE_MAP_FILE,
     );

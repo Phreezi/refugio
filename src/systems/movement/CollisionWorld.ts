@@ -37,6 +37,7 @@ export class CollisionWorld {
     map: ZoneMap,
     resources: Readonly<Record<string, WorldObjectDef>>,
     props: Readonly<Record<string, WorldObjectDef>> = {},
+    stations: Readonly<Record<string, WorldObjectDef>> = {},
   ): CollisionWorld {
     const obstacles: Rect[] = [];
     const keyed: [number, Rect][] = [];
@@ -48,6 +49,10 @@ export class CollisionWorld {
     for (const placement of [...map.props, ...map.chests]) {
       const def = map.chests.includes(placement) ? props.chest : props[placement.id];
       if (def?.footprint) obstacles.push(footprintRect(placement, def.footprint));
+    }
+    for (const placement of map.stations) {
+      const footprint = stations[placement.id]?.footprint;
+      if (footprint) obstacles.push(footprintRect(placement, footprint));
     }
     const world = new CollisionWorld(map.width, map.height, map.tileSize, map.solid, obstacles);
     for (const [key, rect] of keyed) world.addKeyed(key, rect);

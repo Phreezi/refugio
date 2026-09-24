@@ -104,6 +104,7 @@ describe('CollisionWorld', () => {
       ],
       props: [{ id: 'crate', x: 24, y: 10, objectId: 3 }],
       chests: [],
+      stations: [],
       containers: [],
       enemySpawns: [],
     };
