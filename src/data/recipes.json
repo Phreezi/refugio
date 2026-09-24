@@ -248,5 +248,69 @@
     "qty": 1,
     "timeSec": 25,
     "unlockLevel": 12
+  },
+  {
+    "id": "r_crossbow",
+    "station": "workbench",
+    "category": "weapons",
+    "inputs": [
+      ["wood_plank", 4],
+      ["rope", 3],
+      ["iron_ingot", 2]
+    ],
+    "output": "crossbow",
+    "qty": 1,
+    "timeSec": 30,
+    "unlockLevel": 13
+  },
+  {
+    "id": "r_bolt",
+    "station": "workbench",
+    "category": "weapons",
+    "inputs": [
+      ["wood", 2],
+      ["scrap_metal", 1]
+    ],
+    "output": "bolt",
+    "qty": 5,
+    "timeSec": 10,
+    "unlockLevel": 13
+  },
+  {
+    "id": "r_gunpowder",
+    "station": "workbench",
+    "category": "materials",
+    "inputs": [["chemicals", 1]],
+    "output": "gunpowder",
+    "qty": 2,
+    "timeSec": 15,
+    "unlockLevel": 18
+  },
+  {
+    "id": "r_pistol_ammo",
+    "station": "workbench",
+    "category": "weapons",
+    "inputs": [
+      ["gunpowder", 1],
+      ["scrap_metal", 1]
+    ],
+    "output": "pistol_ammo",
+    "qty": 6,
+    "timeSec": 15,
+    "unlockLevel": 18
+  },
+  {
+    "id": "r_pistol",
+    "station": "workbench",
+    "category": "weapons",
+    "inputs": [
+      ["iron_ingot", 6],
+      ["electronics", 2],
+      ["scrap_metal", 4]
+    ],
+    "output": "pistol",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 20
   }
 ]

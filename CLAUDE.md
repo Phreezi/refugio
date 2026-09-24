@@ -405,7 +405,7 @@ Os nós de recurso reaparecem (ver zonas).
 - **Corpo a corpo**: cada arma tem dano, velocidade (`attackSec`), alcance (`reach`), durabilidade (gasta 1 por golpe). Sem arma, punhos (`fistDamage`). Qualquer item com `damage` se equipa como arma (um machado equipado também serve para cortar).
 - Golpe: dano, número a subir, empurrão e 0,3 s de atordoamento — exceto durante o aviso de ataque (o ataque do inimigo já está comprometido). Mantendo a ação premida repete ao ritmo da arma.
 - Ao levar dano: 0,6 s de invulnerabilidade (o boneco pisca) e um pequeno empurrão.
-- **Distância** (Fase 10): pistola/besta com munição; mira automática ao inimigo mais próximo.
+- **Distância** (Fase 10): armas com `ranged: { ammo, range, speed }` (besta, pistola). Com a ação, se houver um inimigo a menos de `range` px, a mira vai sozinha ao mais perto (a seta de alvo mostra-o), gasta 1 de munição (`type: "ammo"`) e dispara um projétil que voa a `speed` px/s; pára na primeira parede/obstáculo ou no primeiro inimigo em que toca. Sem inimigos ao alcance, a ação faz o resto (recolher, abrir…); sem munição, avisa. Os projéteis não se gravam.
 - Inimigos **telegrafam** ataques (0,4 s de aviso com piscar) — dá para recuar.
 - **Sangrar** (Fase 10): alguns inimigos (`bleedPct` em `enemies.json`: corredor, lobo, brutamontes) podem pôr o jogador a sangrar — perde 1 de vida a cada `bleedEverySec` durante `bleedSec` (nunca instantâneo); itens com `stopsBleeding` (ligadura, kit médico) estancam. Morrer também. Save: `player.bleed` (ticks).
 - Furtividade simples: andar devagar (segurar Shift/Ctrl / joystick parcial) reduz raio de deteção para metade (`sneakDetectMultiplier`).
@@ -834,7 +834,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 - [x] Zonas T3: **Zona Industrial**, **Hospital de Campanha** (mapas gerados por `npm run map:t3`; armários industriais e de medicamentos).
 - [x] Inimigos: tank (aviso mais longo, `windupSec`), screamer (grita e alerta os outros, `scream`).
-- [ ] Armas à distância (besta, pistola) e munição craftável.
+- [x] Armas à distância (besta, pistola) e munição craftável (virotes, pólvora, balas) na **bancada de trabalho** (nova estação, nível 12).
 - [ ] **Bunker**: 4 pisos, checkpoint por piso, chefe final, chave obtida em quest simples.
 - [ ] Zona T4: **Base Militar** (cartão de acesso), depois **Cidade em Ruínas**.
 - [ ] Zonas-evento: queda de avião, comboio, acampamento com comerciante (troca).
@@ -1044,3 +1044,4 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Nova Fase 15: co-op online a 2 com código de 5 caracteres, único entre as sessões ativas | Pedido do jogador. Anfitrião autoritativo por WebRTC; os códigos são gerados e reservados pelo servidor de sinalização (única forma de garantir que não se repetem) |
 | 2026-09-24 | Fase 10 dividida em partes (A: T3 + medicina; B: armas à distância; C: bunker; D: T4; E: eventos e moto) | É a maior fase; cada parte é jogável e publicada à parte |
 | 2026-09-24 | Save v10: `player.bleed`; sem infeção | O sangramento dá uso às ligaduras e aos kits; a infeção era opcional e acrescentava gestão sem ganho |
+| 2026-09-24 | Armas à distância com mira automática ao inimigo mais perto e projéteis de verdade (param em paredes) | Joga-se igual com toque e teclado (um botão); as paredes continuam a proteger |

@@ -159,7 +159,8 @@
       ["nails", 3, 2, 5],
       ["iron_ingot", 2, 1, 2],
       ["rope", 2, 1, 2],
-      ["bandage", 1, 1, 1]
+      ["bandage", 1, 1, 1],
+      ["bolt", 2, 3, 6]
     ]
   },
   "medical_cabinet": {

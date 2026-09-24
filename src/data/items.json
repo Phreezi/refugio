@@ -424,5 +424,56 @@
     "durability": 200,
     "armor": 12,
     "equip": "legs"
+  },
+  "crossbow": {
+    "name": "item.crossbow",
+    "icon": "icon_crossbow",
+    "type": "weapon",
+    "stack": 1,
+    "rarity": "uncommon",
+    "damage": 18,
+    "attackSec": 1.0,
+    "durability": 240,
+    "ranged": {
+      "ammo": "bolt",
+      "range": 130,
+      "speed": 240
+    }
+  },
+  "pistol": {
+    "name": "item.pistol",
+    "icon": "icon_pistol",
+    "type": "weapon",
+    "stack": 1,
+    "rarity": "rare",
+    "damage": 28,
+    "attackSec": 0.55,
+    "durability": 300,
+    "ranged": {
+      "ammo": "pistol_ammo",
+      "range": 160,
+      "speed": 400
+    }
+  },
+  "bolt": {
+    "name": "item.bolt",
+    "icon": "icon_bolt",
+    "type": "ammo",
+    "stack": 100,
+    "rarity": "common"
+  },
+  "pistol_ammo": {
+    "name": "item.pistol_ammo",
+    "icon": "icon_pistol_ammo",
+    "type": "ammo",
+    "stack": 100,
+    "rarity": "uncommon"
+  },
+  "gunpowder": {
+    "name": "item.gunpowder",
+    "icon": "icon_gunpowder",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "uncommon"
   }
 }

@@ -351,3 +351,51 @@ describe('Inimigos T3 e medicina (Fase 10)', () => {
     expect(player.hp).toBeGreaterThanOrEqual(after);
   });
 });
+
+describe('Armas à distância (Fase 10)', () => {
+  it('a besta mira sozinha no inimigo mais perto, gasta um virote e o virote acerta', () => {
+    const { state, sim, events, run } = setup(map([{ id: 'walker', x: 330, y: 240 }]));
+    const player = state.data.player;
+    player.equipment[0] = ['crossbow', 1, 240];
+    player.inventory[0] = ['bolt', 2];
+    const walker = sim.combat.list[0];
+    if (!walker) throw new Error('sem arrastado');
+    expect(sim.interaction.currentTarget(PLAYER_FOOTPRINT)?.data.type).toBe('enemy');
+    expect(sim.combat.shoot()).toBe('shot');
+    expect(countItem([player.inventory], 'bolt')).toBe(1);
+    expect(player.facing).toBe('right');
+    expect(sim.combat.shots).toHaveLength(1);
+    run(0.6);
+    expect(sim.combat.shots).toHaveLength(0);
+    expect(walker.hp).toBe(40 - 18);
+    // Sem virotes: avisa e não dispara.
+    player.inventory[0] = null;
+    expect(sim.combat.shoot()).toBe('no_ammo');
+    expect(events.filter((e) => e.startsWith('hurt:'))).toEqual([]);
+  });
+
+  it('sem inimigos ao alcance não dispara (a ação faz o resto)', () => {
+    const { state, sim } = setup(map([{ id: 'walker', x: 450, y: 450 }]));
+    state.data.player.equipment[0] = ['crossbow', 1, 240];
+    state.data.player.inventory[0] = ['bolt', 5];
+    expect(sim.combat.shoot()).toBeNull();
+    expect(countItem([state.data.player.inventory], 'bolt')).toBe(5);
+  });
+
+  it('as paredes param os projéteis', () => {
+    const zone = map([{ id: 'walker', x: 330, y: 240 }]);
+    // Uma parede entre o jogador e o inimigo (coluna de tiles x = 17).
+    for (let y = 0; y < N; y++) (zone.solid as boolean[])[y * N + 17] = true;
+    const { state, sim, run } = setup(zone);
+    state.data.player.equipment[0] = ['crossbow', 1, 240];
+    state.data.player.inventory[0] = ['bolt', 1];
+    const walker = sim.combat.list[0];
+    if (!walker) throw new Error('sem arrastado');
+    walker.state = 'idle';
+    walker.timer = 1000;
+    expect(sim.combat.shoot()).toBe('shot');
+    run(0.3);
+    expect(sim.combat.shots).toHaveLength(0);
+    expect(walker.hp).toBe(40);
+  });
+});

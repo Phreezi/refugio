@@ -10,7 +10,7 @@ import {
   weaponStats,
   type WeaponStats,
 } from '../systems/combat/combat';
-import { addItem, createContainer, type Container } from '../systems/inventory/inventory';
+import { addItem, createContainer, removeItem, type Container } from '../systems/inventory/inventory';
 import type { Rect } from '../systems/movement/geometry';
 import { moveWithCollision, normalize } from '../systems/movement/movement';
 import { secondsToTicks, TICKS_PER_SECOND } from './Clock';
@@ -21,6 +21,28 @@ import type { PlayerActions } from './PlayerActions';
 import type { Building } from './Building';
 import { isNight } from './DayNight';
 import { nextRandom, randomInt } from './Rng';
+
+/** Projétil em voo (seta, bala). Não se grava. */
+export interface Projectile {
+  id: number;
+  /** Munição (para o desenho). */
+  ammo: string;
+  /** Posição à altura do peito (o chão fica `SHOT_HEIGHT` px abaixo). */
+  x: number;
+  y: number;
+  px: number;
+  py: number;
+  /** Direção (normalizada) e px por tick. */
+  dx: number;
+  dy: number;
+  step: number;
+  /** Distância que ainda pode voar. */
+  left: number;
+  damage: number;
+}
+
+/** Altura dos tiros acima dos pés (px). */
+const SHOT_HEIGHT = 8;
 
 export interface CombatContent {
   items: ItemDefs;
@@ -50,6 +72,8 @@ export class Combat {
   building: Building | null = null;
   /** Próximo tick em que cada armadilha pode voltar a ferir (não se grava). */
   private trapReady = new Map<number, number>();
+  private projectiles: Projectile[] = [];
+  private nextShot = 1;
   /** Hora real (ms): as mochilas no chão duram horas reais (§7.12). Substituível nos testes. */
   now: () => number = () => Date.now();
 
@@ -71,6 +95,7 @@ export class Combat {
     this.enemies = [];
     this.invulnerableUntil = 0;
     this.trapReady.clear();
+    this.projectiles = [];
     if (!zone) return;
     const bags = zoneState(this.state.data, zone.zoneId).bags;
     const now = this.now();
@@ -145,6 +170,107 @@ export class Combat {
     this.enemies = this.enemies.filter((e) => !e.horde);
   }
 
+  /** Projéteis em voo (para desenhar). */
+  get shots(): readonly Projectile[] {
+    return this.projectiles;
+  }
+
+  /** Inimigo vivo mais perto do jogador, até `range` px (a mira automática, §7.8). */
+  nearestInRange(range: number): Enemy | null {
+    const player = this.state.data.player;
+    let best: Enemy | null = null;
+    let bestDist = range;
+    for (const enemy of this.enemies) {
+      if (enemy.dying > 0) continue;
+      const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+      if (dist <= bestDist) {
+        best = enemy;
+        bestDist = dist;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Dispara a arma à distância equipada no inimigo mais perto (gasta 1 de munição).
+   * @returns 'shot', 'no_ammo' (há alvo mas falta munição) ou null (sem arma à distância/alvo).
+   */
+  shoot(): 'shot' | 'no_ammo' | null {
+    const weapon = this.weapon();
+    const ranged = weapon.ranged;
+    if (!ranged) return null;
+    const target = this.nearestInRange(ranged.range);
+    if (!target) return null;
+    const containers = this.actions.pickupContainers();
+    if (!removeItem(containers, ranged.ammo, 1)) return 'no_ammo';
+    const player = this.state.data.player;
+    const equipment = player.equipment;
+    for (const item of wearSlots(equipment, [0])) this.bus.emit('item:broken', { item });
+    const from = { x: player.x, y: player.y - SHOT_HEIGHT };
+    const body = this.bodyArea(target);
+    const dir = normalize({ x: body.x + body.w / 2 - from.x, y: body.y + body.h / 2 - from.y });
+    player.facing =
+      Math.abs(dir.x) > Math.abs(dir.y) ? (dir.x > 0 ? 'right' : 'left') : dir.y > 0 ? 'down' : 'up';
+    this.projectiles.push({
+      id: this.nextShot++,
+      ammo: ranged.ammo,
+      x: from.x,
+      y: from.y,
+      px: from.x,
+      py: from.y,
+      dx: dir.x,
+      dy: dir.y,
+      step: ranged.speed / TICKS_PER_SECOND,
+      left: ranged.range,
+      damage: weapon.damage,
+    });
+    this.state.markDirty();
+    this.bus.emit('player:action', { kind: 'attack' });
+    this.bus.emit('inventory:changed', {});
+    return 'shot';
+  }
+
+  /** Projéteis: avançam em passos curtos; param numa parede ou no primeiro inimigo em que tocam. */
+  private flyProjectiles(): void {
+    if (this.projectiles.length === 0) return;
+    const world = this.zone?.collision;
+    const { enemies } = this.content();
+    const player = this.state.data.player;
+    this.projectiles = this.projectiles.filter((shot) => {
+      shot.px = shot.x;
+      shot.py = shot.y;
+      let travelled = 0;
+      while (travelled < shot.step && shot.left > 0) {
+        const d = Math.min(4, shot.step - travelled, shot.left);
+        shot.x += shot.dx * d;
+        shot.y += shot.dy * d;
+        shot.left -= d;
+        travelled += d;
+        const ground = { x: shot.x - 1, y: shot.y + SHOT_HEIGHT - 1, w: 2, h: 2 };
+        if (world?.blocks(ground)) return false;
+        const hit = this.enemies.find((e) => {
+          if (e.dying > 0) return false;
+          const b = this.bodyArea(e);
+          return shot.x >= b.x && shot.x <= b.x + b.w && shot.y >= b.y && shot.y <= b.y + b.h;
+        });
+        if (hit) {
+          const def = enemies[hit.id];
+          const died = hitEnemy(
+            hit,
+            shot.damage,
+            player,
+            BALANCE.enemyKnockbackPx / 2,
+            secondsToTicks(BALANCE.enemyHitStunSec),
+          );
+          this.bus.emit('enemy:hit', { uid: hit.uid, damage: shot.damage, x: hit.x, y: hit.y - BODY_HEIGHT });
+          if (died && def) this.defeated(hit, def);
+          return false;
+        }
+      }
+      return shot.left > 0;
+    });
+  }
+
   /** Inimigos vivos na zona (para desenhar). */
   get list(): readonly Enemy[] {
     return this.enemies;
@@ -183,6 +309,7 @@ export class Combat {
   /** Um tick: a IA de cada inimigo; os ataques que acertam tiram vida ao jogador. */
   tick(sneaking: boolean): void {
     const zone = this.zone;
+    this.flyProjectiles();
     if (!zone || this.enemies.length === 0) return;
     const { enemies } = this.content();
     const player = this.state.data.player;

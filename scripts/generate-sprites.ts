@@ -1885,6 +1885,104 @@ const PHASE10A_ICONS: Sprite[] = [
   },
 ];
 
+/** Fase 10 (parte B): bancada de trabalho e armas à distância. */
+const PHASE10B: Sprite[] = [
+  {
+    file: 'workbench',
+    width: 32,
+    height: 20,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 16, 18, 14, 1.5);
+      img.fill(3, 4, 26, 5, c('stone'));
+      img.fill(3, 4, 26, 1, c('stone_light'));
+      img.fill(3, 8, 26, 1, c('stone_dark'));
+      for (const x of [4, 26]) {
+        img.fill(x, 9, 2, 9, c('stone_dark'));
+        img.fill(x + 1, 9, 1, 9, c('shadow'));
+      }
+      img.fill(6, 13, 20, 1, c('stone_dark'));
+      // Torno de bancada e ferramentas.
+      img.fill(7, 1, 5, 3, c('teal'));
+      img.fill(8, 0, 3, 1, c('stone_light'));
+      img.fill(16, 3, 6, 1, c('bark_dark'));
+      img.fill(20, 2, 2, 1, c('stone_light'));
+      img.fill(24, 2, 3, 2, c('gold'));
+    },
+  },
+];
+
+const PHASE10B_ICONS: Sprite[] = [
+  {
+    file: 'crossbow',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 11; i++) img.set(3 + i, 13 - i, c('wood'));
+      for (let i = 0; i < 10; i++) img.set(3 + i, 12 - i, c('bark'));
+      // Arco atravessado.
+      for (let i = 0; i < 9; i++) img.set(4 + i, 3 + i, c('stone_light'));
+      img.set(3, 2, c('stone'));
+      img.set(13, 12, c('stone'));
+      img.fill(7, 9, 2, 2, c('bark_dark'));
+    },
+  },
+  {
+    file: 'pistol',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 5, 12, 3, c('stone_dark'));
+      img.fill(2, 5, 12, 1, c('stone'));
+      img.fill(4, 8, 4, 5, c('bark'));
+      img.fill(4, 8, 1, 5, c('wood'));
+      img.set(9, 8, c('stone_dark'));
+      img.set(9, 9, c('stone_dark'));
+      img.set(13, 4, c('stone'));
+    },
+  },
+  {
+    file: 'bolt',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (const o of [0, 4]) {
+        for (let i = 0; i < 9; i++) img.set(3 + i + o, 12 - i, c('wood_light'));
+        img.fill(11 + o, 2, 2, 2, c('stone_light'));
+        img.set(3 + o, 12, c('red'));
+      }
+    },
+  },
+  {
+    file: 'pistol_ammo',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (const x of [3, 7, 11]) {
+        img.fill(x, 6, 3, 7, c('gold'));
+        img.fill(x, 4, 3, 2, c('orange'));
+        img.set(x, 7, c('wheat'));
+      }
+    },
+  },
+  {
+    file: 'gunpowder',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 10, 5.5, 4, c('shadow'));
+      img.ellipse(7, 9, 3, 2, c('stone_dark'));
+      img.fill(6, 3, 4, 4, c('sand'));
+      img.fill(5, 6, 6, 1, c('bark'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -1898,6 +1996,7 @@ for (const [dir, list] of [
   [outDir, PHASE8B],
   [outDir, PHASE9],
   [outDir, PHASE10A],
+  [outDir, PHASE10B],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
   [iconDir, FOOD_ICONS],
@@ -1905,6 +2004,7 @@ for (const [dir, list] of [
   [iconDir, IRON_ICONS],
   [iconDir, PHASE9_ICONS],
   [iconDir, PHASE10A_ICONS],
+  [iconDir, PHASE10B_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -1915,7 +2015,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

@@ -194,5 +194,22 @@
       ["wood", 4],
       ["nails", 4]
     ]
+  },
+  "workbench": {
+    "sprite": "workbench",
+    "layer": "top",
+    "size": [2, 1],
+    "station": "workbench",
+    "footprint": {
+      "width": 22,
+      "height": 6
+    },
+    "needsFoundation": true,
+    "unlockLevel": 12,
+    "cost": [
+      ["iron_ingot", 4],
+      ["wood_plank", 6],
+      ["nails", 6]
+    ]
   }
 }
