@@ -1,5 +1,6 @@
 import { BALANCE } from '../data/balance';
 import type { EnemyDefs, Recipe, Recipes, ResourceDefs, StructureDefs, ZoneDefs } from '../data/types';
+import { countItem } from '../systems/inventory/inventory';
 import { addXp } from '../systems/progression/progression';
 import type { EventBus, GameEvents } from './EventBus';
 import type { GameState } from './GameState';
@@ -76,6 +77,40 @@ export class Progression {
     return (this.content().zones[zoneId]?.unlockLevel ?? 1) <= this.level;
   }
 
+  /** Item que falta levar para poder viajar para a zona (ex.: a chave do bunker), ou null. */
+  missingItem(zoneId: string): string | null {
+    const item = this.content().zones[zoneId]?.requiresItem;
+    if (!item) return null;
+    const { inventory, hotbar } = this.state.data.player;
+    return countItem([inventory, hotbar], item) > 0 ? null : item;
+  }
+
+  /**
+   * Para onde leva uma viagem à zona: numa masmorra, ao piso mais fundo já alcançado
+   * (checkpoint por piso, §11 Fase 10); nas outras zonas, a própria zona.
+   */
+  dungeonEntry(zoneId: string): string {
+    const zones = this.content().zones;
+    const dungeon = zones[zoneId]?.dungeon;
+    if (!dungeon) return zoneId;
+    const floor = this.state.data.dungeons[dungeon.id] ?? 1;
+    const target = Object.entries(zones).find(
+      ([, z]) => z.dungeon?.id === dungeon.id && z.dungeon.floor === floor,
+    );
+    return target?.[0] ?? zoneId;
+  }
+
+  /** Entrou numa zona: nas masmorras, o piso fica como checkpoint (se for o mais fundo). */
+  visit(zoneId: string): void {
+    const dungeon = this.content().zones[zoneId]?.dungeon;
+    if (!dungeon) return;
+    const reached = this.state.data.dungeons;
+    if ((reached[dungeon.id] ?? 0) >= dungeon.floor) return;
+    reached[dungeon.id] = dungeon.floor;
+    this.state.markDirty();
+    if (dungeon.floor > 1) this.bus.emit('dungeon:checkpoint', { floor: dungeon.floor });
+  }
+
   /** Soma XP; ao subir de nível avisa com o que ficou desbloqueado. */
   gain(amount: number): void {
     if (!this.state.hasGame || amount <= 0) return;
@@ -110,7 +145,7 @@ export class Progression {
         .filter(([, def]) => def.unlockLevel === level)
         .map(([id]) => id),
       zones: Object.entries(zones)
-        .filter(([, def]) => def.unlockLevel === level)
+        .filter(([, def]) => def.unlockLevel === level && !def.hidden)
         .map(([id]) => id),
     };
   }

@@ -119,6 +119,7 @@ export class Simulation {
     this.building.setZone(zone);
     this.combat.setZone(zone);
     this.horde.setZone(zone);
+    if (zone) this.progression.visit(zone.zoneId);
     this.interaction.setZone(zone);
   }
 
@@ -154,12 +155,13 @@ export class Simulation {
    * Viagem pelo mapa-mundo (CLAUDE.md §8.1): paga a fome/sede e entra na zona `to` pela saída
    * que dá para o mapa-mundo. @returns false se o jogador estiver demasiado fraco.
    */
-  travel(to: string, map: ZoneMap, cost: TravelCost): boolean {
+  travel(to: string, map: ZoneMap, cost: TravelCost, atSpawn = false): boolean {
     const player = this.state.data.player;
     if (!canTravel(player, cost)) return false;
     player.hunger -= cost.hunger;
     player.thirst -= cost.thirst;
-    const at = arrivalPoint(map, null);
+    // Num piso de baixo de uma masmorra (checkpoint), aparece-se no início do piso.
+    const at = atSpawn ? { ...map.playerSpawn } : arrivalPoint(map, null);
     player.zoneId = to;
     player.x = at.x;
     player.y = at.y;

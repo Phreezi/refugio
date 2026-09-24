@@ -268,6 +268,7 @@ npm run map:farm   # gera maps/farm.json (idem; usa scripts/mapgen.ts)
 npm run map:lake   # gera maps/lake.json (idem)
 npm run map:t2     # gera maps/road.json, village.json, deep_forest.json (idem)
 npm run map:t3     # gera maps/industrial.json, hospital.json (idem)
+npm run map:bunker # gera maps/bunker_1..4.json (idem)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -478,6 +479,9 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - Zonas bloqueadas (nível abaixo de `unlockLevel`) aparecem a cinzento com o nível pedido e não se pode viajar para lá (a zona onde se está fica sempre acessível).
 - Ícones de estado: zona segura/perigosa, recursos disponíveis, mochila caída, evento ativo.
 - Cada zona tem **nível de perigo** T1–T4 (cor verde, amarelo, laranja, vermelho).
+- Zonas com `requiresItem` (ex.: bunker → chave) só se visitam levando o item (não se gasta); o painel diz o que falta e mostra a pista (`hint`).
+- **Masmorras** (`dungeon: { id, floor }` em `zones.json`, Fase 10): só o piso 1 aparece no mapa-mundo; os outros são `hidden` e ligam-se por escadas (saídas `exit:<zona do piso>` sobre os tiles `stairs_up`/`stairs_down`). O piso mais fundo já alcançado é o **checkpoint** (save `dungeons[id]`): viajar para a masmorra leva lá, ao início do piso. Zonas com `darkness` são sempre escuras.
+- Chefes (`boss: true` em `enemies.json`): barra de vida no topo do HUD; derrotados, só voltam ao fim de `respawnDays` da zona (save `bosses[zona]`).
 
 ### 8.2 Lista de zonas
 
@@ -493,7 +497,7 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 | 7 | **Zona Industrial** | T3 | 96×64 | Nível 14 | Aço, componentes elétricos, químicos | runners, bloated, tanks, screamers | 3 dias |
 | 8 | **Hospital de Campanha** | T3 | 64×64 | Nível 16 | Medicamentos avançados, ligaduras, kits | runners, screamers | 3 dias |
 | 9 | **Base Militar** | T4 | 96×96 | Nível 20 + cartão de acesso | Armas, munição, armadura, componentes raros | tanks, runners, screamers, grupos | 4 dias |
-| 10 | **Bunker (dungeon)** | T3→T4 | 4 pisos de ~40×40 | Nível 18 + chave do bunker | Loot épico, receitas raras | Crescente por piso + chefe | Semanal (jogo) |
+| 10 | **Bunker (dungeon)** | T3→T4 | 4 pisos de 40×40 | Nível 18 + chave do bunker (cofre da Zona Industrial) | Caixas militares, munições, kits | Crescente por piso + chefe (piso 4) | Semanal (jogo) |
 | 11 | **Cidade em Ruínas** (endgame) | T4 | 128×96 | Nível 25 | Tudo, com raridade alta | Tudo, em maior número | 4 dias |
 
 ### 8.3 Zonas-evento (temporárias, Fase 10)
@@ -835,7 +839,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [x] Zonas T3: **Zona Industrial**, **Hospital de Campanha** (mapas gerados por `npm run map:t3`; armários industriais e de medicamentos).
 - [x] Inimigos: tank (aviso mais longo, `windupSec`), screamer (grita e alerta os outros, `scream`).
 - [x] Armas à distância (besta, pistola) e munição craftável (virotes, pólvora, balas) na **bancada de trabalho** (nova estação, nível 12).
-- [ ] **Bunker**: 4 pisos, checkpoint por piso, chefe final, chave obtida em quest simples.
+- [x] **Bunker**: 4 pisos (`npm run map:bunker`), checkpoint por piso, chefe final (Guarda do Bunker, dá o cartão de acesso militar), chave num cofre da Zona Industrial (pista no mapa-mundo).
 - [ ] Zona T4: **Base Militar** (cartão de acesso), depois **Cidade em Ruínas**.
 - [ ] Zonas-evento: queda de avião, comboio, acampamento com comerciante (troca).
 - [ ] Veículo (moto): craft em várias peças, reduz custo de viagem.
@@ -1045,3 +1049,7 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Fase 10 dividida em partes (A: T3 + medicina; B: armas à distância; C: bunker; D: T4; E: eventos e moto) | É a maior fase; cada parte é jogável e publicada à parte |
 | 2026-09-24 | Save v10: `player.bleed`; sem infeção | O sangramento dá uso às ligaduras e aos kits; a infeção era opcional e acrescentava gestão sem ganho |
 | 2026-09-24 | Armas à distância com mira automática ao inimigo mais perto e projéteis de verdade (param em paredes) | Joga-se igual com toque e teclado (um botão); as paredes continuam a proteger |
+| 2026-09-24 | Bunker como 4 zonas (uma por piso) ligadas por escadas; checkpoint = piso mais fundo alcançado | Reaproveita a ZoneScene e as saídas `exit:<zona>`; o save só guarda o número do piso |
+| 2026-09-24 | Tiles novos (chão escuro, escadas) acrescentados no fim do tileset; o tileset embebido de todos os mapas atualizado | Como pede §8.4 (não baralhar gids); é a mesma edição que o Tiled faria |
+| 2026-09-24 | Save v11: `dungeons`, `bosses` | Checkpoint do bunker e respawn semanal do chefe |
+| 2026-09-24 | "Quest" da chave: cofre na Zona Industrial + pista no mapa-mundo; o chefe dá o cartão militar | Simples e sem NPCs (§14); encadeia T3 → bunker → Base Militar |

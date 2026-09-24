@@ -1177,6 +1177,61 @@
         "border": "ink",
         "letter": "P"
       }
+    },
+    "boss_warden": {
+      "type": "image",
+      "file": "sprites/boss_warden.png",
+      "placeholder": {
+        "width": 32,
+        "height": 40,
+        "color": "forest",
+        "border": "ink",
+        "letter": "G"
+      }
+    },
+    "safe": {
+      "type": "image",
+      "file": "sprites/safe.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_dark",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "military_crate": {
+      "type": "image",
+      "file": "sprites/military_crate.png",
+      "placeholder": {
+        "width": 24,
+        "height": 16,
+        "color": "forest",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_bunker_key": {
+      "type": "image",
+      "file": "sprites/icons/bunker_key.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "gold",
+        "border": "ink",
+        "letter": "K"
+      }
+    },
+    "icon_military_keycard": {
+      "type": "image",
+      "file": "sprites/icons/military_keycard.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "forest",
+        "border": "ink",
+        "letter": "C"
+      }
     }
   }
 }

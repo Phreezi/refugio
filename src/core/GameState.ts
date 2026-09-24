@@ -98,6 +98,10 @@ export interface GameStateData {
   /** Definições do jogo gravadas no save (§10.5). */
   settings: { hordes: boolean };
   horde: HordeState;
+  /** Masmorras (bunker): piso mais fundo já alcançado (checkpoint), pelo id da masmorra. */
+  dungeons: Record<string, number>;
+  /** Chefes derrotados: zona → tick em que o chefe volta (respawn semanal). */
+  bosses: Record<string, number>;
 }
 
 /** Baú da base num jogo novo: mantimentos para os primeiros minutos (e testar a fogueira). */
@@ -142,6 +146,8 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
     unlocks: { recipes: [] },
     settings: { hordes: false },
     horde: { at: 0, count: 0, active: false },
+    dungeons: {},
+    bosses: {},
   };
 }
 

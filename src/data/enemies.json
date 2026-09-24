@@ -1,5 +1,5 @@
 {
-  "$comment": "Inimigos e animais (CLAUDE.md §7.9). Distâncias em px, tempos em segundos de jogo. behavior: hostile (persegue e ataca, com aviso de windup) ou flee (foge). drops: [item, mín, máx] (mín pode ser 0). windupSec: aviso próprio. bleedPct: % de pôr o jogador a sangrar. scream: gritador (raio, intervalo, distância a que fica, duração do alerta).",
+  "$comment": "Inimigos e animais (CLAUDE.md §7.9). Distâncias em px, tempos em segundos de jogo. behavior: hostile (persegue e ataca, com aviso de windup) ou flee (foge). drops: [item, mín, máx] (mín pode ser 0). windupSec: aviso próprio. bleedPct: % de pôr o jogador a sangrar. scream: gritador (raio, intervalo, distância a que fica, duração do alerta). boss: chefe (volta ao fim de respawnDays da zona; barra no HUD).",
   "zombie_walker": {
     "sprite": "zombie_walker",
     "footprint": {
@@ -180,5 +180,35 @@
       ["electronics", 0, 1]
     ],
     "xp": 20
+  },
+  "boss_warden": {
+    "sprite": "boss_warden",
+    "footprint": {
+      "width": 18,
+      "height": 8
+    },
+    "behavior": "hostile",
+    "hp": 700,
+    "damage": 24,
+    "speed": 45,
+    "detectRadius": 150,
+    "leashRadius": 400,
+    "attackRange": 18,
+    "attackSec": 1.8,
+    "windupSec": 0.7,
+    "bleedPct": 30,
+    "charge": {
+      "range": 100,
+      "speed": 170,
+      "sec": 0.8
+    },
+    "boss": true,
+    "drops": [
+      ["military_keycard", 1, 1],
+      ["pistol_ammo", 6, 12],
+      ["medkit", 1, 2],
+      ["electronics", 2, 3]
+    ],
+    "xp": 300
   }
 }

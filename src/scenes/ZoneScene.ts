@@ -761,7 +761,8 @@ export class ZoneScene extends Phaser.Scene {
   private renderLighting(): void {
     const night = this.night;
     if (!night) return;
-    const darkness = darknessAt(gameState.data.world.tick, BALANCE);
+    // Debaixo de terra (bunker) é sempre escuro; lá fora, conforme a hora.
+    const darkness = content.zones[this.zoneId]?.darkness ?? darknessAt(gameState.data.world.tick, BALANCE);
     if (darkness <= 0.01) {
       night.setVisible(false);
       return;

@@ -1,5 +1,5 @@
 {
-  "$comment": "Zonas (CLAUDE.md §8.2, §9.4). danger: 0 = segura (base), 1–4 = T1–T4. worldMapPos: posição no mapa-mundo (0–100). travelCost: fome/sede para lá chegar. respawnDays: dias de jogo até os contentores voltarem a ter loot. unlockLevel: verificado a partir da Fase 8 (níveis).",
+  "$comment": "Zonas (CLAUDE.md §8.2, §9.4). danger: 0 = segura (base), 1–4 = T1–T4. worldMapPos: posição no mapa-mundo (0–100). travelCost: fome/sede para lá chegar. respawnDays: dias de jogo até os contentores voltarem a ter loot. unlockLevel: verificado a partir da Fase 8 (níveis). requiresItem: item que é preciso levar (não se gasta). dungeon { id, floor }: masmorra com pisos (só o piso 1 no mapa-mundo; os outros hidden). darkness: sempre escuro.",
   "zone_base": {
     "name": "zone.base",
     "map": "maps/base.json",
@@ -108,5 +108,82 @@
     "respawnDays": 3,
     "unlockLevel": 16,
     "nightEnemyMultiplier": 1.5
+  },
+  "zone_bunker": {
+    "name": "zone.bunker",
+    "map": "maps/bunker_1.json",
+    "danger": 4,
+    "worldMapPos": [58, 10],
+    "travelCost": {
+      "hunger": 8,
+      "thirst": 8
+    },
+    "respawnDays": 7,
+    "unlockLevel": 18,
+    "nightEnemyMultiplier": 1,
+    "darkness": 0.62,
+    "requiresItem": "bunker_key",
+    "dungeon": {
+      "id": "bunker",
+      "floor": 1
+    },
+    "hint": "map.bunker_hint"
+  },
+  "zone_bunker_2": {
+    "name": "zone.bunker_2",
+    "map": "maps/bunker_2.json",
+    "danger": 4,
+    "worldMapPos": [58, 10],
+    "travelCost": {
+      "hunger": 8,
+      "thirst": 8
+    },
+    "respawnDays": 7,
+    "unlockLevel": 18,
+    "nightEnemyMultiplier": 1,
+    "darkness": 0.62,
+    "hidden": true,
+    "dungeon": {
+      "id": "bunker",
+      "floor": 2
+    }
+  },
+  "zone_bunker_3": {
+    "name": "zone.bunker_3",
+    "map": "maps/bunker_3.json",
+    "danger": 4,
+    "worldMapPos": [58, 10],
+    "travelCost": {
+      "hunger": 8,
+      "thirst": 8
+    },
+    "respawnDays": 7,
+    "unlockLevel": 18,
+    "nightEnemyMultiplier": 1,
+    "darkness": 0.62,
+    "hidden": true,
+    "dungeon": {
+      "id": "bunker",
+      "floor": 3
+    }
+  },
+  "zone_bunker_4": {
+    "name": "zone.bunker_4",
+    "map": "maps/bunker_4.json",
+    "danger": 4,
+    "worldMapPos": [58, 10],
+    "travelCost": {
+      "hunger": 8,
+      "thirst": 8
+    },
+    "respawnDays": 7,
+    "unlockLevel": 18,
+    "nightEnemyMultiplier": 1,
+    "darkness": 0.62,
+    "hidden": true,
+    "dungeon": {
+      "id": "bunker",
+      "floor": 4
+    }
   }
 }

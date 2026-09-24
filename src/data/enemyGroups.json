@@ -25,5 +25,6 @@
   "t3_mixed": [
     ["zombie_walker", 1, 2],
     ["zombie_runner", 1, 2]
-  ]
+  ],
+  "warden": [["boss_warden", 1, 1]]
 }

@@ -3,7 +3,7 @@ import { paletteNumber, type PaletteColor } from '../assets/palette';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
 import { simulation } from '../core/Simulation';
 import { getView, setupFixedCamera } from '../display/view';
-import { t, tKey } from '../i18n';
+import { itemName, t, tKey } from '../i18n';
 import { autosave } from '../save';
 import { canTravel } from '../systems/travel/travel';
 import { Button } from '../ui/Button';
@@ -107,8 +107,8 @@ export class WorldMapScene extends Phaser.Scene {
     // Caminhos da base a cada zona (tracejado).
     const base = this.screenPos(BASE_ZONE_ID);
     g.fillStyle(paletteNumber('stone'));
-    for (const zoneId of Object.keys(content.zones)) {
-      if (zoneId === BASE_ZONE_ID) continue;
+    for (const [zoneId, zone] of Object.entries(content.zones)) {
+      if (zoneId === BASE_ZONE_ID || zone.hidden) continue;
       const to = this.screenPos(zoneId);
       const steps = Math.round(Math.hypot(to.x - base.x, to.y - base.y) / 6);
       for (let i = 1; i < steps; i += 1) {
@@ -120,11 +120,12 @@ export class WorldMapScene extends Phaser.Scene {
 
     const data = gameState.data;
     for (const [zoneId, zone] of Object.entries(content.zones)) {
+      if (zone.hidden) continue; // pisos de baixo das masmorras
       const { x, y } = this.screenPos(zoneId);
-      const here = zoneId === this.from;
+      const here = zoneId === this.surface();
       if (here) this.add.circle(x, y, NODE_R + 3, paletteNumber('gold'));
       this.add.circle(x, y, NODE_R + 1, paletteNumber('ink'));
-      const locked = zoneId !== this.from && !simulation.progression.isZoneUnlocked(zoneId);
+      const locked = !here && !simulation.progression.isZoneUnlocked(zoneId);
       const node = this.add.circle(
         x,
         y,
@@ -182,14 +183,26 @@ export class WorldMapScene extends Phaser.Scene {
     const lines: string[] = [
       zone.danger === 0 ? t('map.safe') : t('map.danger', { tier: `T${String(zone.danger)}` }),
     ];
-    const here = zoneId === this.from;
+    const here = zoneId === this.surface();
     const cost = here ? { hunger: 0, thirst: 0 } : zone.travelCost;
     if (here) lines.push(t('map.here'));
     else if (cost.hunger + cost.thirst === 0) lines.push(t('map.free'));
     else lines.push(t('map.cost', { hunger: cost.hunger, thirst: cost.thirst }));
     if (gameState.data.zones[zoneId]?.bags.some((bag) => bag.death)) lines.push(t('map.bag'));
-    const locked = !here && !simulation.progression.isZoneUnlocked(zoneId);
-    if (locked) lines.push(t('map.locked', { level: zone.unlockLevel }));
+    const levelLocked = !here && !simulation.progression.isZoneUnlocked(zoneId);
+    const missing = here ? null : simulation.progression.missingItem(zoneId);
+    const locked = levelLocked || missing !== null;
+    const lockText = levelLocked
+      ? t('map.locked', { level: zone.unlockLevel })
+      : missing
+        ? t('map.needs_item', { item: itemName(missing) })
+        : '';
+    if (locked) lines.push(lockText);
+    if (missing && zone.hint) lines.push(tKey(zone.hint));
+    // Masmorra: diz em que piso se vai entrar (checkpoint).
+    const entry = simulation.progression.dungeonEntry(zoneId);
+    const floor = content.zones[entry]?.dungeon?.floor ?? 1;
+    if (!here && floor > 1) lines.push(t('map.checkpoint', { floor }));
     add(new Label(this, cx, top, tKey(zone.name), { size: 10, bold: true, color: 'wheat' }, [0.5, 0]));
     add(
       new Label(
@@ -215,7 +228,7 @@ export class WorldMapScene extends Phaser.Scene {
         { width: 80, height: 16, fontSize: 9, style: locked ? 'secondary' : 'primary' },
         () => {
           if (here) this.back();
-          else if (locked) this.flash(t('map.locked', { level: zone.unlockLevel }));
+          else if (locked) this.flash(lockText);
           else this.travel(zoneId);
         },
       ),
@@ -230,18 +243,30 @@ export class WorldMapScene extends Phaser.Scene {
     this.go(this.from);
   }
 
+  /** A zona do mapa-mundo onde se está (nos pisos de baixo de uma masmorra, a entrada). */
+  private surface(): string {
+    const dungeon = content.zones[this.from]?.dungeon;
+    if (!dungeon) return this.from;
+    const entry = Object.entries(content.zones).find(
+      ([, z]) => z.dungeon?.id === dungeon.id && z.dungeon.floor === 1,
+    );
+    return entry?.[0] ?? this.from;
+  }
+
   private travel(zoneId: string): void {
     const zone = content.zones[zoneId];
     if (this.busy || !zone) return;
+    // Numa masmorra, vai-se direto ao checkpoint (piso mais fundo já alcançado).
+    const target = simulation.progression.dungeonEntry(zoneId);
     const player = gameState.data.player;
     if (!canTravel(player, zone.travelCost)) {
       this.flash(t('map.too_tired', { hunger: zone.travelCost.hunger, thirst: zone.travelCost.thirst }));
       return;
     }
     this.busy = true;
-    simulation.travel(zoneId, content.zoneMap(zoneId), zone.travelCost);
-    uiState.pendingNotice = tKey(zone.name);
-    this.go(zoneId);
+    simulation.travel(target, content.zoneMap(target), zone.travelCost, target !== zoneId);
+    uiState.pendingNotice = tKey(content.zones[target]?.name ?? zone.name);
+    this.go(target);
   }
 
   private go(zoneId: string): void {

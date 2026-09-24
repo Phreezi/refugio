@@ -908,6 +908,8 @@ export interface EnemyDef {
    * os inimigos a menos de `radius` px à procura do jogador durante `alertSec`.
    */
   scream?: { radius: number; everySec: number; keepAway: number; alertSec: number };
+  /** Chefe (fim do bunker): derrotado, só volta ao fim de `respawnDays` da zona; barra no HUD. */
+  boss?: boolean;
 }
 
 export type EnemyDefs = Readonly<Record<string, EnemyDef>>;
@@ -930,6 +932,7 @@ const ENEMY_KEYS = new Set([
   'windupSec',
   'bleedPct',
   'scream',
+  'boss',
 ]);
 
 function isNonNegativeInt(value: unknown): value is number {
@@ -1029,6 +1032,10 @@ export function parseEnemies(
       if (positive(raw.windupSec) && raw.windupSec <= 5) defs[id].windupSec = raw.windupSec;
       else problems.push(`"${id}": windupSec tem de ser um número entre 0 e 5`);
     }
+    if (raw.boss !== undefined) {
+      if (raw.boss === true) defs[id].boss = true;
+      else problems.push(`"${id}": boss tem de ser true`);
+    }
     if (raw.bleedPct !== undefined) {
       if (isNonNegativeInt(raw.bleedPct) && raw.bleedPct <= 100) defs[id].bleedPct = raw.bleedPct;
       else problems.push(`"${id}": bleedPct tem de ser um inteiro de 0 a 100`);
@@ -1098,6 +1105,19 @@ export interface ZoneDef {
   unlockLevel: number;
   /** Mais inimigos à noite (§7.11): multiplica as quantidades dos grupos. */
   nightEnemyMultiplier: number;
+  /** Item que é preciso ter (não se gasta) para viajar até lá (ex.: a chave do bunker). */
+  requiresItem?: string;
+  /** Chave i18n de uma pista mostrada no mapa-mundo enquanto falta o `requiresItem`. */
+  hint?: string;
+  /**
+   * Masmorra com pisos (bunker, Fase 10): zonas com o mesmo `dungeon`, piso 1 no mapa-mundo e os
+   * outros escondidos (`hidden`). Viajar para lá leva ao piso mais fundo já alcançado (checkpoint).
+   */
+  dungeon?: { id: string; floor: number };
+  /** Não aparece no mapa-mundo (pisos de baixo de uma masmorra). */
+  hidden: boolean;
+  /** Sempre escura (debaixo de terra): `darkness` do véu, em vez do dia/noite. */
+  darkness?: number;
 }
 
 export type ZoneDefs = Readonly<Record<string, ZoneDef>>;
@@ -1125,6 +1145,11 @@ export function parseZones(input: unknown): ZoneDefs {
           'respawnDays',
           'unlockLevel',
           'nightEnemyMultiplier',
+          'requiresItem',
+          'hint',
+          'dungeon',
+          'hidden',
+          'darkness',
         ].includes(key)
       )
         problems.push(`"${id}": campo desconhecido "${key}"`);
@@ -1149,7 +1174,7 @@ export function parseZones(input: unknown): ZoneDefs {
       problems.push(`"${id}": respawnDays tem de ser > 0`);
     const unlockLevel = raw.unlockLevel ?? 1;
     if (!isPositiveInt(unlockLevel)) problems.push(`"${id}": unlockLevel tem de ser um inteiro > 0`);
-    defs[id] = {
+    const def: ZoneDef = {
       name,
       map,
       danger: isNonNegativeInt(danger) ? danger : 0,
@@ -1164,12 +1189,51 @@ export function parseZones(input: unknown): ZoneDefs {
         typeof raw.nightEnemyMultiplier === 'number' && raw.nightEnemyMultiplier > 0
           ? raw.nightEnemyMultiplier
           : 1,
+      hidden: raw.hidden === true,
     };
+    defs[id] = def;
     if (
       raw.nightEnemyMultiplier !== undefined &&
       !(typeof raw.nightEnemyMultiplier === 'number' && raw.nightEnemyMultiplier > 0)
     )
       problems.push(`"${id}": nightEnemyMultiplier tem de ser > 0`);
+    if (raw.hidden !== undefined && typeof raw.hidden !== 'boolean')
+      problems.push(`"${id}": hidden tem de ser true/false`);
+    if (raw.requiresItem !== undefined) {
+      if (typeof raw.requiresItem === 'string' && raw.requiresItem !== '')
+        def.requiresItem = raw.requiresItem;
+      else problems.push(`"${id}": requiresItem tem de ser o id de um item`);
+    }
+    if (raw.hint !== undefined) {
+      if (typeof raw.hint === 'string' && raw.hint !== '') def.hint = raw.hint;
+      else problems.push(`"${id}": hint tem de ser uma chave i18n`);
+    }
+    if (raw.dungeon !== undefined) {
+      const d = raw.dungeon;
+      if (isObject(d) && typeof d.id === 'string' && isPositiveInt(d.floor))
+        def.dungeon = { id: d.id, floor: d.floor };
+      else problems.push(`"${id}": dungeon tem de ser { id, floor }`);
+    }
+    if (raw.darkness !== undefined) {
+      if (typeof raw.darkness === 'number' && raw.darkness > 0 && raw.darkness <= 1)
+        def.darkness = raw.darkness;
+      else problems.push(`"${id}": darkness tem de ser um número entre 0 e 1`);
+    }
+  }
+  // Cada masmorra tem um piso 1 visível e pisos seguidos (1, 2, 3…).
+  const dungeons = new Map<string, number[]>();
+  for (const def of Object.values(defs)) {
+    if (def.dungeon)
+      dungeons.set(def.dungeon.id, [...(dungeons.get(def.dungeon.id) ?? []), def.dungeon.floor]);
+  }
+  for (const [dungeon, floors] of dungeons) {
+    const sorted = [...floors].sort((a, b) => a - b);
+    if (!sorted.every((f, i) => f === i + 1))
+      problems.push(`masmorra "${dungeon}": pisos têm de ser 1, 2, 3…`);
+  }
+  for (const [id, def] of Object.entries(defs)) {
+    if (def.dungeon && (def.dungeon.floor === 1) === def.hidden)
+      problems.push(`"${id}": numa masmorra só o piso 1 aparece no mapa-mundo (os outros são hidden)`);
   }
   if (problems.length > 0) throw new DataError('zones.json', problems);
   return defs;

@@ -475,5 +475,19 @@
     "type": "resource",
     "stack": 50,
     "rarity": "uncommon"
+  },
+  "bunker_key": {
+    "name": "item.bunker_key",
+    "icon": "icon_bunker_key",
+    "type": "key",
+    "stack": 1,
+    "rarity": "rare"
+  },
+  "military_keycard": {
+    "name": "item.military_keycard",
+    "icon": "icon_military_keycard",
+    "type": "key",
+    "stack": 1,
+    "rarity": "epic"
   }
 }

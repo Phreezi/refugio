@@ -110,13 +110,15 @@ export class Combat {
     // À noite há mais inimigos (e aparecem os grupos só de noite, §7.11).
     const night = isNight(rng.tick, BALANCE);
     const multiplier = night ? (zone.nightEnemyMultiplier ?? 1) : 1;
+    // Um chefe derrotado só volta ao fim de uns dias (respawn da zona).
+    const bossAway = (this.state.data.bosses[zone.zoneId] ?? 0) > rng.tick;
     for (const spawn of zone.map.enemySpawns) {
       const group = enemyGroups[spawn.id];
       if (!group || (group.night && !night)) continue;
       for (const member of group.members) {
         const def = enemies[member.enemy];
-        if (!def) continue;
-        const count = Math.round(randomInt(rng, member.min, member.max) * multiplier);
+        if (!def || (def.boss && bossAway)) continue;
+        const count = Math.round(randomInt(rng, member.min, member.max) * (def.boss ? 1 : multiplier));
         for (let i = 0; i < count; i++) {
           const at = {
             x: Math.round(spawn.x + (nextRandom(rng) - 0.5) * 24),
@@ -558,6 +560,12 @@ export class Combat {
     this.enemies = this.enemies.filter((e) => e !== enemy);
     this.bus.emit('enemy:killed', { uid: enemy.uid, enemy: enemy.id, x: enemy.x, y: enemy.y });
     if (!def || !zone) return;
+    if (def.boss) {
+      const days = zone.respawnDays ?? 1;
+      this.state.data.bosses[zone.zoneId] =
+        this.state.data.world.tick + secondsToTicks(days * BALANCE.dayLengthSec);
+      this.bus.emit('boss:defeated', { enemy: enemy.id });
+    }
     const containers = this.actions.pickupContainers();
     const leftovers = createContainer(0);
     for (const drop of rollEnemyDrops(def, this.state.data.world)) {
