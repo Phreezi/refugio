@@ -44,6 +44,10 @@ m.put('container:crate', 50, 10);
 m.put('container:barrel', 42, 16);
 m.put('container:barrel', 50, 16);
 m.put('container:crate', 47, 13);
+// Sacos de sementes (Fase 9: horta), dois no celeiro e um ao fundo dos campos.
+m.put('container:seed_sack', 45, 10);
+m.put('container:seed_sack', 46, 16);
+m.put('container:seed_sack', 23, 36);
 m.put('prop:car_wreck', 36, 28);
 m.put('container:crate', 39, 30);
 m.put('prop:well', 34, 19);

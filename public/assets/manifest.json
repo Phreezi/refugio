@@ -857,6 +857,160 @@
         "border": "ink",
         "letter": "F"
       }
+    },
+    "garden_bed": {
+      "type": "image",
+      "file": "sprites/garden_bed.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark",
+        "border": "ink",
+        "letter": "H"
+      }
+    },
+    "garden_bed_wet": {
+      "type": "image",
+      "file": "sprites/garden_bed_wet.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark_dark",
+        "border": "ink",
+        "letter": "H"
+      }
+    },
+    "crop_sprout": {
+      "type": "image",
+      "file": "sprites/crop_sprout.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "leaf",
+        "border": "ink",
+        "letter": "P"
+      }
+    },
+    "crop_carrot": {
+      "type": "image",
+      "file": "sprites/crop_carrot.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "orange",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "crop_tomato": {
+      "type": "image",
+      "file": "sprites/crop_tomato.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "red",
+        "border": "ink",
+        "letter": "T"
+      }
+    },
+    "rain_collector": {
+      "type": "image",
+      "file": "sprites/rain_collector.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "wood",
+        "border": "ink",
+        "letter": "A"
+      }
+    },
+    "rain_collector_full": {
+      "type": "image",
+      "file": "sprites/rain_collector_full.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "sky",
+        "border": "ink",
+        "letter": "A"
+      }
+    },
+    "snare": {
+      "type": "image",
+      "file": "sprites/snare.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "L"
+      }
+    },
+    "snare_full": {
+      "type": "image",
+      "file": "sprites/snare_full.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood_light",
+        "border": "ink",
+        "letter": "L"
+      }
+    },
+    "seed_sack": {
+      "type": "image",
+      "file": "sprites/seed_sack.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "sand",
+        "border": "ink",
+        "letter": "S"
+      }
+    },
+    "icon_carrot_seeds": {
+      "type": "image",
+      "file": "sprites/icons/carrot_seeds.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "parchment",
+        "border": "ink",
+        "letter": "S"
+      }
+    },
+    "icon_tomato_seeds": {
+      "type": "image",
+      "file": "sprites/icons/tomato_seeds.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "parchment",
+        "border": "ink",
+        "letter": "S"
+      }
+    },
+    "icon_carrot": {
+      "type": "image",
+      "file": "sprites/icons/carrot.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "orange",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_tomato": {
+      "type": "image",
+      "file": "sprites/icons/tomato.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "red",
+        "border": "ink",
+        "letter": "T"
+      }
     }
   }
 }

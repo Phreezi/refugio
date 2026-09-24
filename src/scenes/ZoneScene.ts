@@ -16,7 +16,7 @@ import { installShortcutGuard } from '../input/browserShortcuts';
 import { keyboardDirection } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
 import { autosave } from '../save';
-import { structureSprite } from '../data/types';
+import { CROP_SPROUT_SPRITE, cropSprite, structureSprite, type StructureDef } from '../data/types';
 import { structureArea, structureFeet, type StructureRecord } from '../systems/building/building';
 import { CollisionWorld } from '../systems/movement/CollisionWorld';
 import { buildMode, buildTargetTile } from '../ui/buildMode';
@@ -55,6 +55,8 @@ const LAYER_DEPTH: Readonly<Record<TileLayerName, number>> = {
 const FOUNDATION_DEPTH = -0.5;
 /** Realce dos tiles no modo construção: no chão, por cima das fundações. */
 const GHOST_AREA_DEPTH = FOUNDATION_DEPTH + 0.2;
+/** Peças rasas e atravessáveis (canteiros, armadilhas): por cima do chão, por baixo do resto. */
+const FLAT_DEPTH = FOUNDATION_DEPTH + 0.1;
 const GHOST_OK = 0x78ae48;
 const GHOST_BAD = 0xb33a3a;
 
@@ -108,12 +110,16 @@ export class ZoneScene extends Phaser.Scene {
   private resourceSprites = new Map<number, Phaser.GameObjects.Image>();
   /** Sprites das peças construídas, pelo uid. */
   private structureSprites = new Map<number, Phaser.GameObjects.Image>();
+  /** Plantas dos canteiros da horta, pelo uid do canteiro. */
+  private cropSprites = new Map<number, Phaser.GameObjects.Image>();
   private marker: Phaser.GameObjects.Image | null = null;
   private ghost: Phaser.GameObjects.Image | null = null;
   private ghostArea: Phaser.GameObjects.Rectangle | null = null;
   /** Peça tingida de vermelho (alvo da demolição). */
   private demolishTinted: number | null = null;
   private attackUntil = 0;
+  /** Último "+N item" mostrado (para empilhar os que chegam juntos). */
+  private lastGain: { x: number; y: number; at: number; row: number } | null = null;
 
   constructor() {
     super(SceneKey.Zone);
@@ -202,6 +208,7 @@ export class ZoneScene extends Phaser.Scene {
       sprite.setVisible(!simulation.interaction.isDepleted(objectId));
     }
     this.structureSprites = new Map();
+    this.cropSprites = new Map();
     for (const record of simulation.building.structures()) this.addStructureSprite(record);
     this.marker = this.add.image(0, 0, this.markerTexture()).setOrigin(0.5, 1).setVisible(false);
     this.ghost = this.add.image(0, 0, '__DEFAULT').setOrigin(0.5, 1).setAlpha(0.75).setVisible(false);
@@ -228,6 +235,7 @@ export class ZoneScene extends Phaser.Scene {
       simulation.setRespawnPoint(null);
       this.resourceSprites.clear();
       this.structureSprites.clear();
+      this.cropSprites.clear();
       this.enemyViews.clear();
       this.containerSprites.clear();
       this.night = null;
@@ -260,6 +268,7 @@ export class ZoneScene extends Phaser.Scene {
     if (this.player) this.player.anims.timeScale = speed;
     this.renderPlayer();
     this.renderEnemies();
+    this.renderHomestead();
     this.renderLighting();
     // Com toque, andar volta a pôr a peça à frente do jogador.
     if (simulation.playerMoved && buildMode.pickedBy === 'touch') {
@@ -271,15 +280,57 @@ export class ZoneScene extends Phaser.Scene {
   }
 
   private addStructureSprite(record: StructureRecord): void {
-    const [uid, id, tx, ty, rot, state] = record;
+    const [uid, id, tx, ty] = record;
     const def = content.structures[id];
     if (!def) return;
     const feet = structureFeet(def, tx, ty, simulation.building.tileSize);
+    const flat = !def.solid && !def.footprint;
+    const depth = def.layer === 'floor' ? FOUNDATION_DEPTH : flat ? FLAT_DEPTH : feet.y;
     const sprite = this.add
-      .image(feet.x, feet.y, structureSprite(def, rot, state === 1))
+      .image(feet.x, feet.y, this.structureTexture(record, def))
       .setOrigin(0.5, 1)
-      .setDepth(def.layer === 'floor' ? FOUNDATION_DEPTH : feet.y);
+      .setDepth(depth);
     this.structureSprites.set(uid, sprite);
+  }
+
+  /** Textura de uma peça no estado atual (porta aberta, canteiro regado, algo para recolher). */
+  private structureTexture(record: StructureRecord, def: StructureDef): string {
+    const [uid, , , , rot, state] = record;
+    if (def.farm && simulation.homestead.stage(uid) === 'growing') return `${def.sprite}_wet`;
+    if (def.produce && simulation.homestead.produced(uid) > 0) return `${def.sprite}_full`;
+    return structureSprite(def, rot, state === 1);
+  }
+
+  /** Horta e peças que produzem: o aspeto muda com o tempo (sem eventos), por isso vê-se a cada frame. */
+  private renderHomestead(): void {
+    const homestead = simulation.homestead;
+    for (const record of simulation.building.structures()) {
+      const def = content.structures[record[1]];
+      if (!def || !(def.farm || def.produce)) continue;
+      const uid = record[0];
+      const sprite = this.structureSprites.get(uid);
+      const texture = this.structureTexture(record, def);
+      if (sprite && sprite.texture.key !== texture) sprite.setTexture(texture);
+      if (!def.farm || !sprite) continue;
+      const stage = homestead.stage(uid);
+      const seed = homestead.seedOf(uid);
+      const crop = seed ? content.items[seed]?.plant?.crop : undefined;
+      const plant =
+        stage === 'empty' ? null : stage === 'ready' && crop ? cropSprite(crop) : CROP_SPROUT_SPRITE;
+      let view = this.cropSprites.get(uid);
+      if (plant === null) {
+        view?.destroy();
+        this.cropSprites.delete(uid);
+        continue;
+      }
+      if (!view) {
+        view = this.add
+          .image(sprite.x, sprite.y - 2, plant)
+          .setOrigin(0.5, 1)
+          .setDepth(sprite.y - 1);
+        this.cropSprites.set(uid, view);
+      } else if (view.texture.key !== plant) view.setTexture(plant);
+    }
   }
 
   /**
@@ -413,12 +464,13 @@ export class ZoneScene extends Phaser.Scene {
       eventBus.on('structure:removed', ({ uid }) => {
         this.structureSprites.get(uid)?.destroy();
         this.structureSprites.delete(uid);
+        this.cropSprites.get(uid)?.destroy();
+        this.cropSprites.delete(uid);
       }),
       eventBus.on('structure:changed', ({ uid }) => {
         const record = simulation.building.get(uid);
         const def = record ? content.structures[record[1]] : undefined;
-        if (record && def)
-          this.structureSprites.get(uid)?.setTexture(structureSprite(def, record[4], record[5] === 1));
+        if (record && def) this.structureSprites.get(uid)?.setTexture(this.structureTexture(record, def));
       }),
       eventBus.on('enemy:hit', ({ uid, damage, x, y }) => {
         this.floatText(`-${String(damage)}`, Math.round(x), Math.round(y) - 2, 'gold');
@@ -489,7 +541,13 @@ export class ZoneScene extends Phaser.Scene {
         }
       }),
       eventBus.on('item:gained', ({ item, qty, x, y }) => {
-        this.floatText(t('msg.gained', { qty, item: itemName(item) }), Math.round(x), Math.round(y) - 20);
+        // Vários ganhos no mesmo sítio e no mesmo instante (fruto + sementes) ficam empilhados.
+        const now = this.time.now;
+        const last = this.lastGain;
+        const row = last?.x === x && last.y === y && now - last.at < 100 ? last.row + 1 : 0;
+        this.lastGain = { x, y, at: now, row };
+        const text = t('msg.gained', { qty, item: itemName(item) });
+        this.floatText(text, Math.round(x), Math.round(y) - 20 - row * 9);
       }),
     ];
     return () => {

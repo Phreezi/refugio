@@ -105,7 +105,22 @@
       ["iron_ore", 1, 1, 2],
       ["note_machete", 1, 1, 1],
       ["note_spiked_club", 1, 1, 1],
-      ["cloth_shirt", 1, 1, 1]
+      ["cloth_shirt", 1, 1, 1],
+      ["tomato_seeds", 2, 1, 2]
+    ]
+  },
+  "seed_sack": {
+    "sprite": "seed_sack",
+    "footprint": {
+      "width": 10,
+      "height": 5
+    },
+    "rolls": [1, 2],
+    "slots": 4,
+    "entries": [
+      ["carrot_seeds", 6, 2, 4],
+      ["tomato_seeds", 3, 1, 2],
+      ["fiber", 2, 1, 3]
     ]
   }
 }

@@ -212,10 +212,17 @@ export class UIScene extends Phaser.Scene {
         this.showNotice(uiState.pendingNotice);
         if (zoneId === gameState.data.player.zoneId) uiState.pendingNotice = null;
       }),
-      eventBus.on('action:blocked', ({ reason, tool }) => {
+      eventBus.on('action:blocked', ({ reason, tool, item, hours }) => {
         if (reason === 'inventory_full') this.showNotice(t('msg.inventory_full'));
         else if (reason === 'door_blocked') this.showNotice(t('build.problem.door_blocked'));
         else if (reason === 'needs_rod') this.showNotice(t('fish.needs'));
+        else if (reason === 'needs_seeds') this.showNotice(t('farm.needs_seeds'));
+        else if (reason === 'needs_water') this.showNotice(t('farm.needs_water'));
+        else if (reason === 'crop_growing')
+          this.showNotice(t('farm.growing', { hours: Math.max(1, hours ?? 1) }));
+        else if (reason === 'nothing_yet') this.showNotice(t('farm.nothing_yet'));
+        else if (reason === 'needs_item')
+          this.showNotice(t('msg.needs_item', { item: itemName(item ?? '') }));
         else this.showNotice(t(tool === 'pickaxe' ? 'msg.needs_pickaxe' : 'msg.needs_axe'));
       }),
       eventBus.on('recipe:learned', ({ recipe }) => {

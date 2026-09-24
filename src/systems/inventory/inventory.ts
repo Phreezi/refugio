@@ -78,6 +78,16 @@ export function addItem(containers: readonly Container[], id: string, qty: numbe
   return left;
 }
 
+/** Cabem todas estas quantidades ao mesmo tempo? (não altera os contentores) */
+export function fitsAll(
+  containers: readonly Container[],
+  stacks: readonly { item: string; qty: number }[],
+  defs: ItemDefs,
+): boolean {
+  const copy = containers.map((c) => c.map((slot): Slot | null => (slot ? [...slot] : null)));
+  return stacks.every(({ item, qty }) => addItem(copy, item, qty, defs) === 0);
+}
+
 /**
  * Remove `qty` de `id` (tudo ou nada), a começar pelo fim da mochila.
  * @returns false se não houver quantidade suficiente (e nada é removido).

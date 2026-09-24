@@ -155,6 +155,7 @@ refugio/
 │   │   ├── Building.ts       # construção: colocar, desfazer, demolir, portas (§7.7)
 │   │   ├── Combat.ts         # inimigos da zona, golpes, dano/armadura, mochilas no chão (§7.8–§7.12)
 │   │   ├── Fishing.ts        # pesca (mini-jogo de 1 botão) e encher garrafas no lago
+│   │   ├── Homestead.ts      # horta (plantar/regar/colher) e peças que produzem (coletor, armadilha)
 │   │   ├── Progression.ts    # XP (ouve os eventos), níveis, desbloqueios, notas de receitas
 │   │   ├── DayNight.ts       # hora do dia, escuridão, é noite?
 │   │   ├── offline.ts        # tempo offline (§7.6)
@@ -451,6 +452,12 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - Desligado por defeito. Se ligado: a cada 3 dias de jogo, uma horda ataca a base.
 - Aviso com 1 dia de antecedência.
 - Recompensa: caixa de horda com loot raro. Paredes danificadas reparam-se com 25% do custo.
+
+### 7.14 Horta e produção na base (Fase 9)
+
+- **Canteiro** (`garden_bed`, `farm: true`): com a ação contextual planta-se a primeira semente da mochila (itens com `plant`), rega-se com água (itens com `waters`; primeiro a suja, a garrafa volta) e, passadas `growHours` horas de jogo, colhe-se o fruto e 0–2 sementes (só se couber tudo). Por regar não cresce. Um canteiro com planta não se demole.
+- **Peças que produzem** (`produce: { everyHours, max, drops, needs? }`): uma unidade a cada `everyHours` horas de jogo, até `max`; recolhe-se com a ação (o coletor de água gasta uma garrafa vazia por unidade). Sprite `_full` quando há algo.
+- O tempo offline também conta (§7.6). Save: `base.crops[uid] = [semente, tick em que amadurece | null]`, `base.produce[uid] = tick de início da contagem`.
 
 ---
 
@@ -802,12 +809,12 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** dar valor à base.
 
-- [ ] Horta: plantar sementes da Quinta, regar com água, colher (ciclos em dias de jogo).
-- [ ] Coletor de água da chuva.
-- [ ] Armadilhas de caça simples.
+- [x] Horta: plantar sementes da Quinta (sacos de sementes no celeiro), regar com água, colher (ver §7.14).
+- [x] Coletor de água da chuva.
+- [x] Armadilhas de caça simples.
 - [ ] Hordas opcionais (desligadas por defeito) com aviso e recompensa.
 - [ ] Durabilidade de estruturas **apenas** em hordas; reparação barata.
-- [ ] Qualidade de vida: filtros. *("Guardar semelhantes" e "Ordenar" já existem desde a Fase 3/4.)*
+- [x] Qualidade de vida: filtro "Posso fazer" no fabrico. *("Guardar semelhantes" e "Ordenar" já existem desde a Fase 3/4.)*
 
 **Aceitação:** com hordas ligadas, uma base de pedra com 2 armadilhas aguenta uma horda de 8 zombies sem intervenção perfeita do jogador.
 
@@ -1001,3 +1008,7 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Inchado explode ao fim de um atraso depois de morrer (`explode` em `enemies.json`) | O aviso a piscar dá tempo para fugir; a explosão só magoa o jogador (mais simples e previsível) |
 | 2026-09-24 | Javali com carga (`charge`): aviso longo, corrida em linha reta na direção do jogador | Desviar-se para o lado é a jogada certa; sem perseguição teleguiada |
 | 2026-09-24 | Fornalha (nível 9) funde minério em lingotes; ferramentas de ferro na bancada (nível 10) | Minério só na Floresta Profunda (nível 10), por isso o ferro marca a entrada no meio do jogo |
+| 2026-09-24 | Fase 9 dividida em 9A (horta, coletor, armadilha de caça, filtro) e 9B (hordas) | Entregas mais pequenas, cada uma jogável |
+| 2026-09-24 | Horta: 1 rega por plantação (não todos os dias) | Simples e sem castigo por não aparecer; a água continua a ser um custo |
+| 2026-09-24 | Save v8: `base.crops` e `base.produce` (pelo uid da peça) | Migração v7 → v8 com teste; o início da produção pode ser negativo (o tempo offline recua-o) |
+| 2026-09-24 | Sementes vêm de sacos na Quinta (e raramente do armário da aldeia) | Dá razão para voltar à Quinta; a colheita devolve sementes, por isso a horta sustenta-se |

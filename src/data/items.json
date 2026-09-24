@@ -159,7 +159,8 @@
       "thirst": 15,
       "hp": -3
     },
-    "returns": "empty_bottle"
+    "returns": "empty_bottle",
+    "waters": true
   },
   "water_clean": {
     "name": "item.water_clean",
@@ -170,7 +171,8 @@
     "effects": {
       "thirst": 35
     },
-    "returns": "empty_bottle"
+    "returns": "empty_bottle",
+    "waters": true
   },
   "bandage": {
     "name": "item.bandage",
@@ -328,5 +330,53 @@
     "stack": 1,
     "rarity": "uncommon",
     "teaches": "r_spiked_club"
+  },
+  "carrot_seeds": {
+    "name": "item.carrot_seeds",
+    "icon": "icon_carrot_seeds",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common",
+    "plant": {
+      "crop": "carrot",
+      "growHours": 16,
+      "yield": [2, 3],
+      "seeds": [1, 2]
+    }
+  },
+  "carrot": {
+    "name": "item.carrot",
+    "icon": "icon_carrot",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "common",
+    "effects": {
+      "hunger": 14,
+      "thirst": 3
+    }
+  },
+  "tomato_seeds": {
+    "name": "item.tomato_seeds",
+    "icon": "icon_tomato_seeds",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "uncommon",
+    "plant": {
+      "crop": "tomato",
+      "growHours": 24,
+      "yield": [2, 4],
+      "seeds": [1, 2]
+    }
+  },
+  "tomato": {
+    "name": "item.tomato",
+    "icon": "icon_tomato",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "common",
+    "effects": {
+      "hunger": 8,
+      "thirst": 12
+    }
   }
 }

@@ -11,6 +11,7 @@ import { BASE_ZONE_ID, gameState, type GameState } from './GameState';
 import { Building } from './Building';
 import { Combat, type CombatContent } from './Combat';
 import { Fishing } from './Fishing';
+import { Homestead } from './Homestead';
 import { Progression, type ProgressionContent } from './Progression';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
@@ -36,6 +37,7 @@ export class Simulation {
   readonly building: Building;
   readonly combat: Combat;
   readonly fishing: Fishing;
+  readonly homestead: Homestead;
   readonly progression: Progression;
   /** Zona para onde o jogador está a sair (a cena faz a transição). */
   private leavingTo: string | null = null;
@@ -85,7 +87,16 @@ export class Simulation {
     this.building.isUnlocked = (id) => this.progression.isStructureUnlocked(id);
     this.combat = new Combat(state, bus, this.actions, combat);
     this.fishing = new Fishing(state, bus, this.actions, items);
-    this.interaction = new Interaction(state, bus, this.actions, this.building, this.combat, this.fishing);
+    this.homestead = new Homestead(state, bus, this.actions, this.building, items);
+    this.interaction = new Interaction(
+      state,
+      bus,
+      this.actions,
+      this.building,
+      this.combat,
+      this.fishing,
+      this.homestead,
+    );
     this.crafting = new Crafting(state, bus, crafting, this.actions);
     this.crafting.isUnlocked = (recipe) => this.progression.isRecipeUnlocked(recipe);
   }

@@ -148,6 +148,8 @@ export class Building {
     const uid = base.nextStructureId++;
     const record: StructureRecord = [uid, id, tx, ty, def.rotatable ? rot & 1 : 0, 0];
     base.structures.push(record);
+    // As peças que produzem começam a contar a partir de agora.
+    if (def.produce) base.produce[String(uid)] = this.state.data.world.tick;
     this.grid.add(record);
     this.applyCollision(record);
     this.recent.push({ uid, tick: this.state.data.world.tick });
@@ -190,6 +192,7 @@ export class Building {
     }
     if (def.chest && data.base.chests[structureChestId(uid)]?.some((slot) => slot !== null))
       return 'chest_not_empty';
+    if (def.farm && data.base.crops[String(uid)]) return 'plot_busy';
     return null;
   }
 
@@ -251,6 +254,8 @@ export class Building {
     this.zone?.collision.removeKeyed(collisionKey(uid));
     if (def.station) Reflect.deleteProperty(data.stations, structureStationKey(def.station, uid));
     if (def.chest) Reflect.deleteProperty(data.base.chests, structureChestId(uid));
+    Reflect.deleteProperty(data.base.produce, String(uid));
+    Reflect.deleteProperty(data.base.crops, String(uid));
     this.recent = this.recent.filter((r) => r.uid !== uid);
     this.changed();
     this.bus.emit('structure:removed', { uid });

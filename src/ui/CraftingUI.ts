@@ -50,6 +50,8 @@ export class CraftingUI {
   /** Estação aberta (`null` = mãos). */
   private station: string | null = null;
   private tab: Tab = 'tools';
+  /** Filtro "Posso fazer": só as receitas desbloqueadas com todos os ingredientes. */
+  private canMakeOnly = false;
   private readonly unsubscribe: (() => void)[];
 
   constructor(scene: Phaser.Scene, sim: Simulation) {
@@ -199,6 +201,21 @@ export class CraftingUI {
     this.button(x + w - 10, y + 9, CLOSE_ICON, 12, () => {
       this.close();
     });
+    if (this.tab !== 'repair') {
+      const filter = t('craft.filter');
+      const fw = Math.max(52, filter.length * 5 + 12);
+      this.button(
+        x + w - 10 - 10 - fw / 2,
+        y + 9,
+        filter,
+        fw,
+        () => {
+          this.canMakeOnly = !this.canMakeOnly;
+          this.build();
+        },
+        this.canMakeOnly,
+      );
+    }
 
     // Separadores.
     let tx = x + PAD;
@@ -228,11 +245,21 @@ export class CraftingUI {
 
   private recipes(): Recipe[] {
     const type = this.station ? stationType(this.station) : HANDS;
-    return this.sim.crafting.recipesFor(type).filter((r) => r.category === this.tab);
+    const containers = this.sim.actions.pickupContainers();
+    return this.sim.crafting
+      .recipesFor(type)
+      .filter((r) => r.category === this.tab)
+      .filter(
+        (r) =>
+          !this.canMakeOnly ||
+          (this.sim.progression.isRecipeUnlocked(r) && missingInputs(containers, r).length === 0),
+      );
   }
 
   private buildRecipes(x: number, y: number, w: number): void {
     const containers = this.sim.actions.pickupContainers();
+    if (this.canMakeOnly && this.recipes().length === 0)
+      this.label(x + PAD, y + 4, t('craft.nothing_to_make'), { size: 8, color: 'stone_light' });
     this.recipes().forEach((recipe, i) => {
       const ry = y + i * ROW_H;
       const def = content.items[recipe.output];

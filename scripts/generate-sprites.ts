@@ -1464,6 +1464,247 @@ const IRON_ICONS: Sprite[] = [
   },
 ];
 
+/** Canteiro da horta (terra seca ou regada, com moldura de madeira). */
+function gardenBed(img: Bitmap, wet: boolean): void {
+  img.fill(1, 3, 14, 12, c('bark_dark'));
+  img.fill(2, 4, 12, 10, c(wet ? 'bark_dark' : 'bark'));
+  const random = rng(wet ? 91 : 90);
+  for (let i = 0; i < 18; i++) {
+    const x = 2 + Math.floor(random() * 12);
+    const y = 4 + Math.floor(random() * 10);
+    img.set(x, y, c(wet ? 'shadow' : 'wood'));
+  }
+  // Moldura: tábuas com luz em cima.
+  img.fill(1, 2, 14, 2, c('wood_light'));
+  img.fill(1, 3, 14, 1, c('wood'));
+  img.fill(1, 14, 14, 1, c('wood'));
+  img.fill(1, 2, 1, 13, c('wood'));
+  img.fill(14, 2, 1, 13, c('bark'));
+}
+
+/** Coletor de água da chuva: barril com funil de pano. */
+function rainCollector(img: Bitmap, full: boolean): void {
+  shadow(img, 8, 22.5, 6, 1.5);
+  img.fill(3, 9, 10, 13, c('wood'));
+  img.fill(3, 9, 2, 13, c('wood_light'));
+  img.fill(11, 9, 2, 13, c('bark'));
+  img.fill(3, 12, 10, 1, c('stone_dark'));
+  img.fill(3, 18, 10, 1, c('stone_dark'));
+  // Funil de pano esticado em quatro paus.
+  img.fill(1, 3, 1, 7, c('bark'));
+  img.fill(14, 3, 1, 7, c('bark'));
+  img.fill(1, 4, 14, 2, c('parchment'));
+  img.fill(3, 6, 10, 2, c('cream'));
+  img.fill(5, 8, 6, 1, c('parchment'));
+  if (full) {
+    img.fill(4, 9, 8, 1, c('sky'));
+    img.fill(5, 9, 3, 1, c('ice'));
+  }
+}
+
+/** Armadilha de caça: laço preso a um pau dobrado; `full` = apanhou alguma coisa. */
+function snare(img: Bitmap, full: boolean): void {
+  shadow(img, 8, 14.5, 5, 1);
+  for (let i = 0; i < 9; i++) img.set(3 + Math.round(i * 0.4), 14 - i, c('bark'));
+  for (let i = 0; i < 7; i++) img.set(6 + i, 6 + Math.round((i * i) / 12), c('wood'));
+  img.ellipse(11, 12, 2.5, 1.5, c('parchment'));
+  img.ellipse(11, 12, 1.5, 0.6, c('bark'));
+  img.fill(2, 14, 4, 1, c('stone_dark'));
+  if (full) {
+    img.ellipse(11, 11.5, 3.5, 2.5, c('wood_light'));
+    img.ellipse(10, 11, 2, 1.5, c('sand'));
+    img.set(13, 10, c('ink'));
+    img.fill(14, 9, 1, 2, c('wood_light'));
+  }
+}
+
+/** Fase 9: horta, coletor de água, armadilha de caça e saco de sementes (na Quinta). */
+const PHASE9: Sprite[] = [
+  {
+    file: 'garden_bed',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      gardenBed(img, false);
+    },
+  },
+  {
+    file: 'garden_bed_wet',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      gardenBed(img, true);
+    },
+  },
+  {
+    file: 'crop_sprout',
+    width: 16,
+    height: 16,
+    outline: 'forest_dark',
+    paint: (img) => {
+      for (const x of [5, 10]) {
+        img.fill(x, 9, 1, 3, c('forest'));
+        img.set(x - 1, 8, c('leaf'));
+        img.set(x + 1, 8, c('lime'));
+      }
+    },
+  },
+  {
+    file: 'crop_carrot',
+    width: 16,
+    height: 16,
+    outline: 'forest_dark',
+    paint: (img) => {
+      for (const x of [4, 8, 12]) {
+        img.fill(x - 1, 10, 3, 2, c('orange'));
+        img.set(x, 10, c('amber'));
+        img.fill(x, 5, 1, 5, c('forest'));
+        img.set(x - 1, 5, c('leaf'));
+        img.set(x + 1, 6, c('leaf'));
+        img.set(x - 1, 7, c('grass'));
+        img.set(x + 1, 4, c('lime'));
+      }
+    },
+  },
+  {
+    file: 'crop_tomato',
+    width: 16,
+    height: 24,
+    outline: 'forest_dark',
+    paint: (img) => {
+      img.fill(8, 3, 1, 17, c('wood'));
+      foliage(
+        img,
+        [
+          [6, 10, 3],
+          [10, 8, 3],
+          [7, 15, 3],
+          [10, 14, 3],
+        ],
+        12,
+      );
+      for (const [x, y] of [
+        [5, 11],
+        [11, 9],
+        [9, 15],
+        [6, 16],
+      ] as const) {
+        img.ellipse(x, y, 1.5, 1.5, c('red'));
+        img.set(x - 1, y - 1, c('peach'));
+      }
+    },
+  },
+  {
+    file: 'rain_collector',
+    width: 16,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      rainCollector(img, false);
+    },
+  },
+  {
+    file: 'rain_collector_full',
+    width: 16,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      rainCollector(img, true);
+    },
+  },
+  {
+    file: 'snare',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      snare(img, false);
+    },
+  },
+  {
+    file: 'snare_full',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      snare(img, true);
+    },
+  },
+  {
+    file: 'seed_sack',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 14.5, 6, 1.5);
+      img.ellipse(8, 10, 5.5, 4.5, c('sand'));
+      img.ellipse(7, 9, 3, 2.5, c('wheat'));
+      img.fill(6, 3, 4, 3, c('sand'));
+      img.fill(5, 5, 6, 1, c('bark'));
+      img.set(8, 2, c('wheat'));
+      img.fill(10, 11, 2, 2, c('wood'));
+    },
+  },
+];
+
+/** Pacote de sementes com o desenho do fruto. */
+function seedPacket(img: Bitmap, fruit: string): void {
+  img.fill(3, 2, 10, 12, c('parchment'));
+  img.fill(3, 2, 10, 2, c('wood_light'));
+  img.fill(12, 4, 1, 10, c('sand'));
+  img.ellipse(8, 9, 2.5, 2.5, c(fruit));
+  img.set(7, 8, c('cream'));
+  img.fill(8, 5, 1, 2, c('forest'));
+}
+
+const PHASE9_ICONS: Sprite[] = [
+  {
+    file: 'carrot_seeds',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      seedPacket(img, 'orange');
+    },
+  },
+  {
+    file: 'tomato_seeds',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      seedPacket(img, 'red');
+    },
+  },
+  {
+    file: 'carrot',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 9; i++) img.fill(4 + i, 12 - i, Math.max(1, 3 - Math.floor(i / 4)), 2, c('orange'));
+      for (let i = 0; i < 6; i++) img.set(5 + i, 12 - i, c('amber'));
+      img.fill(12, 2, 1, 3, c('leaf'));
+      img.fill(13, 3, 2, 1, c('grass'));
+      img.set(11, 2, c('lime'));
+    },
+  },
+  {
+    file: 'tomato',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 9, 5, 4.5, c('red'));
+      img.ellipse(6.5, 7.5, 1.5, 1.2, c('peach'));
+      img.fill(7, 4, 3, 1, c('grass'));
+      img.set(8, 3, c('forest'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -1475,11 +1716,13 @@ for (const [dir, list] of [
   [outDir, ZONE_OBJECTS],
   [outDir, PHASE8],
   [outDir, PHASE8B],
+  [outDir, PHASE9],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
   [iconDir, FOOD_ICONS],
   [iconDir, NOTE_ICONS],
   [iconDir, IRON_ICONS],
+  [iconDir, PHASE9_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -1490,7 +1733,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

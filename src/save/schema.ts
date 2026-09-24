@@ -4,7 +4,7 @@ import { MIGRATIONS, migrate, type Migration } from './migrations';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -151,6 +151,19 @@ export function validateState(input: unknown): GameStateData {
   }
   if (!isObject(base) || !stat(base.nextStructureId) || base.nextStructureId < 1) {
     problems.push('base.nextStructureId inválido');
+  }
+  const validCrop = (crop: unknown): boolean =>
+    Array.isArray(crop) &&
+    crop.length === 2 &&
+    typeof crop[0] === 'string' &&
+    crop[0] !== '' &&
+    (crop[1] === null || stat(crop[1]));
+  if (!isObject(base) || !isObject(base.crops) || !Object.values(base.crops).every(validCrop)) {
+    problems.push('base.crops inválido');
+  }
+  // Pode ser negativo: o tempo offline recua o início da contagem (mesmo no início do jogo).
+  if (!isObject(base) || !isObject(base.produce) || !Object.values(base.produce).every(Number.isInteger)) {
+    problems.push('base.produce inválido');
   }
   const zones = isObject(input) ? input.zones : undefined;
   if (
