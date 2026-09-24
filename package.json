@@ -22,7 +22,9 @@
     "tiles": "node scripts/generate-tiles.ts",
     "sprites": "node scripts/generate-sprites.ts",
     "map:base": "node scripts/generate-base-map.ts",
-    "map:pine": "node scripts/generate-pine-forest.ts"
+    "map:pine": "node scripts/generate-pine-forest.ts",
+    "map:farm": "node scripts/generate-farm.ts",
+    "map:lake": "node scripts/generate-lake.ts"
   },
   "dependencies": {
     "phaser": "^4.2.1"

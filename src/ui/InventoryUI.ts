@@ -70,7 +70,8 @@ export class InventoryUI {
   private panelSlots: SlotView[] = [];
   private panelObjects: { destroy(): void }[] = [];
   private panelRect: Rect | null = null;
-  private chestId: string | null = null;
+  /** Baú ou contentor com loot aberto ao lado da mochila. */
+  private other: `chest:${string}` | `loot:${string}` | null = null;
   private selected: SlotRef | null = null;
   private press: { view: SlotView; x: number; y: number; pointerId: number; dragging: boolean } | null = null;
   private ghost: Phaser.GameObjects.Image | null = null;
@@ -96,8 +97,8 @@ export class InventoryUI {
       eventBus.on('inventory:changed', () => {
         this.refresh();
       }),
-      eventBus.on('container:open', ({ chestId }) => {
-        this.open(chestId);
+      eventBus.on('container:open', ({ container }) => {
+        this.open(container);
       }),
       // Abrir uma estação fecha a mochila (só um painel de cada vez).
       eventBus.on('station:open', () => {
@@ -123,8 +124,8 @@ export class InventoryUI {
     else this.open(null);
   }
 
-  open(chestId: string | null): void {
-    this.chestId = chestId;
+  open(other: `chest:${string}` | `loot:${string}` | null): void {
+    this.other = other;
     this.selected = null;
     uiState.modalOpen = true;
     this.buildPanel();
@@ -133,7 +134,7 @@ export class InventoryUI {
   close(): void {
     this.clearPanel();
     this.panelRect = null;
-    this.chestId = null;
+    this.other = null;
     this.selected = null;
     uiState.modalOpen = false;
     this.refresh();
@@ -244,7 +245,7 @@ export class InventoryUI {
   private layout(scale: number): PanelLayout | null {
     const { width } = getView();
     const bag = bagSize(scale);
-    const chest = this.chestId ? gridSize(BALANCE.chestSlots, CHEST_COLS, scale) : null;
+    const chest = this.otherGrid(scale);
     const sideBySide = chest !== null && bag.w + chest.w + PAD * 3 <= width - 8;
     const block = (g: { w: number; h: number }): { w: number; h: number } => ({ w: g.w, h: TITLE_H + g.h });
     const blocks = [block(bag), ...(chest ? [block(chest)] : [])];
@@ -340,10 +341,13 @@ export class InventoryUI {
         ).setDepth(DEPTH.slots),
       );
     }
-    if (chest && this.chestId) {
+    const other = this.other;
+    if (chest && other) {
       const cx = sideBySide ? gx + bag.w + PAD : gx;
       const cy = sideBySide ? gy : gy + TITLE_H + bag.h + PAD;
-      grid(`chest:${this.chestId}`, BALANCE.chestSlots, CHEST_COLS, cx, cy, t('inv.chest'));
+      const slots = this.actions.container(other).length;
+      const title = t(other.startsWith('loot:') ? 'inv.container' : 'inv.chest');
+      grid(other, slots, Math.min(CHEST_COLS, slots), cx, cy, title);
     }
 
     // Fechar (canto superior direito).
@@ -369,7 +373,7 @@ export class InventoryUI {
   /** Ecrã demasiado pequeno para qualquer escala: usa ×1 mesmo que fique cortado. */
   private layoutFallback(): PanelLayout {
     const bag = bagSize(1);
-    const chest = this.chestId ? gridSize(BALANCE.chestSlots, CHEST_COLS, 1) : null;
+    const chest = this.otherGrid(1);
     const h = TITLE_H + bag.h + (chest ? TITLE_H + chest.h + PAD : 0) + INFO_H + PAD * 2;
     return { scale: 1, bag, chest, sideBySide: false, w: Math.max(bag.w, chest?.w ?? 0) + PAD * 2, h };
   }
@@ -446,16 +450,39 @@ export class InventoryUI {
       );
     }
 
-    const chestId = this.chestId;
-    if (chestId) {
+    const other = this.other;
+    if (other?.startsWith('chest:')) {
       const bw = 96;
       add(
         new Button(scene, x + w - bw / 2, y + 20, t('inv.store_similar'), { ...small, width: bw }, () => {
-          const moved = this.actions.storeSimilar(chestId);
+          const moved = this.actions.storeSimilar(other);
           if (moved > 0) scene.events.emit('ui:message', t('msg.stored', { qty: moved }));
           this.rebuildSoon();
         }),
       ).setDepth(DEPTH.slots);
+    } else if (other) {
+      const bw = 80;
+      add(
+        new Button(
+          scene,
+          x + w - bw / 2,
+          y + 20,
+          t('inv.take_all'),
+          { ...small, width: bw, style: 'primary' },
+          () => {
+            if (!this.actions.takeAll(other)) scene.events.emit('ui:message', t('msg.inventory_full'));
+            this.selected = null;
+            this.rebuildSoon();
+          },
+        ),
+      ).setDepth(DEPTH.slots);
     }
+  }
+
+  /** Tamanho da grelha do baú/contentor aberto (null se não houver). */
+  private otherGrid(scale: number): { w: number; h: number } | null {
+    if (!this.other) return null;
+    const slots = this.actions.container(this.other).length;
+    return gridSize(slots, Math.min(CHEST_COLS, slots), scale);
   }
 }

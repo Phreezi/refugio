@@ -16,5 +16,6 @@ export function advanceRespawns(data: GameStateData, ticks: number): void {
     for (const key of Object.keys(zone.depleted)) {
       zone.depleted[key] = Math.max(0, (zone.depleted[key] ?? 0) - ticks);
     }
+    for (const entry of Object.values(zone.loot)) entry[0] = Math.max(0, entry[0] - ticks);
   }
 }

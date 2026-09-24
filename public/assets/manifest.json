@@ -284,7 +284,8 @@
         "color": "orange",
         "border": "ink",
         "letter": "A"
-      }
+      },
+      "file": "sprites/icons/clay.png"
     },
     "icon_iron_ore": {
       "type": "image",
@@ -404,7 +405,8 @@
         "color": "sky",
         "border": "ink",
         "letter": "P"
-      }
+      },
+      "file": "sprites/icons/fish.png"
     },
     "icon_canned_food": {
       "type": "image",
@@ -447,7 +449,8 @@
         "color": "cream",
         "border": "ink",
         "letter": "L"
-      }
+      },
+      "file": "sprites/icons/bandage.png"
     },
     "icon_empty_bottle": {
       "type": "image",
@@ -708,6 +711,61 @@
         "width": 16,
         "height": 16,
         "color": "parchment",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "clay_pit": {
+      "type": "image",
+      "file": "sprites/clay_pit.png",
+      "placeholder": {
+        "width": 16,
+        "height": 12,
+        "color": "orange",
+        "border": "bark",
+        "letter": "A"
+      }
+    },
+    "dock": {
+      "type": "image",
+      "file": "sprites/dock.png",
+      "placeholder": {
+        "width": 32,
+        "height": 24,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "P"
+      }
+    },
+    "cabinet": {
+      "type": "image",
+      "file": "sprites/cabinet.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "A"
+      }
+    },
+    "icon_cooked_fish": {
+      "type": "image",
+      "file": "sprites/icons/cooked_fish.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "P"
+      }
+    },
+    "icon_fishing_rod": {
+      "type": "image",
+      "file": "sprites/icons/fishing_rod.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
         "border": "ink",
         "letter": "C"
       }

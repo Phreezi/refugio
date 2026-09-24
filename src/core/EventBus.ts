@@ -18,8 +18,8 @@ export interface GameEvents {
   'enemy:killed': { uid: number; enemy: string; x: number; y: number };
   /** Mochilas no chão de uma zona mudaram. */
   'bag:changed': { zoneId: string };
-  /** O jogador passou para outra zona (a cena muda). */
-  'zone:change': { from: string; to: string };
+  /** O jogador pisou uma saída: vai para a zona `to` (null = abre o mapa-mundo). */
+  'zone:change': { from: string; to: string | null; exit: { x: number; y: number } };
   /** O jogador fez a ação contextual (para a animação de ataque/recolha). */
   'player:action': { kind: 'gather' | 'use' | 'open' | 'swing' | 'attack' };
   /** Um recurso levou um golpe (hp restante; 0 = apanhado). */
@@ -33,15 +33,19 @@ export interface GameEvents {
   'item:broken': { item: string };
   'player:consumed': { item: string };
   /** A ação não foi possível (a UI mostra o motivo). */
-  'action:blocked': { reason: 'needs_tool' | 'inventory_full' | 'door_blocked'; tool?: string };
+  'action:blocked': { reason: 'needs_tool' | 'inventory_full' | 'door_blocked' | 'needs_rod'; tool?: string };
+  /** Pesca (Fase 7): começou o mini-jogo; acabou (apanhou ou não); encheu uma garrafa no lago. */
+  'fishing:started': Record<string, never>;
+  'fishing:result': { caught: boolean };
+  'fishing:filled': Record<string, never>;
   /** Peça construída colocada (CLAUDE.md §7.7). */
   'structure:placed': { uid: number };
   /** Peça demolida ou desfeita. */
   'structure:removed': { uid: number };
   /** Uma peça mudou de estado (porta aberta/fechada). */
   'structure:changed': { uid: number };
-  /** Abrir o baú `chestId` (a UI mostra-o ao lado da mochila). */
-  'container:open': { chestId: string };
+  /** Abrir um baú (`chest:<id>`) ou contentor com loot (`loot:<zona>:<id>`), ao lado da mochila. */
+  'container:open': { container: `chest:${string}` | `loot:${string}` };
   /** Abrir o painel de crafting de uma estação (`<tipo>_<id do objeto>`). */
   'station:open': { stationKey: string };
   /** Um craft terminou (mãos: já está no inventário; estação: à espera de ser recolhido). */

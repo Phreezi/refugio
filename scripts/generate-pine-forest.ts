@@ -198,7 +198,7 @@ const point = (name: string, x: number, y: number) => ({
 
 const objects = [
   point('player_spawn', SPAWN.tx * TILE + TILE / 2, SPAWN.ty * TILE + TILE / 2),
-  ...EXIT_ROWS.map((row) => point('exit:zone_base', TILE / 2, (row + 1) * TILE)),
+  ...EXIT_ROWS.map((row) => point('exit', TILE / 2, (row + 1) * TILE)),
   ...placements.sort((a, b) => a.y - b.y || a.x - b.x).map((p) => point(p.name, p.x, p.y)),
 ];
 

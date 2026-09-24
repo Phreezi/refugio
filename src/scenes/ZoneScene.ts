@@ -25,6 +25,7 @@ import { content } from '../world/content';
 import { BASE_TILESET_NAME } from '../world/tileset';
 import { TILE_LAYERS, type TileLayerName } from '../world/zoneMap';
 import { SceneKey } from './keys';
+import type { WorldMapData } from './WorldMapScene';
 
 const PLAYER_TEXTURE = 'player';
 /** Seta por cima do alvo da ação contextual (textura gerada por código). */
@@ -84,6 +85,8 @@ type MoveKeys = Record<'up' | 'down' | 'left' | 'right' | 'action' | 'sneak', Ph
 export class ZoneScene extends Phaser.Scene {
   private zoneId: string = BASE_ZONE_ID;
   private enemyViews = new Map<number, EnemyView>();
+  /** Contentores com loot, pelo id do objeto (ficam escuros quando vazios). */
+  private containerSprites = new Map<number, Phaser.GameObjects.Image>();
   private bagSprites: Phaser.GameObjects.Image[] = [];
   /** A sair da zona (fade em curso): o jogador fica parado. */
   private leaving = false;
@@ -134,6 +137,11 @@ export class ZoneScene extends Phaser.Scene {
       const def = content.stations[p.id];
       if (def) place(p, def.sprite);
     }
+    this.containerSprites = new Map();
+    for (const p of zone.containers) {
+      const def = content.lootTables[p.id];
+      if (def) this.containerSprites.set(p.objectId, place(p, def.sprite));
+    }
 
     this.createPlayerAnimations();
     const { x, y, facing } = gameState.data.player;
@@ -160,12 +168,20 @@ export class ZoneScene extends Phaser.Scene {
     simulation.setZone({
       zoneId: this.zoneId,
       map: zone,
-      collision: CollisionWorld.fromZone(zone, content.resources, content.props, content.stations),
+      collision: CollisionWorld.fromZone(
+        zone,
+        content.resources,
+        content.props,
+        content.stations,
+        content.lootTables,
+      ),
       items: content.items,
       resources: content.resources,
       props: content.props,
       stations: content.stations,
       structures: content.structures,
+      lootTables: content.lootTables,
+      respawnDays: content.zones[this.zoneId]?.respawnDays ?? 1,
     });
     simulation.setRespawnPoint(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     simulation.reset();
@@ -180,6 +196,7 @@ export class ZoneScene extends Phaser.Scene {
     this.ghostArea.setDepth(GHOST_AREA_DEPTH);
     this.enemyViews = new Map();
     this.renderBags();
+    this.renderContainers();
     const offFeedback = this.listenForFeedback();
     camera.fadeIn(FADE_MS);
     autosave.start();
@@ -199,6 +216,7 @@ export class ZoneScene extends Phaser.Scene {
       this.resourceSprites.clear();
       this.structureSprites.clear();
       this.enemyViews.clear();
+      this.containerSprites.clear();
       this.bagSprites = [];
       this.marker = null;
       this.ghost = null;
@@ -413,19 +431,33 @@ export class ZoneScene extends Phaser.Scene {
         this.hurtUntil = this.time.now + 150;
         this.cameras.main.shake(100, 0.004);
       }),
+      eventBus.on('inventory:changed', () => {
+        this.renderContainers();
+      }),
       eventBus.on('bag:changed', ({ zoneId }) => {
         if (zoneId === this.zoneId) this.renderBags();
       }),
-      eventBus.on('zone:change', ({ to }) => {
+      eventBus.on('zone:change', ({ from, to, exit }) => {
+        if (to === null) {
+          // Saída para o mapa-mundo: o jogador fica na saída até escolher para onde vai.
+          this.leave(() => {
+            this.scene.start(SceneKey.WorldMap, { from, exit } satisfies WorldMapData);
+          });
+          return;
+        }
         this.leave(() => {
           simulation.enterZone(to, content.zoneMap(to));
           uiState.pendingNotice = tKey(content.zones[to]?.name ?? to);
-          return to;
+          this.scene.restart({ zoneId: to } satisfies ZoneSceneData);
         });
       }),
       eventBus.on('player:died', () => {
         // O jogador já está na base (GameState): se morreu noutra zona, muda de cena.
-        if (this.zoneId !== BASE_ZONE_ID) this.leave(() => BASE_ZONE_ID);
+        if (this.zoneId !== BASE_ZONE_ID) {
+          this.leave(() => {
+            this.scene.restart({ zoneId: BASE_ZONE_ID } satisfies ZoneSceneData);
+          });
+        }
       }),
       eventBus.on('item:gained', ({ item, qty, x, y }) => {
         this.floatText(t('msg.gained', { qty, item: itemName(item) }), Math.round(x), Math.round(y) - 20);
@@ -436,16 +468,13 @@ export class ZoneScene extends Phaser.Scene {
     };
   }
 
-  /** Sai da zona com um fade; `next` diz para que zona vai (e atualiza o estado). */
-  private leave(next: () => string): void {
+  /** Sai da zona com um fade; `next` muda de cena (e atualiza o estado, se for preciso). */
+  private leave(next: () => void): void {
     if (this.leaving) return;
     this.leaving = true;
     const camera = this.cameras.main;
     camera.fadeOut(FADE_MS, 0, 0, 0);
-    camera.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      const zoneId = next();
-      this.scene.restart({ zoneId } satisfies ZoneSceneData);
-    });
+    camera.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, next);
   }
 
   /** Inimigos: posição interpolada, andar aos saltinhos, aviso de ataque a piscar, vida. */
@@ -496,6 +525,14 @@ export class ZoneScene extends Phaser.Scene {
       if (now < this.hurtUntil) this.player.setTint(0xb33a3a).setTintMode(Phaser.TintModes.FILL);
       else this.player.clearTint();
       this.player.setAlpha(simulation.combat.playerInvulnerable && Math.floor(now / 80) % 2 === 0 ? 0.4 : 1);
+    }
+  }
+
+  /** Contentores já vazios ficam mais escuros (voltam a encher com o tempo). */
+  private renderContainers(): void {
+    for (const [objectId, sprite] of this.containerSprites) {
+      if (simulation.interaction.isLooted(objectId)) sprite.setTint(0x777777);
+      else sprite.clearTint();
     }
   }
 

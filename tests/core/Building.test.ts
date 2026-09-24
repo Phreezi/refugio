@@ -42,7 +42,7 @@ function setup(data?: GameStateData, map: ZoneMap = MAP) {
   bus.on('structure:placed', ({ uid }) => events.push(`placed:${String(uid)}`));
   bus.on('structure:removed', ({ uid }) => events.push(`removed:${String(uid)}`));
   bus.on('station:open', ({ stationKey }) => events.push(`station:${stationKey}`));
-  bus.on('container:open', ({ chestId }) => events.push(`chest:${chestId}`));
+  bus.on('container:open', ({ container }) => events.push(container));
   bus.on('action:blocked', ({ reason }) => events.push(`blocked:${reason}`));
   const sim = new Simulation(
     state,
@@ -124,6 +124,7 @@ describe('Building (construção da base)', () => {
     state.data.zones[BASE_ZONE_ID] = {
       depleted: { ...depleted, '5': state.data.world.tick + 20 },
       bags: [],
+      loot: {},
     };
     expect(sim.building.place('foundation_wood', 3, 3, 0)).toBeNull();
     for (let i = 0; i < 60; i++) sim.update(FIXED_STEP_MS);

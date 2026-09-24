@@ -10,12 +10,13 @@ import { FixedStep } from './FixedStep';
 import { BASE_ZONE_ID, gameState, type GameState } from './GameState';
 import { Building } from './Building';
 import { Combat, type CombatContent } from './Combat';
+import { Fishing } from './Fishing';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
 import { PlayerActions } from './PlayerActions';
 import { secondsToTicks } from './Clock';
 import { content } from '../world/content';
-import { arrivalPoint } from '../systems/travel/travel';
+import { arrivalPoint, canTravel, type TravelCost } from '../systems/travel/travel';
 import type { ZoneMap } from '../world/zoneMap';
 
 /**
@@ -33,6 +34,7 @@ export class Simulation {
   readonly crafting: Crafting;
   readonly building: Building;
   readonly combat: Combat;
+  readonly fishing: Fishing;
   /** Zona para onde o jogador está a sair (a cena faz a transição). */
   private leavingTo: string | null = null;
   private exits: ZoneMap['exits'] = [];
@@ -70,7 +72,8 @@ export class Simulation {
     this.actions = new PlayerActions(state, bus, items);
     this.building = new Building(state, bus, this.actions);
     this.combat = new Combat(state, bus, this.actions, combat);
-    this.interaction = new Interaction(state, bus, this.actions, this.building, this.combat);
+    this.fishing = new Fishing(state, bus, this.actions, items);
+    this.interaction = new Interaction(state, bus, this.actions, this.building, this.combat, this.fishing);
     this.crafting = new Crafting(state, bus, crafting, this.actions);
   }
 
@@ -79,6 +82,7 @@ export class Simulation {
     this.world = zone?.collision ?? null;
     this.exits = zone?.map.exits ?? [];
     this.leavingTo = null;
+    this.fishing.cancel();
     this.building.setZone(zone);
     this.combat.setZone(zone);
     this.interaction.setZone(zone);
@@ -102,14 +106,31 @@ export class Simulation {
    * Passa o jogador para a zona `to` (chamado pela cena na transição): fica no ponto de chegada
    * (junto à saída que leva de volta, ou no `player_spawn`).
    */
-  enterZone(to: string, map: ZoneMap): void {
+  enterZone(to: string, map: ZoneMap, via?: { x: number; y: number }): void {
     const player = this.state.data.player;
-    const from = player.zoneId;
-    const at = arrivalPoint(map, from);
+    const from = player.zoneId === to ? null : player.zoneId;
+    const at = arrivalPoint(map, via ? null : from, via);
     player.zoneId = to;
     player.x = at.x;
     player.y = at.y;
     this.state.markDirty();
+  }
+
+  /**
+   * Viagem pelo mapa-mundo (CLAUDE.md §8.1): paga a fome/sede e entra na zona `to` pela saída
+   * que dá para o mapa-mundo. @returns false se o jogador estiver demasiado fraco.
+   */
+  travel(to: string, map: ZoneMap, cost: TravelCost): boolean {
+    const player = this.state.data.player;
+    if (!canTravel(player, cost)) return false;
+    player.hunger -= cost.hunger;
+    player.thirst -= cost.thirst;
+    const at = arrivalPoint(map, null);
+    player.zoneId = to;
+    player.x = at.x;
+    player.y = at.y;
+    this.state.markDirty();
+    return true;
   }
 
   /** Onde o jogador reaparece se morrer (o `player_spawn` da base). */
@@ -186,24 +207,30 @@ export class Simulation {
   private checkExits(): void {
     if (this.leavingTo !== null || !this.moved) return;
     const player = this.state.data.player;
-    const exit = this.exits.find(
-      (e) => e.to !== null && Math.hypot(e.x - player.x, e.y - player.y) <= BALANCE.exitReachPx,
-    );
-    if (!exit?.to) return;
-    this.leavingTo = exit.to;
-    this.bus.emit('zone:change', { from: player.zoneId, to: exit.to });
+    const exit = this.exits.find((e) => Math.hypot(e.x - player.x, e.y - player.y) <= BALANCE.exitReachPx);
+    if (!exit) return;
+    // Sem destino, a saída abre o mapa-mundo (a cena decide para onde se vai).
+    this.leavingTo = exit.to ?? 'world';
+    this.bus.emit('zone:change', { from: player.zoneId, to: exit.to, exit: { x: exit.x, y: exit.y } });
   }
 
   private runAction(tick: number): void {
     if (!(this.actionQueued || this.actionHeld) || tick < this.nextActionTick) return;
     this.actionQueued = false;
+    // A pescar, o botão de ação é o "puxar" do mini-jogo.
+    if (this.fishing.active) {
+      this.fishing.strike();
+      this.actionHeld = false;
+      this.nextActionTick = tick + this.actionCooldownTicks;
+      return;
+    }
     const done = this.interaction.act(PLAYER_FOOTPRINT);
     if (done === null) return;
     // Golpes (em inimigos ou no ar) seguem o ritmo da arma; o resto, o ritmo normal.
     const attack = done === 'enemy' || done === 'swing';
     this.nextActionTick = tick + (attack ? this.combat.attackTicks() : this.actionCooldownTicks);
     // Abrir um baú, beber ou abrir uma porta não se repete com a tecla presa (só golpes em recursos).
-    if (done === 'chest' || done === 'drink' || done === 'door' || done === 'bag') this.actionHeld = false;
+    if (done !== 'enemy' && done !== 'resource' && done !== 'swing') this.actionHeld = false;
   }
 
   /**
@@ -230,7 +257,7 @@ export class Simulation {
     const player = this.state.data.player;
     this.previous = { x: player.x, y: player.y };
     this.moved = false;
-    if (this.world === null || isZero(this.intent)) return;
+    if (this.world === null || isZero(this.intent) || this.fishing.active) return;
 
     player.facing = facingFromIntent(this.intent, player.facing);
     const speed = BALANCE.playerSpeed * (this.sneaking ? BALANCE.sneakMultiplier : 1);

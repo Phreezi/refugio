@@ -57,6 +57,8 @@ export interface ZoneState {
   /** Recursos apanhados: id do objeto no Tiled → tick em que reaparece. */
   depleted: Record<string, number>;
   bags: GroundBag[];
+  /** Contentores já abertos: id do objeto → [tick em que volta a encher, conteúdo]. */
+  loot: Record<string, [number, Container]>;
 }
 
 /**
@@ -120,7 +122,7 @@ export function stationState(data: GameStateData, key: string): StationState {
 
 /** Estado de uma zona (criado se ainda não existir). */
 export function zoneState(data: GameStateData, zoneId: string): ZoneState {
-  data.zones[zoneId] ??= { depleted: {}, bags: [] };
+  data.zones[zoneId] ??= { depleted: {}, bags: [], loot: {} };
   return data.zones[zoneId];
 }
 

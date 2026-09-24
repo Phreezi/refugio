@@ -210,8 +210,8 @@ const point = (name: string, x: number, y: number) => ({
 
 const objects = [
   point('player_spawn', SPAWN.tx * TILE + TILE / 2, SPAWN.ty * TILE + TILE / 2),
-  point('exit:zone_pine_forest', (W - 1) * TILE + TILE / 2, PATH_Y[1] * TILE),
-  point('exit:zone_pine_forest', PATH_X[1] * TILE, (H - 1) * TILE + TILE / 2),
+  point('exit', (W - 1) * TILE + TILE / 2, PATH_Y[1] * TILE),
+  point('exit', PATH_X[1] * TILE, (H - 1) * TILE + TILE / 2),
   ...placements.sort((a, b) => a.y - b.y || a.x - b.x).map((p) => point(p.name, p.x, p.y)),
 ];
 

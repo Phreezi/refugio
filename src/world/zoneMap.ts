@@ -57,7 +57,8 @@ export interface ZoneMap {
   chests: readonly ResourcePlacement[];
   /** Estações de crafting (`station:<tipo>`): o id é o tipo (ex.: `campfire`). */
   stations: readonly ResourcePlacement[];
-  containers: readonly TaggedPoint[];
+  /** Contentores com loot (`container:<tabela>`): o id é a tabela de loot. */
+  containers: readonly ResourcePlacement[];
   enemySpawns: readonly TaggedPoint[];
 }
 
@@ -75,6 +76,8 @@ export interface ZoneMapRules {
   floorTiles?: Readonly<Record<string, readonly number[]>>;
   /** Zonas válidas em `exit:<zona>` (omisso = não se verifica). */
   zoneIds?: Iterable<string>;
+  /** Tabelas válidas em `container:<tabela>` (omisso = não se verifica). */
+  lootTableIds?: Iterable<string>;
   /** Grupos válidos em `enemy_spawn:<grupo>` (omisso = não se verifica). */
   enemyGroupIds?: Iterable<string>;
 }
@@ -243,7 +246,8 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
   const zoneIds = rules.zoneIds ? new Set(rules.zoneIds) : null;
   const groupIds = rules.enemyGroupIds ? new Set(rules.enemyGroupIds) : null;
   const resources: ResourcePlacement[] = [];
-  const containers: TaggedPoint[] = [];
+  const containers: ResourcePlacement[] = [];
+  const lootIds = rules.lootTableIds ? new Set(rules.lootTableIds) : null;
   const enemySpawns: TaggedPoint[] = [];
   const objectLayers = layers.filter((l) => l.name === OBJECT_LAYER);
   const objectLayer = objectLayers[0];
@@ -286,8 +290,10 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
       } else if (kind === 'chest' && id) {
         if (chests.some((c) => c.id === id)) problems.push(`${label}: baú "${id}" repetido`);
         else chests.push({ id, objectId, ...point });
-      } else if (kind === 'container' && id) containers.push({ id, ...point });
-      else if (kind === 'enemy_spawn' && id) {
+      } else if (kind === 'container' && id) {
+        if (lootIds && !lootIds.has(id)) problems.push(`${label}: tabela de loot desconhecida "${id}"`);
+        containers.push({ id, objectId, ...point });
+      } else if (kind === 'enemy_spawn' && id) {
         if (groupIds && !groupIds.has(id)) problems.push(`${label}: grupo de inimigos desconhecido "${id}"`);
         enemySpawns.push({ id, ...point });
       } else {

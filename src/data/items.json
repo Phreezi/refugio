@@ -116,7 +116,19 @@
     "stack": 10,
     "rarity": "common",
     "effects": {
-      "hunger": 6
+      "hunger": 6,
+      "hp": -1
+    }
+  },
+  "cooked_fish": {
+    "name": "item.cooked_fish",
+    "icon": "icon_cooked_fish",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "common",
+    "effects": {
+      "hunger": 22,
+      "thirst": 2
     }
   },
   "canned_food": {
@@ -169,6 +181,14 @@
     "type": "tool",
     "stack": 10,
     "rarity": "common"
+  },
+  "fishing_rod": {
+    "name": "item.fishing_rod",
+    "icon": "icon_fishing_rod",
+    "type": "tool",
+    "stack": 1,
+    "rarity": "common",
+    "durability": 60
   },
   "stone_axe": {
     "name": "item.stone_axe",

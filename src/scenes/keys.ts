@@ -4,6 +4,7 @@ export const SceneKey = {
   Preload: 'Preload',
   MainMenu: 'MainMenu',
   Zone: 'Zone',
+  WorldMap: 'WorldMap',
   UI: 'UI',
 } as const;
 

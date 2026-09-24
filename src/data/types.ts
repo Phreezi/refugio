@@ -37,8 +37,8 @@ export interface ResourceDef extends WorldObjectDef {
 }
 
 export type ResourceDefs = Readonly<Record<string, ResourceDef>>;
-export type PropAction = 'drink';
-const PROP_ACTIONS: readonly PropAction[] = ['drink'];
+export type PropAction = 'drink' | 'fish';
+const PROP_ACTIONS: readonly PropAction[] = ['drink', 'fish'];
 
 /** Obstáculo/decoração; alguns têm uma ação contextual (ex.: beber no poço). */
 export interface PropDef extends WorldObjectDef {
@@ -800,6 +800,14 @@ export interface ZoneDef {
   map: string;
   /** Nível de perigo: 0 = segura (base), 1–4 = T1–T4. */
   danger: number;
+  /** Posição no mapa-mundo (0–100 em cada eixo; a base fica ao centro). */
+  worldMapPos: { x: number; y: number };
+  /** Custo de viajar até lá (fome e sede). */
+  travelCost: { hunger: number; thirst: number };
+  /** Dias de jogo até os contentores voltarem a ter loot. */
+  respawnDays: number;
+  /** Nível do jogador para desbloquear (a verificar a partir da Fase 8). */
+  unlockLevel: number;
 }
 
 export type ZoneDefs = Readonly<Record<string, ZoneDef>>;
@@ -817,7 +825,8 @@ export function parseZones(input: unknown): ZoneDefs {
       continue;
     }
     for (const key of Object.keys(raw)) {
-      if (!['name', 'map', 'danger'].includes(key)) problems.push(`"${id}": campo desconhecido "${key}"`);
+      if (!['name', 'map', 'danger', 'worldMapPos', 'travelCost', 'respawnDays', 'unlockLevel'].includes(key))
+        problems.push(`"${id}": campo desconhecido "${key}"`);
     }
     const name = typeof raw.name === 'string' ? raw.name : '';
     if (name !== `zone.${id.slice('zone_'.length)}`)
@@ -826,8 +835,97 @@ export function parseZones(input: unknown): ZoneDefs {
     if (!/^maps\/[a-z0-9_]+\.json$/.test(map)) problems.push(`"${id}": map tem de ser "maps/<nome>.json"`);
     const danger = raw.danger;
     if (!isNonNegativeInt(danger) || danger > 4) problems.push(`"${id}": danger tem de ser 0–4`);
-    defs[id] = { name, map, danger: isNonNegativeInt(danger) ? danger : 0 };
+    const [px, py] = Array.isArray(raw.worldMapPos) ? (raw.worldMapPos as unknown[]) : [];
+    const inRange = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 100;
+    if (!inRange(px) || !inRange(py)) problems.push(`"${id}": worldMapPos tem de ser [x, y] entre 0 e 100`);
+    const cost = isObject(raw.travelCost) ? raw.travelCost : {};
+    const hunger = cost.hunger ?? 0;
+    const thirst = cost.thirst ?? 0;
+    if (!isNonNegativeInt(hunger) || !isNonNegativeInt(thirst))
+      problems.push(`"${id}": travelCost tem de ser { hunger, thirst } inteiros ≥ 0`);
+    const respawnDays = raw.respawnDays ?? 1;
+    if (typeof respawnDays !== 'number' || respawnDays <= 0)
+      problems.push(`"${id}": respawnDays tem de ser > 0`);
+    const unlockLevel = raw.unlockLevel ?? 1;
+    if (!isPositiveInt(unlockLevel)) problems.push(`"${id}": unlockLevel tem de ser um inteiro > 0`);
+    defs[id] = {
+      name,
+      map,
+      danger: isNonNegativeInt(danger) ? danger : 0,
+      worldMapPos: { x: inRange(px) ? px : 50, y: inRange(py) ? py : 50 },
+      travelCost: {
+        hunger: isNonNegativeInt(hunger) ? hunger : 0,
+        thirst: isNonNegativeInt(thirst) ? thirst : 0,
+      },
+      respawnDays: typeof respawnDays === 'number' && respawnDays > 0 ? respawnDays : 1,
+      unlockLevel: isPositiveInt(unlockLevel) ? unlockLevel : 1,
+    };
   }
   if (problems.length > 0) throw new DataError('zones.json', problems);
   return defs;
+}
+
+/** Entrada de uma tabela de loot: item, peso (probabilidade relativa), quantidade mín–máx. */
+export interface LootEntry {
+  item: string;
+  weight: number;
+  min: number;
+  max: number;
+}
+
+/** Contentor com loot (`container:<tabela>` nos mapas, CLAUDE.md §7.10). */
+export interface LootTableDef extends WorldObjectDef {
+  /** Quantas tiragens (mín–máx). */
+  rolls: { min: number; max: number };
+  /** Slots do contentor. */
+  slots: number;
+  /** "Pity" (§7.10): garante pelo menos um item incomum ou melhor. */
+  guaranteeUncommon: boolean;
+  entries: readonly LootEntry[];
+}
+
+export type LootTables = Readonly<Record<string, LootTableDef>>;
+
+/** Valida `lootTables.json`. */
+export function parseLootTables(
+  input: unknown,
+  spriteKeys: Iterable<string>,
+  itemIds: Iterable<string>,
+): LootTables {
+  const items = new Set(itemIds);
+  return parseWorldObjects(
+    input,
+    spriteKeys,
+    'lootTables.json',
+    ['rolls', 'slots', 'guaranteeUncommon', 'entries'],
+    (id, raw, problems) => {
+      const [rmin, rmax] = Array.isArray(raw.rolls) ? (raw.rolls as unknown[]) : [];
+      const rollsOk = isPositiveInt(rmin) && isPositiveInt(rmax) && rmax >= rmin;
+      if (!rollsOk) problems.push(`"${id}": rolls tem de ser [mín, máx] inteiros > 0`);
+      if (!isPositiveInt(raw.slots) || raw.slots > 24) problems.push(`"${id}": slots tem de ser 1–24`);
+      if (raw.guaranteeUncommon !== undefined && typeof raw.guaranteeUncommon !== 'boolean')
+        problems.push(`"${id}": guaranteeUncommon tem de ser true/false`);
+      const entries: LootEntry[] = [];
+      if (!Array.isArray(raw.entries) || raw.entries.length === 0) {
+        problems.push(`"${id}": entries tem de ser [[item, peso, mín, máx], …]`);
+      } else {
+        for (const entry of raw.entries as unknown[]) {
+          const [item, weight, min, max] = Array.isArray(entry) ? (entry as unknown[]) : [];
+          if (typeof item !== 'string' || !items.has(item))
+            problems.push(`"${id}": item desconhecido ${describe(item)}`);
+          else if (!isPositiveInt(weight) || !isPositiveInt(min) || !isPositiveInt(max) || max < min)
+            problems.push(`"${id}": ${item} com peso/mín/máx inválidos`);
+          else entries.push({ item, weight, min, max });
+        }
+      }
+      if (rollsOk && isPositiveInt(raw.slots) && rmax > raw.slots)
+        problems.push(`"${id}": mais tiragens do que slots`);
+      return {
+        rolls: rollsOk ? { min: rmin, max: rmax } : { min: 1, max: 1 },
+        slots: isPositiveInt(raw.slots) ? raw.slots : 1,
+        guaranteeUncommon: raw.guaranteeUncommon === true,
+        entries,
+      };
+    },
+  );
 }

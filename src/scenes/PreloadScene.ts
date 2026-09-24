@@ -6,6 +6,7 @@ import { TILE_SIZE, versioned, zoneMapKey } from '../config';
 import enemiesJson from '../data/enemies.json';
 import enemyGroupsJson from '../data/enemyGroups.json';
 import itemsJson from '../data/items.json';
+import lootTablesJson from '../data/lootTables.json';
 import propsJson from '../data/props.json';
 import recipesJson from '../data/recipes.json';
 import stationsJson from '../data/stations.json';
@@ -16,6 +17,7 @@ import {
   parseEnemies,
   parseEnemyGroups,
   parseItems,
+  parseLootTables,
   parseProps,
   parseRecipes,
   parseResources,
@@ -133,6 +135,9 @@ export class PreloadScene extends Phaser.Scene {
     const groups = parseEnemyGroups(enemyGroupsJson, Object.keys(enemies));
     content.setEnemies(enemies, groups);
 
+    const lootTables = parseLootTables(lootTablesJson, Object.keys(manifest.assets), Object.keys(items));
+    content.setLootTables(lootTables);
+
     const zones = this.zones ?? parseZones(zonesJson);
     content.setZones(zones);
     for (const [zoneId, zone] of Object.entries(zones)) {
@@ -151,6 +156,7 @@ export class PreloadScene extends Phaser.Scene {
           floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
           zoneIds: Object.keys(zones),
           enemyGroupIds: Object.keys(groups),
+          lootTableIds: Object.keys(lootTables),
         },
         zone.map,
       );
