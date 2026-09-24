@@ -49,6 +49,7 @@ function setup(data?: GameStateData, map: ZoneMap = MAP) {
     bus,
     () => content.items,
     () => content,
+    () => content,
   );
   const collision = CollisionWorld.fromZone(map, content.resources, content.props);
   sim.setZone({ zoneId: BASE_ZONE_ID, map, collision, ...content });
@@ -120,7 +121,10 @@ describe('Building (construção da base)', () => {
     give([['wood', 5]]);
     expect(sim.building.check('foundation_wood', 3, 3)).toBe('blocked');
     const depleted = state.data.zones[BASE_ZONE_ID]?.depleted ?? {};
-    state.data.zones[BASE_ZONE_ID] = { depleted: { ...depleted, '5': state.data.world.tick + 20 } };
+    state.data.zones[BASE_ZONE_ID] = {
+      depleted: { ...depleted, '5': state.data.world.tick + 20 },
+      bags: [],
+    };
     expect(sim.building.place('foundation_wood', 3, 3, 0)).toBeNull();
     for (let i = 0; i < 60; i++) sim.update(FIXED_STEP_MS);
     expect(sim.interaction.isDepleted(5)).toBe(true); // a fundação está por cima

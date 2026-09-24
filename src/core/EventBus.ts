@@ -9,10 +9,19 @@ export interface GameEvents {
   'game:started': { zoneId: string };
   /** A lógica avançou um tick de passo fixo. */
   'world:tick': { tick: number };
-  /** A vida chegou a 0; o jogador já reapareceu na base (CLAUDE.md §7.12). */
-  'player:died': { zoneId: string };
+  /** A vida chegou a 0; o jogador já reapareceu na base (CLAUDE.md §7.12). `bag` = deixou mochila. */
+  'player:died': { zoneId: string; bag: boolean };
+  /** O jogador levou dano (já descontada a armadura). */
+  'player:damaged': { amount: number; x: number; y: number };
+  /** Um golpe acertou num inimigo. */
+  'enemy:hit': { uid: number; damage: number; x: number; y: number };
+  'enemy:killed': { uid: number; enemy: string; x: number; y: number };
+  /** Mochilas no chão de uma zona mudaram. */
+  'bag:changed': { zoneId: string };
+  /** O jogador passou para outra zona (a cena muda). */
+  'zone:change': { from: string; to: string };
   /** O jogador fez a ação contextual (para a animação de ataque/recolha). */
-  'player:action': { kind: 'gather' | 'use' | 'open' | 'swing' };
+  'player:action': { kind: 'gather' | 'use' | 'open' | 'swing' | 'attack' };
   /** Um recurso levou um golpe (hp restante; 0 = apanhado). */
   'resource:hit': { zoneId: string; objectId: number; hp: number; maxHp: number };
   'resource:respawned': { zoneId: string; objectId: number };

@@ -2,21 +2,27 @@ import Phaser from 'phaser';
 import type { AssetManifest } from '../assets/manifest';
 import { paletteNumber } from '../assets/palette';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
-import { BASE_MAP_FILE, BASE_MAP_KEY, TILE_SIZE, versioned } from '../config';
-import { BASE_ZONE_ID } from '../core/GameState';
+import { TILE_SIZE, versioned, zoneMapKey } from '../config';
+import enemiesJson from '../data/enemies.json';
+import enemyGroupsJson from '../data/enemyGroups.json';
 import itemsJson from '../data/items.json';
 import propsJson from '../data/props.json';
 import recipesJson from '../data/recipes.json';
 import stationsJson from '../data/stations.json';
 import structuresJson from '../data/structures.json';
+import zonesJson from '../data/zones.json';
 import resourcesJson from '../data/resources.json';
 import {
+  parseEnemies,
+  parseEnemyGroups,
   parseItems,
   parseProps,
   parseRecipes,
   parseResources,
   parseStations,
   parseStructures,
+  parseZones,
+  type ZoneDefs,
 } from '../data/types';
 import { getView, setupFixedCamera } from '../display/view';
 import { t } from '../i18n';
@@ -40,6 +46,7 @@ const BAR_HEIGHT = 6;
  */
 export class PreloadScene extends Phaser.Scene {
   private manifest: AssetManifest | null = null;
+  private zones: ZoneDefs | null = null;
 
   constructor() {
     super(SceneKey.Preload);
@@ -82,7 +89,11 @@ export class PreloadScene extends Phaser.Scene {
           frameHeight: entry.frameHeight,
         });
     }
-    this.load.tilemapTiledJSON(BASE_MAP_KEY, versioned(BASE_MAP_FILE));
+    // Os mapas de todas as zonas (são pequenos): o Phaser desenha-os e a lógica valida-os.
+    this.zones = parseZones(zonesJson);
+    for (const [zoneId, zone] of Object.entries(this.zones)) {
+      this.load.tilemapTiledJSON(zoneMapKey(zoneId), versioned(zone.map));
+    }
   }
 
   create(): void {
@@ -118,21 +129,32 @@ export class PreloadScene extends Phaser.Scene {
       ),
     );
 
-    const cached: unknown = this.cache.tilemap.get(BASE_MAP_KEY);
-    const data = typeof cached === 'object' && cached !== null && 'data' in cached ? cached.data : undefined;
-    if (data === undefined) throw new Error(`Não foi possível carregar ${BASE_MAP_FILE}.`);
-    const map = parseZoneMap(
-      data,
-      {
-        tileSize: TILE_SIZE,
-        tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
-        resourceIds: Object.keys(resources),
-        propIds: Object.keys(props),
-        stationIds: Object.keys(stations),
-        floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
-      },
-      BASE_MAP_FILE,
-    );
-    content.setZoneMap(BASE_ZONE_ID, map);
+    const enemies = parseEnemies(enemiesJson, Object.keys(manifest.assets), Object.keys(items));
+    const groups = parseEnemyGroups(enemyGroupsJson, Object.keys(enemies));
+    content.setEnemies(enemies, groups);
+
+    const zones = this.zones ?? parseZones(zonesJson);
+    content.setZones(zones);
+    for (const [zoneId, zone] of Object.entries(zones)) {
+      const cached: unknown = this.cache.tilemap.get(zoneMapKey(zoneId));
+      const data =
+        typeof cached === 'object' && cached !== null && 'data' in cached ? cached.data : undefined;
+      if (data === undefined) throw new Error(`Não foi possível carregar ${zone.map}.`);
+      const map = parseZoneMap(
+        data,
+        {
+          tileSize: TILE_SIZE,
+          tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
+          resourceIds: Object.keys(resources),
+          propIds: Object.keys(props),
+          stationIds: Object.keys(stations),
+          floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
+          zoneIds: Object.keys(zones),
+          enemyGroupIds: Object.keys(groups),
+        },
+        zone.map,
+      );
+      content.setZoneMap(zoneId, map);
+    }
   }
 }

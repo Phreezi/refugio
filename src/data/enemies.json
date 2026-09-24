@@ -1,0 +1,79 @@
+{
+  "$comment": "Inimigos e animais (CLAUDE.md §7.9). Distâncias em px, tempos em segundos de jogo. behavior: hostile (persegue e ataca, com aviso de windup) ou flee (foge). drops: [item, mín, máx] (mín pode ser 0).",
+  "zombie_walker": {
+    "sprite": "zombie_walker",
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 40,
+    "damage": 6,
+    "speed": 40,
+    "detectRadius": 72,
+    "leashRadius": 180,
+    "attackRange": 10,
+    "attackSec": 1.6,
+    "drops": [
+      ["cloth", 0, 2],
+      ["nails", 0, 2]
+    ]
+  },
+  "zombie_runner": {
+    "sprite": "zombie_runner",
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 30,
+    "damage": 5,
+    "speed": 90,
+    "detectRadius": 64,
+    "leashRadius": 160,
+    "attackRange": 10,
+    "attackSec": 1.4,
+    "drops": [
+      ["cloth", 0, 1],
+      ["scrap_metal", 1, 2]
+    ]
+  },
+  "deer": {
+    "sprite": "deer",
+    "footprint": {
+      "width": 14,
+      "height": 6
+    },
+    "behavior": "flee",
+    "hp": 30,
+    "damage": 0,
+    "speed": 70,
+    "detectRadius": 56,
+    "leashRadius": 200,
+    "attackRange": 1,
+    "attackSec": 1,
+    "drops": [
+      ["raw_meat", 2, 3],
+      ["leather", 1, 1]
+    ]
+  },
+  "wolf": {
+    "sprite": "wolf",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 45,
+    "damage": 8,
+    "speed": 100,
+    "detectRadius": 80,
+    "leashRadius": 170,
+    "attackRange": 10,
+    "attackSec": 1.3,
+    "drops": [
+      ["raw_meat", 1, 2],
+      ["leather", 1, 2]
+    ]
+  }
+}

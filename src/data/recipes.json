@@ -90,5 +90,55 @@
     "qty": 1,
     "timeSec": 8,
     "unlockLevel": 1
+  },
+  {
+    "id": "r_spiked_club",
+    "station": "wood_bench",
+    "category": "weapons",
+    "inputs": [
+      ["wooden_club", 1],
+      ["nails", 3]
+    ],
+    "output": "spiked_club",
+    "qty": 1,
+    "timeSec": 10,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_machete",
+    "station": "wood_bench",
+    "category": "weapons",
+    "inputs": [
+      ["scrap_metal", 4],
+      ["wood", 1],
+      ["cloth", 1]
+    ],
+    "output": "machete",
+    "qty": 1,
+    "timeSec": 20,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_cloth_shirt",
+    "station": "hands",
+    "category": "armor",
+    "inputs": [
+      ["cloth", 6],
+      ["rope", 1]
+    ],
+    "output": "cloth_shirt",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_cloth_hat",
+    "station": "hands",
+    "category": "armor",
+    "inputs": [["cloth", 3]],
+    "output": "cloth_hat",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1
   }
 ]

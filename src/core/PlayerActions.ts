@@ -1,4 +1,4 @@
-import type { ItemDefs } from '../data/types';
+import { EQUIP_SLOTS, equipSlotOf, type ItemDefs } from '../data/types';
 import { BALANCE } from '../data/balance';
 import {
   addItem,
@@ -12,7 +12,7 @@ import type { EventBus, GameEvents } from './EventBus';
 import { chestContents, type GameState } from './GameState';
 
 /** Onde está um slot: mochila, hotbar ou um baú (`chest:<id>`). */
-export type ContainerRef = 'inventory' | 'hotbar' | `chest:${string}`;
+export type ContainerRef = 'inventory' | 'hotbar' | 'equipment' | `chest:${string}`;
 
 export interface SlotRef {
   container: ContainerRef;
@@ -38,6 +38,7 @@ export class PlayerActions {
     const data = this.state.data;
     if (ref === 'inventory') return data.player.inventory;
     if (ref === 'hotbar') return data.player.hotbar;
+    if (ref === 'equipment') return data.player.equipment;
     return chestContents(data, ref.slice('chest:'.length));
   }
 
@@ -76,7 +77,17 @@ export class PlayerActions {
     return true;
   }
 
+  /** O item deste slot pode ficar no slot de equipamento `index`? (vazio pode sempre) */
+  fitsEquipment(item: string | undefined, index: number): boolean {
+    return item === undefined || equipSlotOf(this.items()[item]) === EQUIP_SLOTS[index];
+  }
+
   move(from: SlotRef, to: SlotRef): boolean {
+    // No equipamento só entra o que é desse slot (nos dois sentidos, se for uma troca).
+    const source = this.container(from.container)[from.index];
+    const target = this.container(to.container)[to.index];
+    if (to.container === 'equipment' && !this.fitsEquipment(source?.[0], to.index)) return false;
+    if (from.container === 'equipment' && !this.fitsEquipment(target?.[0], from.index)) return false;
     const moved = moveSlot(
       this.container(from.container),
       from.index,
@@ -86,6 +97,31 @@ export class PlayerActions {
     );
     if (moved) this.changed();
     return moved;
+  }
+
+  /** Equipa o item do slot (troca com o que estava equipado). @returns false se não se equipa. */
+  equip(ref: SlotRef): boolean {
+    const slot = this.container(ref.container)[ref.index];
+    const kind = equipSlotOf(slot ? this.items()[slot[0]] : undefined);
+    if (!slot || !kind || ref.container === 'equipment') return false;
+    return this.move(ref, { container: 'equipment', index: EQUIP_SLOTS.indexOf(kind) });
+  }
+
+  /** Tira o item equipado para o primeiro slot vazio da mochila ou da hotbar. */
+  unequip(index: number): boolean {
+    const equipment = this.state.data.player.equipment;
+    const slot = equipment[index];
+    if (!slot) return false;
+    for (const container of this.pickupContainers()) {
+      const free = container.indexOf(null);
+      if (free >= 0) {
+        container[free] = slot;
+        equipment[index] = null;
+        this.changed();
+        return true;
+      }
+    }
+    return false;
   }
 
   split(ref: SlotRef): boolean {

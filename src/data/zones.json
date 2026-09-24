@@ -1,0 +1,13 @@
+{
+  "$comment": "Zonas (CLAUDE.md §8.2). danger: 0 = segura (base), 1–4 = T1–T4. Até haver mapa-mundo (Fase 7), as saídas exit:<zona> dos mapas levam diretamente à zona.",
+  "zone_base": {
+    "name": "zone.base",
+    "map": "maps/base.json",
+    "danger": 0
+  },
+  "zone_pine_forest": {
+    "name": "zone.pine_forest",
+    "map": "maps/pine_forest.json",
+    "danger": 1
+  }
+}

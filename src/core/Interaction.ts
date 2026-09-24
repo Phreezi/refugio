@@ -12,6 +12,7 @@ import { secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
 import { zoneState, type GameState } from './GameState';
 import { structureChestId, structureStationKey, type Building } from './Building';
+import type { Combat } from './Combat';
 import { stationKey } from './Crafting';
 import type { PlayerActions } from './PlayerActions';
 
@@ -36,7 +37,9 @@ export type TargetData =
   | { type: 'chest'; placement: ResourcePlacement; chestId: string }
   | { type: 'drink'; placement: ResourcePlacement }
   | { type: 'station'; placement: ResourcePlacement; key: string }
-  | { type: 'door'; placement: ResourcePlacement; uid: number };
+  | { type: 'door'; placement: ResourcePlacement; uid: number }
+  | { type: 'enemy'; placement: ResourcePlacement; uid: number }
+  | { type: 'bag'; placement: ResourcePlacement; index: number };
 /** Os recursos que reaparecem verificam-se uma vez por segundo de jogo. */
 const RESPAWN_CHECK_TICKS = 20;
 
@@ -50,15 +53,23 @@ export class Interaction {
   private readonly bus: EventBus<GameEvents>;
   private readonly actions: PlayerActions;
   private readonly building: Building;
+  private readonly combat: Combat;
   private zone: ZoneContext | null = null;
   /** Vida dos recursos já golpeados (não se grava: ao recarregar voltam a estar inteiros). */
   private readonly nodeHp = new Map<number, number>();
 
-  constructor(state: GameState, bus: EventBus<GameEvents>, actions: PlayerActions, building: Building) {
+  constructor(
+    state: GameState,
+    bus: EventBus<GameEvents>,
+    actions: PlayerActions,
+    building: Building,
+    combat: Combat,
+  ) {
     this.state = state;
     this.bus = bus;
     this.actions = actions;
     this.building = building;
+    this.combat = combat;
   }
 
   setZone(zone: ZoneContext | null): void {
@@ -122,7 +133,28 @@ export class Interaction {
       }
     }
     list.push(...this.structureTargets());
+    this.combat.bags().forEach((bag, index) => {
+      const placement = { id: 'bag', objectId: 0, x: bag.x, y: bag.y };
+      list.push({
+        kind: 'container',
+        area: areaOf(placement, undefined),
+        data: { type: 'bag', placement, index },
+      });
+    });
     return list;
+  }
+
+  /** Inimigos que se podem atacar (área do corpo). */
+  private enemyTargets(): Target<TargetData>[] {
+    return this.combat.list.map((enemy) => ({
+      kind: 'enemy' as const,
+      area: this.combat.bodyArea(enemy),
+      data: {
+        type: 'enemy' as const,
+        placement: { id: enemy.id, objectId: 0, x: enemy.x, y: enemy.y },
+        uid: enemy.uid,
+      },
+    }));
   }
 
   /** Portas, estações e baús construídos. */
@@ -149,7 +181,9 @@ export class Interaction {
     if (!this.zone) return null;
     const player = this.state.data.player;
     const from = { x: player.x, y: player.y - footprint.height / 2 };
-    return pickTarget(from, player.facing, this.targets(), BALANCE.actionReachPx);
+    // Inimigos primeiro (§7.2), com o alcance da arma.
+    const enemy = pickTarget(from, player.facing, this.enemyTargets(), this.combat.weapon().reach);
+    return enemy ?? pickTarget(from, player.facing, this.targets(), BALANCE.actionReachPx);
   }
 
   /**
@@ -164,7 +198,13 @@ export class Interaction {
       return 'swing';
     }
     const data = target.data;
-    if (data.type === 'resource') this.gather(data.placement);
+    if (data.type === 'enemy') {
+      this.bus.emit('player:action', { kind: 'attack' });
+      this.combat.attack(data.uid);
+    } else if (data.type === 'bag') {
+      this.bus.emit('player:action', { kind: 'open' });
+      this.combat.takeBag(data.index);
+    } else if (data.type === 'resource') this.gather(data.placement);
     else if (data.type === 'chest') {
       this.bus.emit('player:action', { kind: 'open' });
       this.bus.emit('container:open', { chestId: data.chestId });
@@ -206,7 +246,9 @@ export class Interaction {
     const def = zone?.resources[placement.id];
     if (!zone || !def) return;
     const containers = this.actions.pickupContainers();
-    const tool = def.tool ? bestTool(containers, def.tool, zone.items) : null;
+    // A ferramenta pode estar na mochila, na hotbar ou equipada como arma (um machado).
+    const toolSources = [...containers, this.state.data.player.equipment];
+    const tool = def.tool ? bestTool(toolSources, def.tool, zone.items) : null;
     const power = hitPower(def, tool);
     if (power === 0) {
       this.bus.emit('action:blocked', { reason: 'needs_tool', ...(def.tool ? { tool: def.tool } : {}) });

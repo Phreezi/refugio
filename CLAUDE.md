@@ -94,7 +94,7 @@ Base (casa) → escolher zona no mapa-mundo → viajar (custa um pouco de comida
 - Resolução **adaptável ao ecrã** com escala inteira (×2, ×3, ×4…) e `pixelArt: true`: escolhe-se o zoom inteiro (píxeis do dispositivo por píxel de jogo) cujo **lado curto** do jogo fica mais perto de **270 px** (≈ 17 tiles, o "zoom" estilo Stardew), e o outro lado enche o ecrã (proporção entre 9:21 e 21:9; fora disso, barras). Funciona **ao alto e ao baixo**: com o telemóvel na vertical vê-se uma área mais alta do que larga (ex.: 270×550). A vista tem sempre dimensões **pares**. Ex.: 1920×1080 → 480×270 ×4; janela 1530×790 → 510×262 ×3. Mínimo 216 px (abaixo disso, zoom fracionário). Valores em `DISPLAY` (`src/config.ts`).
   - O **canvas tem a resolução do dispositivo** e cada câmara amplia o mundo pelo zoom inteiro (`src/display/view.ts`: `getView()`, `setupFixedCamera()`). Assim a pixel art fica exata e o **texto é desenhado à resolução real** (nítido; usar sempre `Label` de `src/ui/text.ts`).
   - Implementação (`src/display/`): `Scale.NONE` + `scale.resize(canvas)` + `scale.setZoom(1 / dpr)`, com a posição do canvas alinhada a píxeis físicos (também com DPR 1,25 ou 2,625).
-  - Com zoom na câmara o Phaser **não arredonda** posições: tudo o que se desenha tem de estar em coordenadas **inteiras** de jogo (o jogador interpolado é arredondado em `BaseScene`).
+  - Com zoom na câmara o Phaser **não arredonda** posições: tudo o que se desenha tem de estar em coordenadas **inteiras** de jogo (o jogador e os inimigos interpolados são arredondados em `ZoneScene`).
   - **Nenhuma cena pode assumir um tamanho fixo**: usar `getView()` (não `this.scale.width`, que está em píxeis do dispositivo) e reagir a `Phaser.Scale.Events.RESIZE` (removendo o listener no SHUTDOWN). Ponteiros: converter com `camera.getWorldPoint`.
 - **Zoom do jogador** (`src/display/worldZoom.ts`): o zoom da vista é o máximo; pode afastar-se até metade, em níveis inteiros (×4 → ×3 → ×2; ×3 → ×2) para a pixel art continuar exata. **Ctrl + roda** (ou pinça no touchpad) ou +/− no PC — a roda sozinha não faz zoom; pinça com 2 dedos no telemóvel (UIScene).
 - **Velocidade do jogo** (`src/ui/gameSpeed.ts`, botão x1/x2/x3 no HUD): multiplica o tempo real que entra na `Simulation`, por isso acelera tudo o que corre no passo fixo (relógio, fome/sede, movimento, golpes, respawn) e as animações do jogador. Guardada no localStorage (`refugio.speed`). Guardado no localStorage (`refugio.zoomOut`). Só a câmara do mundo muda; o HUD mantém o tamanho. Se se vê mais do que o mapa, este fica centrado.
@@ -141,8 +141,7 @@ refugio/
 │   │   ├── BootScene.ts      # carrega manifest
 │   │   ├── PreloadScene.ts
 │   │   ├── MainMenuScene.ts
-│   │   ├── BaseScene.ts      # a base do jogador
-│   │   ├── ZoneScene.ts      # qualquer zona explorável (recebe zoneId)
+│   │   ├── ZoneScene.ts      # qualquer zona, incluindo a base (recebe { zoneId }); fade entre zonas
 │   │   ├── WorldMapScene.ts  # mapa-mundo
 │   │   └── UIScene.ts        # HUD por cima (corre em paralelo)
 │   ├── core/
@@ -154,6 +153,7 @@ refugio/
 │   │   ├── PlayerActions.ts  # usar/mover/dividir/guardar semelhantes/beber
 │   │   ├── Crafting.ts       # craft nas mãos/estações, fila, recolher, reparar
 │   │   ├── Building.ts       # construção: colocar, desfazer, demolir, portas (§7.7)
+│   │   ├── Combat.ts         # inimigos da zona, golpes, dano/armadura, mochilas no chão (§7.8–§7.12)
 │   │   ├── offline.ts        # tempo offline (§7.6)
 │   │   ├── Clock.ts          # tempo de jogo, dia/noite
 │   │   └── Rng.ts            # RNG com seed
@@ -165,11 +165,11 @@ refugio/
 │   │   ├── inventory/
 │   │   ├── crafting/
 │   │   ├── building/         # grelha de peças, regras de colocação, colisão, reembolso
-│   │   ├── combat/
+│   │   ├── combat/           # arma/punhos, armadura, desgaste, drops de inimigos
 │   │   ├── loot/
-│   │   ├── ai/
+│   │   ├── ai/               # IA dos inimigos (idle/wander/chase/windup/recover/return; flee)
 │   │   ├── progression/
-│   │   └── travel/
+│   │   └── travel/           # ponto de chegada a uma zona
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
 │   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, BuildUI (+ buildMode), gameSpeed, uiState, fileTransfer, fatalError
 │   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
@@ -194,8 +194,9 @@ refugio/
 │   │   ├── items.json
 │   │   ├── recipes.json
 │   │   ├── structures.json   # peças de construção (camada, tamanho, custo, colisão, porta, estação, baú)
-│   │   ├── enemies.json
-│   │   ├── zones.json
+│   │   ├── enemies.json      # inimigos/animais (vida, dano, velocidade, deteção, leash, drops)
+│   │   ├── enemyGroups.json  # grupos dos pontos enemy_spawn:<grupo>
+│   │   ├── zones.json        # zonas (nome, mapa, perigo)
 │   │   ├── lootTables.json
 │   │   └── balance.json
 │   └── i18n/
@@ -257,6 +258,7 @@ npm run palette    # regenera public/assets/palette.png
 npm run tiles      # regenera public/assets/tiles/base_tiles.png (ordem = src/world/tileset.ts)
 npm run sprites    # regenera public/assets/sprites/*.png (pixel art de recursos e obstáculos; `-- --preview f.png`)
 npm run map:base   # gera maps/base.json (recusa substituir sem `-- --force`: o mapa edita-se no Tiled)
+npm run map:pine   # gera maps/pine_forest.json (idem)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -328,8 +330,9 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Andar agachado (metade da velocidade) | Shift ou Ctrl | Joystick pouco empurrado (até 55% do raio) |
 | Zoom (até metade) | Ctrl + roda do rato, +/− | Pinça com 2 dedos |
 | Velocidade do jogo x1/x2/x3 | Botão por baixo do relógio | Idem |
-| Ação contextual (bater, recolher, abrir, atacar) | Espaço / clique | Botão grande (lado direito) |
+| Ação contextual (bater, recolher, abrir, atacar) | Espaço / clique (manter premido repete golpes ao ritmo da arma) | Botão grande (lado direito) |
 | Inventário | I / Tab | Botão mochila |
+| Equipar arma/roupa | Na mochila: selecionar → "Equipar", ou arrastar para a coluna Arma/Cabeça/Corpo | Idem |
 | Craft | C | Botão "Fabricar" (à esquerda da hotbar) |
 | Modo construção | B (dentro: clique/Espaço coloca, R roda, Z desfaz, X demolir, B/Esc sai) | Botão "Construir" (por cima do "Fabricar"); toque curto no mundo escolhe o tile, botões Colocar/Rodar/Desfazer/Demolir/Sair |
 | Comer/beber rápido | 1–4 (hotbar) | Hotbar de 4 slots |
@@ -387,11 +390,14 @@ Os nós de recurso reaparecem (ver zonas).
 
 ### 7.8 Combate
 
-- **Corpo a corpo**: cada arma tem dano, velocidade, alcance, durabilidade.
+- **Corpo a corpo**: cada arma tem dano, velocidade (`attackSec`), alcance (`reach`), durabilidade (gasta 1 por golpe). Sem arma, punhos (`fistDamage`). Qualquer item com `damage` se equipa como arma (um machado equipado também serve para cortar).
+- Golpe: dano, número a subir, empurrão e 0,3 s de atordoamento — exceto durante o aviso de ataque (o ataque do inimigo já está comprometido). Mantendo a ação premida repete ao ritmo da arma.
+- Ao levar dano: 0,6 s de invulnerabilidade (o boneco pisca) e um pequeno empurrão.
 - **Distância** (Fase 10): pistola/besta com munição; mira automática ao inimigo mais próximo.
 - Inimigos **telegrafam** ataques (0,4 s de aviso com piscar) — dá para recuar.
-- Furtividade simples: andar devagar (segurar Shift / joystick parcial) reduz raio de deteção para metade. *(Andar agachado já existe desde a Fase 3: `sneakMultiplier`, frames próprios do boneco; o raio de deteção entra na Fase 6.)*
-- Armadura reduz dano em percentagem (máx. 60%).
+- Furtividade simples: andar devagar (segurar Shift/Ctrl / joystick parcial) reduz raio de deteção para metade (`sneakDetectMultiplier`).
+- Armadura reduz dano em percentagem (máx. 60%; soma das peças equipadas; cada golpe recebido gasta 1 de durabilidade a cada peça). Um golpe que acerta tira sempre pelo menos 1.
+- Os inimigos não se gravam: nascem nos pontos `enemy_spawn:<grupo>` ao entrar na zona (os grupos estão em `enemyGroups.json`).
 
 ### 7.9 Inimigos
 
@@ -425,8 +431,9 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 ### 7.12 Morte
 
 - Reaparece na base com vida 50%, fome/sede 50%.
-- Conteúdo da **mochila** fica numa mochila caída no local da morte (marcada no mapa-mundo).
+- Conteúdo da **mochila** fica numa mochila caída no local da morte (marcada no mapa-mundo, Fase 7), durante `deathBagHoursReal` horas reais; morrer de novo na mesma zona junta tudo na mesma mochila. Apanha-se com a ação contextual (o que não couber fica lá).
 - Itens **equipados** e hotbar mantêm-se.
+- Os drops de inimigos que não cabem na mochila também ficam numa mochila no chão.
 - Nunca se perde nada guardado na base.
 
 ### 7.13 Hordas (raids opcionais, Fase 9)
@@ -476,7 +483,7 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 ### 8.4 Regras de desenho de mapas (Tiled)
 
 - Camadas: `ground`, `decor_low`, `collision`, `decor_high` (por cima do jogador), `objects`.
-- Camada `objects` contém pontos de spawn: `player_spawn`, `exit`, `resource:<id>`, `prop:<id>`, `chest:<id>`, `station:<tipo>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
+- Camada `objects` contém pontos de spawn: `player_spawn`, `exit` / `exit:<zona>` (sem zona = mapa-mundo, Fase 7; com zona = vai direto para ela; chega-se junto à saída que leva de volta), `resource:<id>`, `prop:<id>`, `chest:<id>`, `station:<tipo>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
 - Estado de uma estação no save: `stations["<tipo>_<id do objeto>"] = { queue: [[receita, ticks que faltam]], output: Slot[] }` (estações construídas: `<tipo>_s<uid>`).
 - O chão da camada `ground` com os tiles `floor_wood`/`floor_concrete` conta como fundação (`BASE_FLOOR_TILES`).
 - O **id do objeto no Tiled** identifica cada recurso no save (`zones.<zona>.depleted`): não reutilizar ids (o Tiled nunca o faz).
@@ -734,14 +741,14 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** perigo real mas justo.
 
-- [ ] `enemies.json`; entidades zombie_walker e zombie_runner, animais (veado, lobo).
-- [ ] IA com máquina de estados (idle, wander, chase, attack, return) e leash.
-- [ ] Combate corpo a corpo: dano, knockback, i-frames curtos, números de dano.
-- [ ] Ataques inimigos telegrafados.
-- [ ] Armas: moca, moca com pregos, machete.
-- [ ] Armadura básica de tecido.
-- [ ] Morte → mochila caída + respawn na base (ver 7.12).
-- [ ] Drops de inimigos (carne, couro, trapos).
+- [x] `enemies.json`; entidades zombie_walker e zombie_runner, animais (veado, lobo). Sprites em pixel art por script.
+- [x] IA com máquina de estados (idle, wander, chase, attack, return) e leash (quem desiste volta a casa e recupera a vida). Presas fogem.
+- [x] Combate corpo a corpo: dano, knockback, i-frames curtos, números de dano, barra de vida dos inimigos.
+- [x] Ataques inimigos telegrafados (0,4 s a piscar; recuar evita o golpe).
+- [x] Armas: moca, moca com pregos, machete (bancada).
+- [x] Armadura básica de tecido (camisa, chapéu); equipamento arma/cabeça/corpo no painel da mochila.
+- [x] Morte → mochila caída + respawn na base (ver 7.12).
+- [x] Drops de inimigos (carne, couro, trapos, pregos, sucata).
 
 **Aceitação:** um jogador equipado com moca vence 3 walkers sem morrer se recuar entre ataques; ao morrer, recupera a mochila.
 
@@ -752,11 +759,11 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 **Objetivo:** o core loop completo.
 
 - [ ] `WorldMapScene` com base, zonas, estado de cada uma e custo de viagem.
-- [ ] `ZoneScene` genérica que carrega qualquer zona a partir de `zones.json`.
-- [ ] Zonas: **Pinhal**, **Quinta Abandonada**, **Margem do Lago**.
+- [x] `ZoneScene` genérica que carrega qualquer zona a partir de `zones.json` (Fase 6: a base e o Pinhal).
+- [ ] Zonas: **Pinhal** (feito na Fase 6, para haver onde combater; liga-se à base diretamente pelas saídas até haver mapa-mundo), **Quinta Abandonada**, **Margem do Lago**.
 - [ ] Contentores com tabelas de loot e raridade.
 - [ ] Respawn de recursos/contentores por zona (tempo de jogo).
-- [ ] Transição suave entre zonas (fade) com save automático.
+- [x] Transição suave entre zonas (fade) com save automático.
 - [ ] Pesca simples no lago (mini-jogo de 1 botão).
 - [ ] Água suja → ferver na fogueira → água limpa.
 
@@ -967,3 +974,8 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Pode-se construir onde um recurso foi apanhado (só reaparece com o sítio livre) | A base tem muitas árvores: sem isto não havia espaço para uma casa 6×6 |
 | 2026-09-24 | Desfazer guardado só em memória (não no save) | A janela é de 10 s; perder o Desfazer ao recarregar não custa nada (continua a dar para demolir a 50%) |
 | 2026-09-24 | Ctrl também agacha; atalhos do browser com Ctrl anulados no jogo; fechar com Ctrl premido pede confirmação | Pedido do jogador: Ctrl+WASD disparava atalhos do browser (guardar página, marcador, fechar separador) |
+| 2026-09-24 | Fase 6: primeira zona (Pinhal) já agora, ligada à base pelas saídas `exit:<zona>` | A base é segura (sem inimigos): sem outra zona não havia onde combater. O mapa-mundo (Fase 7) fica entre as duas |
+| 2026-09-24 | `BaseScene` → `ZoneScene` genérica ({ zoneId }); mapas de todas as zonas carregados no arranque | São pequenos (JSON); a mesma cena desenha qualquer zona e a construção só está disponível na base |
+| 2026-09-24 | Inimigos não se gravam (nascem ao entrar na zona) | Save pequeno; recarregar a meio de um combate repõe os inimigos (sem vantagem real) |
+| 2026-09-24 | Save v5: `player.equipment` (6 slots, ordem de `EQUIP_SLOTS`) e `zones.<zona>.bags` (mochilas no chão com hora de expirar) | Morte sem perder nada (§7.12); o equipamento fica ao morrer |
+| 2026-09-24 | O ataque anunciado (windup) não é interrompido por golpes | Senão bastava bater sem parar; assim recuar no aviso é a jogada certa (como pede a aceitação) |

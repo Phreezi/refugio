@@ -183,7 +183,7 @@ describe('Autosave', () => {
     await vi.advanceTimersByTimeAsync(600);
     expect(adapter.data.size).toBe(0);
     state.markDirty();
-    bus.emit('player:died', { zoneId: 'zone_base' });
+    bus.emit('player:died', { zoneId: 'zone_base', bag: false });
     await vi.advanceTimersByTimeAsync(600);
     expect(adapter.data.size).toBe(1);
     autosave.stop();

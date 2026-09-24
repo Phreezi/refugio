@@ -4,7 +4,7 @@ import { DEBUG_QUERY_PARAM, LANGUAGE_QUERY_PARAM } from './config';
 import { installDebugOverlay } from './debug/installDebugOverlay';
 import { installPixelScaling, measurePixelScale } from './display/installPixelScaling';
 import { getLanguage, isLanguage, setLanguage } from './i18n';
-import { BaseScene } from './scenes/BaseScene';
+import { ZoneScene } from './scenes/ZoneScene';
 import { BootScene } from './scenes/BootScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { PreloadScene } from './scenes/PreloadScene';
@@ -40,7 +40,7 @@ const game = new Phaser.Game({
     autoCenter: Phaser.Scale.NO_CENTER,
   },
   disableContextMenu: true,
-  scene: [BootScene, PreloadScene, MainMenuScene, BaseScene, UIScene],
+  scene: [BootScene, PreloadScene, MainMenuScene, ZoneScene, UIScene],
 });
 
 const scaling = installPixelScaling(game, host);

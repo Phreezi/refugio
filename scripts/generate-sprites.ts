@@ -921,6 +921,266 @@ const ICONS: Sprite[] = [
   },
 ];
 
+/**
+ * Zombie (16×32, visto de frente), com a mesma proporção do jogador. `skin`/`shirt` mudam de
+ * tipo para tipo; os braços esticados à frente distinguem-no de longe.
+ */
+function zombie(
+  img: Bitmap,
+  skin: string,
+  skinDark: string,
+  shirt: string,
+  shirtDark: string,
+  pants: string,
+): void {
+  shadow(img, 8, 30.5, 5.5, 1.5);
+  // Pernas (uma mais à frente, a arrastar).
+  img.fill(5, 22, 3, 8, c(pants));
+  img.fill(9, 23, 3, 7, c(pants));
+  img.fill(5, 29, 3, 1, c('ink'));
+  img.fill(9, 29, 3, 1, c('ink'));
+  // Tronco com a camisa rasgada.
+  img.fill(4, 13, 9, 10, c(shirt));
+  img.fill(4, 20, 9, 2, c(shirtDark));
+  img.set(6, 21, c(skin));
+  img.set(10, 17, c(skinDark));
+  img.fill(12, 13, 1, 9, c(shirtDark));
+  // Braços esticados para a frente.
+  img.fill(2, 14, 2, 6, c(skin));
+  img.fill(13, 14, 2, 6, c(skinDark));
+  img.fill(2, 19, 2, 1, c(skinDark));
+  // Cabeça inclinada, olhos vazios.
+  img.fill(4, 4, 8, 9, c(skin));
+  img.fill(4, 11, 8, 2, c(skinDark));
+  img.fill(4, 3, 8, 2, c('bark_dark')); // cabelo ralo
+  img.set(5, 5, c('bark_dark'));
+  img.fill(5, 7, 2, 2, c('ink'));
+  img.fill(9, 7, 2, 2, c('ink'));
+  img.set(6, 7, c('red'));
+  img.set(10, 7, c('red'));
+  img.fill(6, 10, 4, 1, c('shadow')); // boca
+}
+
+const CREATURES: Sprite[] = [
+  {
+    file: 'zombie_walker',
+    width: 16,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      zombie(img, 'lime', 'leaf', 'stone', 'stone_dark', 'teal');
+    },
+  },
+  {
+    file: 'zombie_runner',
+    width: 16,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      zombie(img, 'peach', 'rose', 'red', 'blood', 'shadow');
+    },
+  },
+  {
+    file: 'deer',
+    width: 24,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 12, 22.5, 9, 1.5);
+      // Corpo de lado, a olhar para a direita.
+      img.ellipse(11, 13, 7.5, 4, c('wood'));
+      img.ellipse(10, 12, 6, 2.5, c('wood_light'));
+      img.ellipse(9, 15, 5, 1.5, c('sand')); // barriga
+      for (const x of [5, 8, 14, 17]) {
+        img.fill(x, 16, 2, 6, c('wood'));
+        img.set(x, 21, c('bark_dark'));
+      }
+      // Pescoço, cabeça e hastes.
+      img.fill(16, 6, 3, 7, c('wood'));
+      img.ellipse(19.5, 6, 3, 2.2, c('wood_light'));
+      img.set(22, 6, c('ink'));
+      img.set(19, 5, c('ink'));
+      img.fill(17, 1, 1, 4, c('bark'));
+      img.fill(20, 1, 1, 4, c('bark'));
+      img.set(16, 1, c('bark'));
+      img.set(21, 1, c('bark'));
+      img.fill(3, 11, 2, 2, c('cream')); // cauda
+    },
+  },
+  {
+    file: 'wolf',
+    width: 24,
+    height: 20,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 12, 18.5, 9, 1.5);
+      img.ellipse(11, 11, 7.5, 3.5, c('stone'));
+      img.ellipse(10, 10, 6, 2, c('stone_light'));
+      img.ellipse(10, 13, 5, 1.2, c('parchment'));
+      for (const x of [5, 8, 14, 17]) {
+        img.fill(x, 13, 2, 5, c('stone_dark'));
+        img.set(x, 17, c('ink'));
+      }
+      // Cabeça com focinho e orelhas, a olhar para a direita.
+      img.ellipse(19, 8, 3.5, 3, c('stone'));
+      img.fill(21, 8, 3, 2, c('stone_light'));
+      img.set(23, 8, c('ink'));
+      img.set(19, 7, c('gold'));
+      img.fill(17, 3, 2, 3, c('stone_dark'));
+      img.fill(20, 3, 2, 3, c('stone_dark'));
+      // Cauda.
+      img.fill(1, 8, 3, 2, c('stone_dark'));
+      img.set(0, 7, c('stone_dark'));
+    },
+  },
+  {
+    file: 'bag_dropped',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 14.5, 7, 1.5);
+      img.ellipse(8, 9, 6, 5, c('teal'));
+      img.ellipse(7, 8, 4, 3, c('sky'));
+      img.fill(4, 10, 8, 3, c('teal'));
+      img.fill(5, 4, 6, 2, c('bark')); // alça
+      img.fill(6, 3, 4, 1, c('bark'));
+      img.fill(7, 9, 2, 2, c('gold')); // fivela
+    },
+  },
+];
+
+const WEAPON_ICONS: Sprite[] = [
+  {
+    file: 'wooden_club',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 6; i++) img.fill(3 + i, 12 - i, 2, 2, c('bark'));
+      img.ellipse(10.5, 5.5, 3.5, 3.5, c('wood'));
+      img.ellipse(10, 5, 2, 2, c('wood_light'));
+    },
+  },
+  {
+    file: 'spiked_club',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 6; i++) img.fill(3 + i, 12 - i, 2, 2, c('bark'));
+      img.ellipse(10.5, 5.5, 3.5, 3.5, c('wood'));
+      img.ellipse(10, 5, 2, 2, c('wood_light'));
+      for (const [x, y] of [
+        [10, 1],
+        [14, 4],
+        [14, 7],
+        [7, 3],
+        [12, 9],
+      ] as const) {
+        img.set(x, y, c('stone_light'));
+      }
+    },
+  },
+  {
+    file: 'machete',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 11, 4, 2, c('bark')); // cabo
+      img.set(2, 13, c('bark_dark'));
+      for (let i = 0; i < 8; i++) {
+        img.fill(5 + i, 10 - i, 2, 2, c('stone_light'));
+        img.set(6 + i, 11 - i, c('stone'));
+      }
+      img.set(13, 2, c('cream'));
+    },
+  },
+  {
+    file: 'cloth_shirt',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(4, 4, 8, 10, c('parchment'));
+      img.fill(1, 4, 3, 5, c('parchment'));
+      img.fill(12, 4, 3, 5, c('parchment'));
+      img.fill(6, 4, 4, 2, c('stone_light')); // gola
+      img.fill(4, 12, 8, 2, c('stone_light'));
+      img.set(8, 8, c('stone'));
+      img.set(8, 10, c('stone'));
+    },
+  },
+  {
+    file: 'cloth_hat',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 11, 7, 2.5, c('sand'));
+      img.ellipse(8, 8, 4.5, 4, c('parchment'));
+      img.fill(4, 9, 8, 1, c('red')); // fita
+    },
+  },
+  {
+    file: 'cloth',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(3, 5, 10, 7, c('parchment'));
+      img.fill(3, 9, 10, 3, c('stone_light'));
+      img.set(5, 12, c('parchment'));
+      img.set(9, 12, c('parchment'));
+      img.fill(6, 6, 1, 3, c('stone_light'));
+    },
+  },
+  {
+    file: 'leather',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 8, 6, 4.5, c('wood'));
+      img.ellipse(7, 7, 3.5, 2.5, c('wood_light'));
+      img.set(3, 5, c('wood'));
+      img.set(13, 11, c('wood'));
+    },
+  },
+  {
+    file: 'nails',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (const [x, y] of [
+        [4, 3],
+        [8, 5],
+        [11, 2],
+      ] as const) {
+        img.fill(x - 1, y, 3, 1, c('stone_light'));
+        img.fill(x, y + 1, 1, 8, c('stone'));
+        img.set(x, y + 1, c('stone_light'));
+      }
+    },
+  },
+  {
+    file: 'scrap_metal',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 6, 7, 6, c('stone'));
+      img.fill(7, 3, 7, 5, c('stone_dark'));
+      img.fill(8, 4, 5, 1, c('stone_light'));
+      img.set(4, 8, c('orange'));
+      img.set(11, 6, c('orange'));
+      img.fill(3, 11, 5, 1, c('stone_dark'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -928,7 +1188,9 @@ const rendered: Bitmap[] = [];
 for (const [dir, list] of [
   [outDir, SPRITES],
   [outDir, STRUCTURES],
+  [outDir, CREATURES],
   [iconDir, ICONS],
+  [iconDir, WEAPON_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -939,7 +1201,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length)} sprites + ${String(ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

@@ -179,7 +179,8 @@
     "toolKind": "axe",
     "gatherPower": 2,
     "damage": 8,
-    "durability": 120
+    "durability": 120,
+    "attackSec": 0.7
   },
   "stone_pickaxe": {
     "name": "item.stone_pickaxe",
@@ -199,7 +200,31 @@
     "stack": 1,
     "rarity": "common",
     "damage": 10,
-    "durability": 100
+    "durability": 100,
+    "attackSec": 0.6,
+    "reach": 14
+  },
+  "spiked_club": {
+    "name": "item.spiked_club",
+    "icon": "icon_spiked_club",
+    "type": "weapon",
+    "stack": 1,
+    "rarity": "uncommon",
+    "damage": 15,
+    "durability": 140,
+    "attackSec": 0.6,
+    "reach": 14
+  },
+  "machete": {
+    "name": "item.machete",
+    "icon": "icon_machete",
+    "type": "weapon",
+    "stack": 1,
+    "rarity": "uncommon",
+    "damage": 20,
+    "durability": 180,
+    "attackSec": 0.5,
+    "reach": 16
   },
   "cloth_shirt": {
     "name": "item.cloth_shirt",
@@ -208,7 +233,18 @@
     "stack": 1,
     "rarity": "common",
     "durability": 150,
-    "armor": 5
+    "armor": 10,
+    "equip": "body"
+  },
+  "cloth_hat": {
+    "name": "item.cloth_hat",
+    "icon": "icon_cloth_hat",
+    "type": "armor",
+    "stack": 1,
+    "rarity": "common",
+    "durability": 100,
+    "armor": 5,
+    "equip": "head"
   },
   "small_backpack": {
     "name": "item.small_backpack",

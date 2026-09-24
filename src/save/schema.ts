@@ -4,7 +4,7 @@ import { MIGRATIONS, migrate, type Migration } from './migrations';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -101,6 +101,17 @@ function validStructure(value: unknown): boolean {
   );
 }
 
+function validBag(value: unknown): boolean {
+  return (
+    isObject(value) &&
+    finite(value.x) &&
+    finite(value.y) &&
+    validContainer(value.items) &&
+    finite(value.expiresAt) &&
+    typeof value.death === 'boolean'
+  );
+}
+
 function validContainer(value: unknown): boolean {
   return Array.isArray(value) && value.every(validSlot);
 }
@@ -121,6 +132,8 @@ export function validateState(input: unknown): GameStateData {
     }
     if (!validContainer(player.inventory)) problems.push('player.inventory inválido');
     if (!validContainer(player.hotbar)) problems.push('player.hotbar inválido');
+    if (!validContainer(player.equipment) || (player.equipment as unknown[]).length !== 6)
+      problems.push('player.equipment inválido');
   }
   if (!isObject(world)) problems.push('falta world');
   else {
@@ -141,7 +154,12 @@ export function validateState(input: unknown): GameStateData {
   if (
     !isObject(zones) ||
     !Object.values(zones).every(
-      (z) => isObject(z) && isObject(z.depleted) && Object.values(z.depleted).every(stat),
+      (z) =>
+        isObject(z) &&
+        isObject(z.depleted) &&
+        Object.values(z.depleted).every(stat) &&
+        Array.isArray(z.bags) &&
+        z.bags.every(validBag),
     )
   ) {
     problems.push('zones inválido');

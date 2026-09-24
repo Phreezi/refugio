@@ -110,7 +110,7 @@ describe('tempo offline (§7.6)', () => {
   it('aproxima o reaparecimento dos recursos', () => {
     const state = new GameState();
     const data = state.newGame({ x: 0, y: 0 });
-    data.zones.zone_base = { depleted: { '5': 1000, '6': 50 } };
+    data.zones.zone_base = { depleted: { '5': 1000, '6': 50 }, bags: [] };
     advanceRespawns(data, 100);
     expect(data.zones.zone_base.depleted).toEqual({ '5': 900, '6': 0 });
   });
@@ -191,6 +191,7 @@ describe('Fase 4 — aceitação: madeira → machado → cortar mais depressa �
       state,
       bus,
       () => content.items,
+      () => content,
       () => content,
     );
     const collision = CollisionWorld.fromZone(map, content.resources, content.props, content.stations);

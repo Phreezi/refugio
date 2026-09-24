@@ -34,11 +34,10 @@ export const PLAYER_FOOTPRINT = { width: 10, height: 6 } as const;
 /** Área de objetos sem caixa sólida (ex.: erva): um pouco à volta dos pés (interação, construção). */
 export const LOOSE_OBJECT_AREA = { width: 10, height: 6 } as const;
 
-/** Mapa Tiled da base, relativo a `public/assets/`. */
-export const BASE_MAP_FILE = 'maps/base.json';
-
-/** Chave do mapa da base na cache de tilemaps do Phaser. */
-export const BASE_MAP_KEY = 'map_base';
+/** Chave do mapa de uma zona na cache de tilemaps do Phaser. */
+export function zoneMapKey(zoneId: string): string {
+  return `map_${zoneId}`;
+}
 
 /** Caminho do manifest de assets, relativo ao index.html. */
 export const ASSET_MANIFEST_URL = 'assets/manifest.json';

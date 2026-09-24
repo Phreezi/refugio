@@ -1,4 +1,14 @@
-import type { ItemDefs, PropDefs, Recipes, ResourceDefs, StationDefs, StructureDefs } from '../data/types';
+import type {
+  EnemyDefs,
+  EnemyGroups,
+  ItemDefs,
+  PropDefs,
+  Recipes,
+  ResourceDefs,
+  StationDefs,
+  StructureDefs,
+  ZoneDefs,
+} from '../data/types';
 import type { ZoneMap } from './zoneMap';
 
 /**
@@ -12,6 +22,9 @@ class Content {
   private resourceDefs: ResourceDefs | null = null;
   private propDefs: PropDefs | null = null;
   private structureDefs: StructureDefs | null = null;
+  private enemyDefs: EnemyDefs | null = null;
+  private groups: EnemyGroups | null = null;
+  private zoneDefs: ZoneDefs | null = null;
   private readonly zoneMaps = new Map<string, ZoneMap>();
 
   setItems(defs: ItemDefs): void {
@@ -63,6 +76,30 @@ class Content {
   get structures(): StructureDefs {
     if (this.structureDefs === null) throw new Error('Content: peças de construção ainda não carregadas.');
     return this.structureDefs;
+  }
+
+  setEnemies(defs: EnemyDefs, groups: EnemyGroups): void {
+    this.enemyDefs = defs;
+    this.groups = groups;
+  }
+
+  get enemies(): EnemyDefs {
+    if (this.enemyDefs === null) throw new Error('Content: inimigos ainda não carregados.');
+    return this.enemyDefs;
+  }
+
+  get enemyGroups(): EnemyGroups {
+    if (this.groups === null) throw new Error('Content: grupos de inimigos ainda não carregados.');
+    return this.groups;
+  }
+
+  setZones(defs: ZoneDefs): void {
+    this.zoneDefs = defs;
+  }
+
+  get zones(): ZoneDefs {
+    if (this.zoneDefs === null) throw new Error('Content: zonas ainda não carregadas.');
+    return this.zoneDefs;
   }
 
   setZoneMap(zoneId: string, map: ZoneMap): void {

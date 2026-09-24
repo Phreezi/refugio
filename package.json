@@ -21,7 +21,8 @@
     "palette": "node scripts/generate-palette.ts",
     "tiles": "node scripts/generate-tiles.ts",
     "sprites": "node scripts/generate-sprites.ts",
-    "map:base": "node scripts/generate-base-map.ts"
+    "map:base": "node scripts/generate-base-map.ts",
+    "map:pine": "node scripts/generate-pine-forest.ts"
   },
   "dependencies": {
     "phaser": "^4.2.1"

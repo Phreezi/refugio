@@ -26,6 +26,18 @@
   "demolishRefundPct": 50,
   "hordeEveryDays": 3,
   "maxArmorReductionPct": 60,
+  "fistDamage": 3,
+  "fistAttackSec": 0.5,
+  "fistReachPx": 12,
+  "weaponAttackSec": 0.6,
+  "weaponReachPx": 14,
+  "enemyWindupSec": 0.4,
+  "enemyHitStunSec": 0.3,
+  "enemyKnockbackPx": 8,
+  "playerInvulnSec": 0.6,
+  "playerKnockbackPx": 6,
+  "sneakDetectMultiplier": 0.5,
+  "exitReachPx": 14,
   "xpCurve": {
     "base": 50,
     "growth": 1.25

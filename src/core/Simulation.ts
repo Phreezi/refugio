@@ -7,13 +7,16 @@ import { facingFromIntent, moveWithCollision, normalize } from '../systems/movem
 import { respawnVitals, survivalRules, tickSurvival } from '../systems/survival/survival';
 import { eventBus, type EventBus, type GameEvents } from './EventBus';
 import { FixedStep } from './FixedStep';
-import { gameState, type GameState } from './GameState';
+import { BASE_ZONE_ID, gameState, type GameState } from './GameState';
 import { Building } from './Building';
+import { Combat, type CombatContent } from './Combat';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
 import { PlayerActions } from './PlayerActions';
 import { secondsToTicks } from './Clock';
 import { content } from '../world/content';
+import { arrivalPoint } from '../systems/travel/travel';
+import type { ZoneMap } from '../world/zoneMap';
 
 /**
  * Corre a lógica do jogo em passo fixo. As cenas de jogo (Base, Zona) chamam
@@ -29,6 +32,10 @@ export class Simulation {
   readonly interaction: Interaction;
   readonly crafting: Crafting;
   readonly building: Building;
+  readonly combat: Combat;
+  /** Zona para onde o jogador está a sair (a cena faz a transição). */
+  private leavingTo: string | null = null;
+  private exits: ZoneMap['exits'] = [];
   private actionHeld = false;
   private actionQueued = false;
   private nextActionTick = 0;
@@ -52,19 +59,28 @@ export class Simulation {
       recipes: content.recipes,
       stations: content.stations,
     }),
+    combat: () => CombatContent = () => ({
+      items: content.items,
+      enemies: content.enemies,
+      enemyGroups: content.enemyGroups,
+    }),
   ) {
     this.state = state;
     this.bus = bus;
     this.actions = new PlayerActions(state, bus, items);
     this.building = new Building(state, bus, this.actions);
-    this.interaction = new Interaction(state, bus, this.actions, this.building);
+    this.combat = new Combat(state, bus, this.actions, combat);
+    this.interaction = new Interaction(state, bus, this.actions, this.building, this.combat);
     this.crafting = new Crafting(state, bus, crafting, this.actions);
   }
 
   /** Zona onde o jogador está: colisões, recursos, baús… (null = fora de uma cena de jogo). */
   setZone(zone: ZoneContext | null): void {
     this.world = zone?.collision ?? null;
+    this.exits = zone?.map.exits ?? [];
+    this.leavingTo = null;
     this.building.setZone(zone);
+    this.combat.setZone(zone);
     this.interaction.setZone(zone);
   }
 
@@ -80,6 +96,20 @@ export class Simulation {
   /** Geometria da zona onde o jogador está (null = sem movimento, ex.: fora de uma cena de jogo). */
   setWorld(world: CollisionWorld | null): void {
     this.world = world;
+  }
+
+  /**
+   * Passa o jogador para a zona `to` (chamado pela cena na transição): fica no ponto de chegada
+   * (junto à saída que leva de volta, ou no `player_spawn`).
+   */
+  enterZone(to: string, map: ZoneMap): void {
+    const player = this.state.data.player;
+    const from = player.zoneId;
+    const at = arrivalPoint(map, from);
+    player.zoneId = to;
+    player.x = at.x;
+    player.y = at.y;
+    this.state.markDirty();
   }
 
   /** Onde o jogador reaparece se morrer (o `player_spawn` da base). */
@@ -142,11 +172,26 @@ export class Simulation {
     world.tick += 1;
     this.state.markDirty(); // o tempo de jogo avançou
     this.movePlayer();
+    this.checkExits();
     this.runAction(world.tick);
     this.interaction.tick(world.tick);
+    this.combat.tick(this.sneaking);
     this.crafting.advance(1);
-    if (tickSurvival(this.state.data.player, world.tick, this.survival)) this.respawn();
+    tickSurvival(this.state.data.player, world.tick, this.survival);
+    if (this.state.data.player.hp <= 0) this.respawn();
     this.bus.emit('world:tick', { tick: world.tick });
+  }
+
+  /** Pisar uma saída leva a outra zona (uma vez; a cena trata da transição). */
+  private checkExits(): void {
+    if (this.leavingTo !== null || !this.moved) return;
+    const player = this.state.data.player;
+    const exit = this.exits.find(
+      (e) => e.to !== null && Math.hypot(e.x - player.x, e.y - player.y) <= BALANCE.exitReachPx,
+    );
+    if (!exit?.to) return;
+    this.leavingTo = exit.to;
+    this.bus.emit('zone:change', { from: player.zoneId, to: exit.to });
   }
 
   private runAction(tick: number): void {
@@ -154,21 +199,31 @@ export class Simulation {
     this.actionQueued = false;
     const done = this.interaction.act(PLAYER_FOOTPRINT);
     if (done === null) return;
-    this.nextActionTick = tick + this.actionCooldownTicks;
+    // Golpes (em inimigos ou no ar) seguem o ritmo da arma; o resto, o ritmo normal.
+    const attack = done === 'enemy' || done === 'swing';
+    this.nextActionTick = tick + (attack ? this.combat.attackTicks() : this.actionCooldownTicks);
     // Abrir um baú, beber ou abrir uma porta não se repete com a tecla presa (só golpes em recursos).
-    if (done === 'chest' || done === 'drink' || done === 'door') this.actionHeld = false;
+    if (done === 'chest' || done === 'drink' || done === 'door' || done === 'bag') this.actionHeld = false;
   }
 
+  /**
+   * Morte (CLAUDE.md §7.12): o conteúdo da mochila fica numa mochila no chão onde morreu; a
+   * hotbar e o equipamento ficam com o jogador, que reaparece na base.
+   */
   private respawn(): void {
     const player = this.state.data.player;
+    const zoneId = player.zoneId;
+    const bag = this.combat.dropBag(zoneId, player.x, player.y, player.inventory, true);
+    if (bag) player.inventory.fill(null);
     respawnVitals(player, this.survival);
+    player.zoneId = BASE_ZONE_ID;
     if (this.respawnPoint) {
       player.x = this.respawnPoint.x;
       player.y = this.respawnPoint.y;
       // Sem interpolação: o jogador aparece logo no sítio novo.
       this.previous = { x: player.x, y: player.y };
     }
-    this.bus.emit('player:died', { zoneId: player.zoneId });
+    this.bus.emit('player:died', { zoneId, bag: bag !== null });
   }
 
   private movePlayer(): void {
