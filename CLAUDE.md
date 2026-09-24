@@ -606,7 +606,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [x] `assets/manifest.json` + gerador de placeholders por código.
 - [x] `EventBus`, `GameState` vazio, `config.ts`.
 - [x] Overlay de debug (FPS, posição, tick) com tecla F3.
-- [ ] Deploy automático de preview (ex.: GitHub Pages) para testar no telemóvel. **Workflow pronto** (`.github/workflows/deploy.yml`, testado localmente com o build servido em subpasta). Repositório: `Phreezi/refugio` (público); URL do preview: https://phreezi.github.io/refugio/. Falta só ativar Settings → Pages → Source: GitHub Actions (o `GITHUB_TOKEN` do workflow não o pode fazer) e voltar a correr o workflow.
+- [x] Deploy automático de preview no GitHub Pages para testar no telemóvel (`.github/workflows/deploy.yml`: lint + testes + build; publica a cada push para `main`). Preview: https://phreezi.github.io/refugio/ (repositório `Phreezi/refugio`).
 
 **Aceitação:** `npm run dev` abre um menu "Novo jogo" que leva a um ecrã verde com um quadrado; build de produção funciona no browser do telemóvel.
 
