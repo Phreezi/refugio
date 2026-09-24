@@ -67,6 +67,14 @@ export interface GameEvents {
   'structure:removed': { uid: number };
   /** Uma peça mudou de estado (porta aberta/fechada). */
   'structure:changed': { uid: number };
+  /** Uma horda bateu numa peça (ou uma armadilha gastou-se um pouco). */
+  'structure:damaged': { uid: number; amount: number; x: number; y: number };
+  /** A peça foi destruída (vida a 0) ou a armadilha gastou-se toda. */
+  'structure:destroyed': { uid: number; x: number; y: number };
+  'structure:repaired': { uid: number };
+  /** Hordas (§7.13). */
+  'horde:started': { size: number };
+  'horde:ended': { won: boolean };
   /** Abrir um baú (`chest:<id>`) ou contentor com loot (`loot:<zona>:<id>`), ao lado da mochila. */
   'container:open': { container: `chest:${string}` | `loot:${string}` };
   /** Abrir o painel de crafting de uma estação (`<tipo>_<id do objeto>`). */

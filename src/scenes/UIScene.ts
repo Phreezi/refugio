@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { paletteNumber, type PaletteColor } from '../assets/palette';
 import { clockAt } from '../core/Clock';
 import { eventBus } from '../core/EventBus';
-import { gameState, type PlayerState } from '../core/GameState';
+import { BASE_ZONE_ID, gameState, type PlayerState } from '../core/GameState';
+import { hoursToTicks } from '../core/Homestead';
 import { simulation } from '../core/Simulation';
 import { BALANCE } from '../data/balance';
 import { getView, setupFixedCamera } from '../display/view';
@@ -82,6 +83,8 @@ export class UIScene extends Phaser.Scene {
   private fishing: FishingUI | null = null;
   private levelUp: LevelUpUI | null = null;
   private levelLabel: Label | null = null;
+  /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
+  private hordeLabel: Label | null = null;
   private xpFill: Phaser.GameObjects.Rectangle | null = null;
   /** Botão de ação (toque): escondido no modo construção. */
   private actionButton: { setVisible(visible: boolean): unknown }[] = [];
@@ -107,6 +110,14 @@ export class UIScene extends Phaser.Scene {
       HUD_MARGIN,
       '',
       { size: 8, color: 'cream', bold: true },
+      [1, 0],
+    );
+    this.hordeLabel = new Label(
+      this,
+      width - HUD_MARGIN,
+      HUD_MARGIN + 30,
+      '',
+      { size: 7, color: 'amber', bold: true, stroke: true },
       [1, 0],
     );
     this.notice = new Label(
@@ -158,6 +169,7 @@ export class UIScene extends Phaser.Scene {
       this.levelUp?.destroy();
       this.levelUp = null;
       this.levelLabel = null;
+      this.hordeLabel = null;
       this.xpFill = null;
       this.actionButton = [];
       this.buildButton = null;
@@ -194,6 +206,18 @@ export class UIScene extends Phaser.Scene {
     const clock = clockAt(world.tick, BALANCE.dayLengthSec, BALANCE.dayStartHour);
     const pad = (n: number): string => String(n).padStart(2, '0');
     this.clock?.setText(t('hud.clock', { day: clock.day, time: `${pad(clock.hour)}:${pad(clock.minute)}` }));
+    this.hordeLabel?.setText(this.hordeStatus());
+  }
+
+  /** Texto do aviso da horda (vazio se as hordas estiverem desligadas ou ainda longe). */
+  private hordeStatus(): string {
+    const { settings, horde, world, player } = gameState.data;
+    if (!settings.hordes || horde.at === 0) return '';
+    if (horde.active && player.zoneId === BASE_ZONE_ID)
+      return t('horde.active', { n: simulation.combat.hordeLeft });
+    if (horde.active || world.tick >= horde.at) return t('horde.waiting');
+    const hours = Math.ceil((horde.at - world.tick) / hoursToTicks(1));
+    return hours <= 24 ? t('horde.soon', { hours }) : '';
   }
 
   /** Mensagem curta no centro-alto do ecrã (substitui a anterior). */
@@ -224,6 +248,18 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'needs_item')
           this.showNotice(t('msg.needs_item', { item: itemName(item ?? '') }));
         else this.showNotice(t(tool === 'pickaxe' ? 'msg.needs_pickaxe' : 'msg.needs_axe'));
+      }),
+      eventBus.on('horde:started', ({ size }) => {
+        this.showNotice(t('horde.started', { n: size }));
+      }),
+      eventBus.on('horde:ended', ({ won }) => {
+        this.showNotice(t(won ? 'horde.won' : 'horde.lost'));
+      }),
+      eventBus.on('structure:destroyed', () => {
+        this.showNotice(t('horde.destroyed'));
+      }),
+      eventBus.on('structure:repaired', () => {
+        this.showNotice(t('horde.repaired'));
       }),
       eventBus.on('recipe:learned', ({ recipe }) => {
         const output = content.recipes.find((r) => r.id === recipe)?.output ?? recipe;

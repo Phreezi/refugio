@@ -47,6 +47,18 @@ export interface BaseState {
   crops: Record<string, [seed: string, readyAt: number | null]>;
   /** Peças que produzem sozinhas, pelo uid: tick a partir do qual se conta a produção (pode ser < 0). */
   produce: Record<string, number>;
+  /** Dano das peças pelo uid (só em hordas; armadilhas: golpes dados). Repara-se na base. */
+  damage: Record<string, number>;
+}
+
+/** Hordas opcionais (CLAUDE.md §7.13). */
+export interface HordeState {
+  /** Tick em que chega a próxima horda (0 = por marcar). */
+  at: number;
+  /** Hordas já enfrentadas (as seguintes são maiores). */
+  count: number;
+  /** Há uma horda a atacar a base (volta a aparecer se o jogo recarregar). */
+  active: boolean;
 }
 
 /** Mochila no chão: a da morte (§7.12) ou o que não coube ao matar um inimigo. */
@@ -81,6 +93,9 @@ export interface GameStateData {
   stations: Record<string, StationState>;
   /** Receitas aprendidas em notas (antes do nível que as desbloqueia). */
   unlocks: { recipes: string[] };
+  /** Definições do jogo gravadas no save (§10.5). */
+  settings: { hordes: boolean };
+  horde: HordeState;
 }
 
 /** Baú da base num jogo novo: mantimentos para os primeiros minutos (e testar a fogueira). */
@@ -117,10 +132,13 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       nextStructureId: 1,
       crops: {},
       produce: {},
+      damage: {},
     },
     zones: {},
     stations: {},
     unlocks: { recipes: [] },
+    settings: { hordes: false },
+    horde: { at: 0, count: 0, active: false },
   };
 }
 

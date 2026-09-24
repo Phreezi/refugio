@@ -68,6 +68,16 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     const base = s.base as Record<string, unknown>;
     return { ...s, base: { ...base, crops: {}, produce: {} } };
   },
+  // v8 → v9 (Fase 9): hordas opcionais (desligadas) e dano das peças.
+  8: (s) => {
+    const base = s.base as Record<string, unknown>;
+    return {
+      ...s,
+      base: { ...base, damage: {} },
+      settings: { hordes: false },
+      horde: { at: 0, count: 0, active: false },
+    };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

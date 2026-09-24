@@ -1,6 +1,6 @@
 import { PLAYER_FOOTPRINT } from '../config';
 import { BALANCE } from '../data/balance';
-import type { EnemyDefs, EnemyGroups, ItemDefs } from '../data/types';
+import type { EnemyDef, EnemyDefs, EnemyGroups, ItemDefs } from '../data/types';
 import { createEnemy, hitEnemy, stepEnemy, type Enemy } from '../systems/ai/enemyAi';
 import {
   armorPct,
@@ -18,6 +18,7 @@ import type { EventBus, GameEvents } from './EventBus';
 import { zoneState, type GameState, type GroundBag } from './GameState';
 import type { ZoneContext } from './Interaction';
 import type { PlayerActions } from './PlayerActions';
+import type { Building } from './Building';
 import { isNight } from './DayNight';
 import { nextRandom, randomInt } from './Rng';
 
@@ -45,6 +46,10 @@ export class Combat {
   private enemies: Enemy[] = [];
   private nextUid = 1;
   private invulnerableUntil = 0;
+  /** Peças da base: as hordas partem-nas e as armadilhas ferem os inimigos. */
+  building: Building | null = null;
+  /** Próximo tick em que cada armadilha pode voltar a ferir (não se grava). */
+  private trapReady = new Map<number, number>();
   /** Hora real (ms): as mochilas no chão duram horas reais (§7.12). Substituível nos testes. */
   now: () => number = () => Date.now();
 
@@ -65,6 +70,7 @@ export class Combat {
     this.zone = zone;
     this.enemies = [];
     this.invulnerableUntil = 0;
+    this.trapReady.clear();
     if (!zone) return;
     const bags = zoneState(this.state.data, zone.zoneId).bags;
     const now = this.now();
@@ -95,6 +101,48 @@ export class Combat {
         }
       }
     }
+  }
+
+  /**
+   * Uma horda chega à zona (§7.13): os inimigos do grupo aparecem à volta dos pontos dados (as
+   * saídas da base), vêm atrás do jogador e partem o que estiver no caminho.
+   * @param scale multiplica o número de cada membro do grupo.
+   * @returns quantos apareceram.
+   */
+  spawnHorde(group: string, points: readonly { x: number; y: number }[], scale: number): number {
+    const { enemies, enemyGroups } = this.content();
+    const members = enemyGroups[group]?.members ?? [];
+    const rng = this.state.data.world;
+    let placed = 0;
+    for (const member of members) {
+      const def = enemies[member.enemy];
+      if (!def) continue;
+      const count = Math.round(randomInt(rng, member.min, member.max) * scale);
+      for (let i = 0; i < count; i++) {
+        const point = points[placed % Math.max(1, points.length)];
+        if (!point) break;
+        const at = {
+          x: Math.round(point.x + (nextRandom(rng) - 0.5) * 32),
+          y: Math.round(point.y + (nextRandom(rng) - 0.5) * 32),
+        };
+        const enemy = createEnemy(this.nextUid++, member.enemy, def, at);
+        enemy.horde = true;
+        enemy.state = 'chase';
+        this.enemies.push(enemy);
+        placed++;
+      }
+    }
+    return placed;
+  }
+
+  /** Inimigos da horda ainda de pé (a rebentar também contam). */
+  get hordeLeft(): number {
+    return this.enemies.filter((e) => e.horde).length;
+  }
+
+  /** A horda vai-se embora (o jogador morreu): tiram-se os inimigos dela. */
+  clearHorde(): void {
+    this.enemies = this.enemies.filter((e) => !e.horde);
   }
 
   /** Inimigos vivos na zona (para desenhar). */
@@ -146,6 +194,8 @@ export class Combat {
       ticksPerSec: TICKS_PER_SECOND,
       windupTicks: secondsToTicks(BALANCE.enemyWindupSec),
       sneakDetectMultiplier: BALANCE.sneakDetectMultiplier,
+      stuckTicks: secondsToTicks(BALANCE.hordeStuckSec),
+      obstacle: (enemy: Enemy) => this.obstacle(enemy),
     };
     for (const enemy of [...this.enemies]) {
       const def = enemies[enemy.id];
@@ -155,7 +205,74 @@ export class Combat {
         if (enemy.dying === 0) this.explode(enemy);
         continue;
       }
-      if (stepEnemy(enemy, def, ctx) === 'attack') this.damagePlayer(def.damage, enemy);
+      const result = stepEnemy(enemy, def, ctx);
+      if (result === 'attack') this.damagePlayer(def.damage, enemy);
+      else if (result === 'siege' && enemy.siege !== null) {
+        const amount = Math.round((def.damage * BALANCE.hordeStructureDamagePct) / 100);
+        this.building?.damageStructure(enemy.siege, amount);
+        enemy.siege = null;
+      }
+    }
+    this.springTraps();
+  }
+
+  /** Peça construída sólida entre o inimigo e o jogador (o que a horda tem de partir). */
+  private obstacle(enemy: Enemy): number | null {
+    const building = this.building;
+    const def = this.content().enemies[enemy.id];
+    if (!building || !def) return null;
+    const player = this.state.data.player;
+    const dir = normalize({ x: player.x - enemy.x, y: player.y - enemy.y });
+    const cy = enemy.y - def.footprint.height / 2;
+    const ahead = Math.max(def.footprint.width, def.footprint.height) / 2 + 3;
+    const tile = building.tileSize;
+    // Em frente, e só na horizontal ou só na vertical (quando desliza ao longo de uma parede).
+    const probes = [
+      { x: enemy.x + dir.x * ahead, y: cy + dir.y * ahead },
+      { x: enemy.x + Math.sign(dir.x) * ahead, y: cy },
+      { x: enemy.x, y: cy + Math.sign(dir.y) * ahead },
+    ];
+    for (const p of probes) {
+      const uid = building.solidAt(Math.floor(p.x / tile), Math.floor(p.y / tile));
+      if (uid !== null) return uid;
+    }
+    return null;
+  }
+
+  /** Armadilhas de estacas: ferem quem as pisa (a cada `everySec`) e gastam-se. */
+  private springTraps(): void {
+    const building = this.building;
+    if (!building || this.enemies.length === 0) return;
+    const tick = this.state.data.world.tick;
+    const { enemies } = this.content();
+    for (const [uid, id, tx, ty] of building.structures()) {
+      const trap = building.def(id)?.trap;
+      if (!trap || tick < (this.trapReady.get(uid) ?? 0)) continue;
+      const size = building.tileSize;
+      const area = { x: tx * size, y: ty * size, w: size, h: size };
+      const inside = this.enemies.filter(
+        (e) =>
+          e.dying === 0 &&
+          e.x >= area.x &&
+          e.x < area.x + area.w &&
+          e.y > area.y &&
+          e.y <= area.y + area.h + 2,
+      );
+      if (inside.length === 0) continue;
+      this.trapReady.set(uid, tick + secondsToTicks(trap.everySec));
+      for (const enemy of inside) {
+        const def = enemies[enemy.id];
+        if (!def) continue;
+        const died = hitEnemy(enemy, trap.damage, enemy, 0, 0);
+        this.bus.emit('enemy:hit', {
+          uid: enemy.uid,
+          damage: trap.damage,
+          x: enemy.x,
+          y: enemy.y - BODY_HEIGHT,
+        });
+        if (died) this.defeated(enemy, def);
+      }
+      building.damageStructure(uid, 1);
     }
   }
 
@@ -182,15 +299,17 @@ export class Combat {
     );
     this.bus.emit('enemy:hit', { uid, damage, x: enemy.x, y: enemy.y - BODY_HEIGHT });
     this.state.markDirty();
-    if (died) {
-      // O inchado não morre logo: incha e rebenta ao fim do aviso (dá tempo de fugir).
-      if (def.explode) {
-        enemy.dying = secondsToTicks(def.explode.delaySec);
-        enemy.stun = 0;
-        this.bus.emit('enemy:dying', { uid });
-      } else this.kill(enemy);
-    }
+    if (died) this.defeated(enemy, def);
     return true;
+  }
+
+  /** Vida a 0: morre (ou, o inchado, incha e rebenta ao fim do aviso — dá tempo de fugir). */
+  private defeated(enemy: Enemy, def: EnemyDef): void {
+    if (def.explode) {
+      enemy.dying = secondsToTicks(def.explode.delaySec);
+      enemy.stun = 0;
+      this.bus.emit('enemy:dying', { uid: enemy.uid });
+    } else this.kill(enemy);
   }
 
   /** O inchado rebenta: dano em área (com armadura) e depois conta como derrotado. */

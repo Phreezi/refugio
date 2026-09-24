@@ -129,6 +129,11 @@ export function equipSlotOf(def: ItemDef | undefined): EquipSlot | null {
   return null;
 }
 
+/** Grupo de `enemyGroups.json` que forma as hordas (§7.13). */
+export const HORDE_GROUP = 'horde';
+/** Tabela de `lootTables.json` da recompensa por vencer uma horda. */
+export const HORDE_REWARD_TABLE = 'horde_reward';
+
 export class DataError extends Error {
   readonly problems: readonly string[];
 
@@ -599,6 +604,17 @@ export interface StructureDef {
   farm: boolean;
   /** Produz sozinha com o tempo (coletor de água, armadilha de caça); sprite `<sprite>_full`. */
   produce?: ProduceDef;
+  /** Vida contra as hordas (só as peças sólidas: paredes, portas, janelas, vedações). */
+  hp?: number;
+  /** Armadilha de estacas: fere os inimigos que a pisam; gasta-se ao fim de `uses` golpes. */
+  trap?: TrapDef;
+}
+
+export interface TrapDef {
+  damage: number;
+  /** Segundos entre golpes. */
+  everySec: number;
+  uses: number;
 }
 
 /** O que uma peça produz sozinha: uma unidade a cada `everyHours` horas de jogo, até `max`. */
@@ -645,6 +661,8 @@ const STRUCTURE_KEYS = new Set([
   'light',
   'farm',
   'produce',
+  'hp',
+  'trap',
 ]);
 const MAX_STRUCTURE_TILES = 4;
 
@@ -718,6 +736,22 @@ export function parseStructures(
       unlockLevel: isPositiveInt(raw.unlockLevel) ? raw.unlockLevel : 1,
       farm: flag(id, raw, 'farm'),
     };
+    if (raw.hp !== undefined) {
+      if (isPositiveInt(raw.hp)) def.hp = raw.hp;
+      else problems.push(`"${id}": hp tem de ser um inteiro > 0`);
+    }
+    if (raw.trap !== undefined) {
+      const trap = raw.trap;
+      if (
+        isObject(trap) &&
+        isPositiveInt(trap.damage) &&
+        isPositiveInt(trap.uses) &&
+        typeof trap.everySec === 'number' &&
+        trap.everySec > 0
+      )
+        def.trap = { damage: trap.damage, everySec: trap.everySec, uses: trap.uses };
+      else problems.push(`"${id}": trap tem de ser { damage, everySec, uses }`);
+    }
     if (raw.produce !== undefined) {
       const produce = parseProduce(raw.produce, items);
       if (typeof produce === 'string') problems.push(`"${id}": produce ${produce}`);
@@ -747,9 +781,19 @@ export function parseStructures(
     if (def.solid && def.footprint) problems.push(`"${id}": solid e footprint são alternativos`);
     if (def.door && !def.solid) problems.push(`"${id}": uma porta tem de ser solid (quando fechada)`);
     if (def.chest && def.station) problems.push(`"${id}": não pode ser baú e estação`);
-    const roles = [def.chest, def.station !== undefined, def.door, def.farm, def.produce !== undefined];
+    if (def.hp !== undefined && !def.solid) problems.push(`"${id}": só as peças sólidas têm hp`);
+    if (def.trap && (def.solid || def.footprint))
+      problems.push(`"${id}": as armadilhas pisam-se (sem solid)`);
+    const roles = [
+      def.chest,
+      def.station !== undefined,
+      def.door,
+      def.farm,
+      def.produce !== undefined,
+      def.trap !== undefined,
+    ];
     if (roles.filter(Boolean).length > 1)
-      problems.push(`"${id}": só pode ter um papel (baú, estação, porta, canteiro ou produção)`);
+      problems.push(`"${id}": só pode ter um papel (baú, estação, porta, canteiro, produção ou armadilha)`);
     if ((def.rotatable || def.door) && (size.width !== 1 || size.height !== 1))
       problems.push(`"${id}": peças rodáveis e portas têm 1×1 tiles`);
     defs[id] = def;

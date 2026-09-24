@@ -204,5 +204,16 @@
   "farm.nothing_yet": "Ainda não há nada para recolher.",
   "msg.needs_item": "Precisas de: {item}.",
   "craft.filter": "Posso fazer",
-  "craft.nothing_to_make": "Não tens o que é preciso para nada desta categoria."
+  "craft.nothing_to_make": "Não tens o que é preciso para nada desta categoria.",
+  "structure.spike_trap": "Armadilha de estacas",
+  "horde.menu_on": "Hordas: ligadas",
+  "horde.menu_off": "Hordas: desligadas",
+  "horde.soon": "Horda em {hours} h",
+  "horde.waiting": "Horda à espera na base",
+  "horde.active": "Horda! Faltam {n}",
+  "horde.started": "Vem aí uma horda! ({n} zombies)",
+  "horde.won": "Horda vencida! Deixaram uma mochila com prémios.",
+  "horde.lost": "A horda foi-se embora.",
+  "horde.destroyed": "Uma peça foi destruída!",
+  "horde.repaired": "Reparado."
 }
