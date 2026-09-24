@@ -44,6 +44,10 @@ export interface Enemy {
   stuck: number;
   /** Peça construída que está a atacar (uid), quando o aviso é contra ela. */
   siege: number | null;
+  /** Alertado por um grito: ticks em que vai à procura do jogador (sem desistir). */
+  alert: number;
+  /** Gritador: ticks até poder gritar outra vez. */
+  cooldown: number;
 }
 
 export interface AiContext {
@@ -89,6 +93,8 @@ export function createEnemy(uid: number, id: string, def: EnemyDef, at: Vec2): E
     horde: false,
     stuck: 0,
     siege: null,
+    alert: 0,
+    cooldown: 0,
   };
 }
 
@@ -119,7 +125,7 @@ function startIdle(enemy: Enemy, ctx: AiContext): void {
  * @returns 'attack' quando um ataque acaba o aviso com o jogador ao alcance, 'siege' quando acaba
  * o aviso contra a peça `enemy.siege` (quem chama aplica o dano).
  */
-export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack' | 'siege' | null {
+export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack' | 'siege' | 'scream' | null {
   enemy.px = enemy.x;
   enemy.py = enemy.y;
   if (enemy.dying > 0) return null; // a rebentar: quem trata é o Combat
@@ -130,11 +136,16 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
     enemy.y = next.y;
     return null;
   }
+  if (enemy.alert > 0) enemy.alert -= 1;
+  if (enemy.cooldown > 0) enemy.cooldown -= 1;
   const toPlayer = distance(enemy, ctx.player);
+  const windupTicks = def.windupSec ? Math.round(def.windupSec * ctx.ticksPerSec) : ctx.windupTicks;
   const detect = def.detectRadius * (ctx.sneaking ? ctx.sneakDetectMultiplier : 1);
   // A horda vem à procura do jogador e não desiste.
-  const sees = enemy.horde || toPlayer <= detect;
-  const playerFarFromHome = !enemy.horde && distance(ctx.player, enemy.home) > def.leashRadius;
+  // Alertado por um grito: também vem à procura (sem leash) enquanto durar o alerta.
+  const hunting = enemy.horde || enemy.alert > 0;
+  const sees = hunting || toPlayer <= detect;
+  const playerFarFromHome = !hunting && distance(ctx.player, enemy.home) > def.leashRadius;
 
   if (def.behavior === 'flee') {
     if (sees) {
@@ -202,15 +213,26 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
       }
       return null;
     case 'chase':
-      if ((!enemy.horde && distance(enemy, enemy.home) > def.leashRadius) || playerFarFromHome) {
+      if ((!hunting && distance(enemy, enemy.home) > def.leashRadius) || playerFarFromHome) {
         enemy.state = 'return';
         return null;
+      }
+      // Gritador: mantém a distância e grita de tempos a tempos.
+      if (def.scream) {
+        const scream = def.scream;
+        if (toPlayer < scream.keepAway * 0.7) {
+          const away = normalize({ x: enemy.x - ctx.player.x, y: enemy.y - ctx.player.y });
+          walk(enemy, def, { x: enemy.x + away.x * 16, y: enemy.y + away.y * 16 }, def.speed, ctx);
+        } else walk(enemy, def, ctx.player, def.speed, ctx, scream.keepAway);
+        if (enemy.cooldown > 0) return null;
+        enemy.cooldown = Math.round(scream.everySec * ctx.ticksPerSec);
+        return 'scream';
       }
       if (toPlayer <= def.attackRange && def.damage > 0) {
         enemy.state = 'windup';
         enemy.siege = null;
         enemy.charging = false;
-        enemy.timer = ctx.windupTicks;
+        enemy.timer = windupTicks;
         return null;
       }
       // Javali: de longe, avisa e carrega (um aviso mais longo, para dar tempo de sair da frente).
@@ -218,7 +240,7 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
         enemy.state = 'windup';
         enemy.siege = null;
         enemy.charging = true;
-        enemy.timer = ctx.windupTicks * 2;
+        enemy.timer = windupTicks * 2;
         return null;
       }
       walk(enemy, def, ctx.player, def.speed, ctx, def.attackRange - 2);
@@ -248,7 +270,7 @@ function besiege(enemy: Enemy, def: EnemyDef, ctx: AiContext, before: number): v
   enemy.siege = uid;
   enemy.state = 'windup';
   enemy.charging = false;
-  enemy.timer = ctx.windupTicks;
+  enemy.timer = def.windupSec ? Math.round(def.windupSec * ctx.ticksPerSec) : ctx.windupTicks;
 }
 
 /** Parado um bocado, depois anda devagar para um ponto perto de casa. */

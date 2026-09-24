@@ -104,6 +104,8 @@ export interface ItemDef {
   plant?: PlantDef;
   /** Serve para regar os canteiros (água; devolve `returns`). */
   waters?: boolean;
+  /** Estanca o sangramento ao usar (ligaduras, kits). */
+  stopsBleeding?: boolean;
 }
 
 /** Semente: cresce durante `growHours` horas de jogo depois de regada. */
@@ -296,6 +298,7 @@ const ITEM_KEYS = new Set([
   'teaches',
   'plant',
   'waters',
+  'stopsBleeding',
 ]);
 const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
 const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach'] as const;
@@ -389,6 +392,10 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
     }
     if (def.durability !== undefined && def.stack !== 1)
       problems.push(`"${id}": itens com durabilidade têm stack 1`);
+    if (raw.stopsBleeding !== undefined) {
+      if (raw.stopsBleeding === true && def.type === 'consumable') def.stopsBleeding = true;
+      else problems.push(`"${id}": stopsBleeding tem de ser true (e só em consumíveis)`);
+    }
     if (raw.waters !== undefined) {
       if (raw.waters === true) def.waters = true;
       else problems.push(`"${id}": waters tem de ser true`);
@@ -857,6 +864,15 @@ export interface EnemyDef {
   explode?: { radius: number; damage: number; delaySec: number };
   /** Carrega (javali): a esta distância, aviso e depois corre em linha reta a `speed` px/s. */
   charge?: { range: number; speed: number; sec: number };
+  /** Aviso de ataque próprio, em segundos (omisso = `enemyWindupSec`; o brutamontes é lento). */
+  windupSec?: number;
+  /** % de hipótese de cada golpe pôr o jogador a sangrar (§7.8, Fase 10). */
+  bleedPct?: number;
+  /**
+   * Gritador: não ataca; mantém-se a `keepAway` px do jogador e, a cada `everySec`, grita e põe
+   * os inimigos a menos de `radius` px à procura do jogador durante `alertSec`.
+   */
+  scream?: { radius: number; everySec: number; keepAway: number; alertSec: number };
 }
 
 export type EnemyDefs = Readonly<Record<string, EnemyDef>>;
@@ -876,6 +892,9 @@ const ENEMY_KEYS = new Set([
   'xp',
   'explode',
   'charge',
+  'windupSec',
+  'bleedPct',
+  'scream',
 ]);
 
 function isNonNegativeInt(value: unknown): value is number {
@@ -963,6 +982,22 @@ export function parseEnemies(
     const charge = nums('charge', ['range', 'speed', 'sec']);
     if (charge)
       defs[id].charge = { range: charge.range ?? 1, speed: charge.speed ?? 1, sec: charge.sec ?? 1 };
+    const scream = nums('scream', ['radius', 'everySec', 'keepAway', 'alertSec']);
+    if (scream)
+      defs[id].scream = {
+        radius: scream.radius ?? 1,
+        everySec: scream.everySec ?? 1,
+        keepAway: scream.keepAway ?? 1,
+        alertSec: scream.alertSec ?? 1,
+      };
+    if (raw.windupSec !== undefined) {
+      if (positive(raw.windupSec) && raw.windupSec <= 5) defs[id].windupSec = raw.windupSec;
+      else problems.push(`"${id}": windupSec tem de ser um número entre 0 e 5`);
+    }
+    if (raw.bleedPct !== undefined) {
+      if (isNonNegativeInt(raw.bleedPct) && raw.bleedPct <= 100) defs[id].bleedPct = raw.bleedPct;
+      else problems.push(`"${id}": bleedPct tem de ser um inteiro de 0 a 100`);
+    }
     const def = defs[id];
     if (def.leashRadius < def.detectRadius) problems.push(`"${id}": leashRadius tem de ser ≥ detectRadius`);
   }

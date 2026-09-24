@@ -143,5 +143,41 @@
       ["tomato_seeds", 2, 2, 3],
       ["note_machete", 1, 1, 1]
     ]
+  },
+  "industrial_locker": {
+    "sprite": "locker",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "rolls": [2, 3],
+    "slots": 6,
+    "entries": [
+      ["electronics", 4, 1, 2],
+      ["chemicals", 3, 1, 2],
+      ["scrap_metal", 4, 2, 4],
+      ["nails", 3, 2, 5],
+      ["iron_ingot", 2, 1, 2],
+      ["rope", 2, 1, 2],
+      ["bandage", 1, 1, 1]
+    ]
+  },
+  "medical_cabinet": {
+    "sprite": "medical_cabinet",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "rolls": [2, 3],
+    "slots": 6,
+    "guaranteeUncommon": true,
+    "entries": [
+      ["bandage", 5, 1, 2],
+      ["medkit", 2, 1, 1],
+      ["chemicals", 3, 1, 1],
+      ["water_clean", 3, 1, 2],
+      ["canned_food", 2, 1, 1],
+      ["cloth", 3, 2, 3]
+    ]
   }
 }

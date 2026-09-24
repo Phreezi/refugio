@@ -57,5 +57,7 @@
   "xpFish": 4,
   "xpFarm": 4,
   "xpProduce": 1,
-  "playerLightPx": 44
+  "playerLightPx": 44,
+  "bleedSec": 30,
+  "bleedEverySec": 2
 }

@@ -19,6 +19,10 @@ export interface GameEvents {
   /** Um inchado foi derrotado e vai rebentar (aviso). */
   'enemy:dying': { uid: number };
   'enemy:exploded': { x: number; y: number; radius: number };
+  /** Um gritador gritou (os inimigos à volta ficam alertados). */
+  'enemy:scream': { uid: number; x: number; y: number; radius: number };
+  /** O jogador começou a sangrar (uma ligadura estanca). */
+  'player:bleeding': Record<string, never>;
   /** Mochilas no chão de uma zona mudaram. */
   'bag:changed': { zoneId: string };
   /** O jogador pisou uma saída: vai para a zona `to` (null = abre o mapa-mundo). */

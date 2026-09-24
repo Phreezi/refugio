@@ -194,6 +194,14 @@ describe('save: migrações', () => {
     expect(state.horde).toEqual({ at: 0, count: 0, active: false });
   });
 
+  it('v9 → v10 (Fase 10): ninguém está a sangrar', () => {
+    const v9 = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    delete v9.player.bleed;
+    const stateJson = JSON.stringify(v9);
+    const text = `{"version":9,"timestamp":6,"checksum":"${checksum(`9|6|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.player.bleed).toBe(0);
+  });
+
   it('valida a horta', () => {
     const ok = structuredClone(STATE);
     ok.base.crops['3'] = ['carrot_seeds', null];

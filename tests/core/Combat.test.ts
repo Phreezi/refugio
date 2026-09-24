@@ -300,3 +300,54 @@ describe('Inimigos T2 (Fase 8)', () => {
     expect(state.data.player.hp).toBeLessThan(100);
   });
 });
+
+describe('Inimigos T3 e medicina (Fase 10)', () => {
+  it('o brutamontes avisa durante mais tempo e bate com força', () => {
+    const { sim, events, run } = setup(map([{ id: 'tanks', x: 262, y: 240 }]));
+    const tank = sim.combat.list[0];
+    if (!tank) throw new Error('sem brutamontes');
+    for (let i = 0; i < 200 && tank.state !== 'windup'; i++) sim.update(FIXED_STEP_MS);
+    expect(tank.state).toBe('windup');
+    run(BALANCE.enemyWindupSec + 0.1);
+    // Um aviso normal já teria acabado; o dele ainda não.
+    expect(tank.state).toBe('windup');
+    expect(events).toEqual([]);
+    run(1);
+    expect(events.some((e) => e.startsWith('hurt:'))).toBe(true);
+  });
+
+  it('o gritador mantém a distância e o grito põe os outros à procura do jogador', () => {
+    const zone = map([
+      { id: 'screamer', x: 300, y: 240 },
+      { id: 'walker', x: 380, y: 340 },
+    ]);
+    const { sim, run } = setup(zone);
+    const walker = sim.combat.list.find((e) => e.id === 'zombie_walker');
+    const screamer = sim.combat.list.find((e) => e.id === 'zombie_screamer');
+    if (!walker || !screamer) throw new Error('faltam inimigos');
+    run(0.2);
+    // Longe demais para o ver, mas foi alertado pelo grito.
+    expect(walker.alert).toBeGreaterThan(0);
+    expect(walker.state).toBe('chase');
+    run(3);
+    const scream = content.enemies.zombie_screamer?.scream;
+    expect(Math.hypot(screamer.x - 240, screamer.y - 240)).toBeGreaterThan((scream?.keepAway ?? 0) * 0.6);
+  });
+
+  it('sangrar tira vida devagar; uma ligadura estanca', () => {
+    const { state, sim, run } = setup(map([]));
+    const player = state.data.player;
+    sim.combat.damagePlayer(5, { x: 250, y: 240 }, 100);
+    expect(player.bleed).toBeGreaterThan(0);
+    const hp = player.hp;
+    run(6);
+    expect(player.hp).toBeLessThan(hp);
+    expect(player.hp).toBeGreaterThan(hp - 6);
+    player.inventory[0] = ['bandage', 1];
+    expect(sim.actions.use({ container: 'inventory', index: 0 })).toBe(true);
+    expect(player.bleed).toBe(0);
+    const after = player.hp;
+    run(4);
+    expect(player.hp).toBeGreaterThanOrEqual(after);
+  });
+});

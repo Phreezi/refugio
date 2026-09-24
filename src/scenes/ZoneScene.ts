@@ -551,6 +551,22 @@ export class ZoneScene extends Phaser.Scene {
         });
         this.cameras.main.shake(160, 0.006);
       }),
+      eventBus.on('enemy:scream', ({ x, y, radius }) => {
+        // Grito: um anel que cresce até ao raio do alerta.
+        const ring = this.add
+          .circle(Math.round(x), Math.round(y) - 16, 4)
+          .setStrokeStyle(2, paletteNumber('ice'), 0.8)
+          .setDepth(LAYER_DEPTH.decor_high + 1);
+        this.tweens.add({
+          targets: ring,
+          radius,
+          alpha: 0,
+          duration: 600,
+          onComplete: () => {
+            ring.destroy();
+          },
+        });
+      }),
       eventBus.on('player:damaged', ({ amount, x, y }) => {
         this.floatText(`-${String(amount)}`, Math.round(x), Math.round(y) - 34, 'red');
         this.hurtUntil = this.time.now + 150;

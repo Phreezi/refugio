@@ -78,6 +78,11 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
       horde: { at: 0, count: 0, active: false },
     };
   },
+  // v9 → v10 (Fase 10): sangramento (ninguém estava a sangrar).
+  9: (s) => {
+    const player = s.player as Record<string, unknown>;
+    return { ...s, player: { ...player, bleed: 0 } };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

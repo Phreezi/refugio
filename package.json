@@ -25,7 +25,8 @@
     "map:pine": "node scripts/generate-pine-forest.ts",
     "map:farm": "node scripts/generate-farm.ts",
     "map:lake": "node scripts/generate-lake.ts",
-    "map:t2": "node scripts/generate-t2.ts"
+    "map:t2": "node scripts/generate-t2.ts",
+    "map:t3": "node scripts/generate-t3.ts"
   },
   "dependencies": {
     "phaser": "^4.2.1"

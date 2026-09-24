@@ -199,5 +199,54 @@
     "qty": 1,
     "timeSec": 25,
     "unlockLevel": 10
+  },
+  {
+    "id": "r_bandage",
+    "station": "hands",
+    "category": "food",
+    "inputs": [["cloth", 3]],
+    "output": "bandage",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 4
+  },
+  {
+    "id": "r_medkit",
+    "station": "wood_bench",
+    "category": "food",
+    "inputs": [
+      ["bandage", 2],
+      ["chemicals", 1]
+    ],
+    "output": "medkit",
+    "qty": 1,
+    "timeSec": 20,
+    "unlockLevel": 14
+  },
+  {
+    "id": "r_leather_jacket",
+    "station": "wood_bench",
+    "category": "armor",
+    "inputs": [
+      ["leather", 6],
+      ["rope", 2]
+    ],
+    "output": "leather_jacket",
+    "qty": 1,
+    "timeSec": 30,
+    "unlockLevel": 12
+  },
+  {
+    "id": "r_leather_pants",
+    "station": "wood_bench",
+    "category": "armor",
+    "inputs": [
+      ["leather", 4],
+      ["rope", 1]
+    ],
+    "output": "leather_pants",
+    "qty": 1,
+    "timeSec": 25,
+    "unlockLevel": 12
   }
 ]

@@ -27,6 +27,8 @@ export interface PlayerState {
   /** Nível (1–maxLevel) e XP dentro do nível (CLAUDE.md §7.1). */
   level: number;
   xp: number;
+  /** A sangrar: ticks que faltam (0 = não). Uma ligadura estanca. */
+  bleed: number;
 }
 
 export interface WorldState {
@@ -124,6 +126,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       equipment: createContainer(EQUIP_SLOTS.length),
       level: 1,
       xp: 0,
+      bleed: 0,
     },
     world: { tick: 0, rng: seed >>> 0 },
     base: {

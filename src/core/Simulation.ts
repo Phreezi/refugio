@@ -234,8 +234,17 @@ export class Simulation {
     this.horde.tick();
     this.crafting.advance(1);
     tickSurvival(this.state.data.player, world.tick, this.survival);
+    this.tickBleeding(world.tick);
     if (this.state.data.player.hp <= 0) this.respawn();
     this.bus.emit('world:tick', { tick: world.tick });
+  }
+
+  /** A sangrar: perde vida devagar até acabar o tempo ou usar uma ligadura (nunca instantâneo). */
+  private tickBleeding(tick: number): void {
+    const player = this.state.data.player;
+    if (player.bleed === 0) return;
+    player.bleed -= 1;
+    if (tick % secondsToTicks(BALANCE.bleedEverySec) === 0) player.hp = Math.max(0, player.hp - 1);
   }
 
   /** Pisar uma saída leva a outra zona (uma vez; a cena trata da transição). */
@@ -279,6 +288,7 @@ export class Simulation {
     const bag = this.combat.dropBag(zoneId, player.x, player.y, player.inventory, true);
     if (bag) player.inventory.fill(null);
     respawnVitals(player, this.survival);
+    player.bleed = 0;
     player.zoneId = BASE_ZONE_ID;
     if (this.respawnPoint) {
       player.x = this.respawnPoint.x;

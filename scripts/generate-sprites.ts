@@ -1728,6 +1728,163 @@ const PHASE9_ICONS: Sprite[] = [
   },
 ];
 
+/** Fase 10 (parte A): brutamontes, gritador, contentores da Zona Industrial e do Hospital. */
+const PHASE10A: Sprite[] = [
+  {
+    file: 'zombie_tank',
+    width: 24,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 12, 30.5, 9, 1.5);
+      // Pernas grossas.
+      img.fill(6, 23, 5, 7, c('night'));
+      img.fill(13, 23, 5, 7, c('night'));
+      img.fill(6, 29, 5, 1, c('ink'));
+      img.fill(13, 29, 5, 1, c('ink'));
+      // Tronco enorme com fato-macaco rasgado.
+      img.fill(4, 11, 16, 13, c('plum'));
+      img.fill(4, 20, 16, 3, c('shadow'));
+      img.fill(18, 11, 2, 12, c('shadow'));
+      img.fill(9, 14, 3, 4, c('stone'));
+      // Braços pesados, punhos grandes.
+      img.fill(0, 12, 4, 9, c('stone'));
+      img.fill(20, 12, 4, 9, c('stone_dark'));
+      img.fill(0, 20, 4, 3, c('stone_light'));
+      img.fill(20, 20, 4, 3, c('stone'));
+      // Cabeça pequena e careca, afundada nos ombros.
+      img.fill(8, 3, 8, 9, c('stone_light'));
+      img.fill(8, 10, 8, 2, c('stone'));
+      img.fill(9, 6, 2, 2, c('ink'));
+      img.fill(13, 6, 2, 2, c('ink'));
+      img.set(10, 6, c('red'));
+      img.set(14, 6, c('red'));
+      img.fill(10, 9, 4, 1, c('blood'));
+    },
+  },
+  {
+    file: 'zombie_screamer',
+    width: 16,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      zombie(img, 'ice', 'sky', 'plum', 'night', 'shadow');
+      // Boca muito aberta (grita) e cabelo comprido.
+      img.fill(6, 9, 4, 3, c('ink'));
+      img.fill(7, 10, 2, 1, c('blood'));
+      img.fill(3, 3, 2, 10, c('bark_dark'));
+      img.fill(11, 3, 2, 10, c('bark_dark'));
+    },
+  },
+  {
+    file: 'locker',
+    width: 16,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 22.5, 7, 1.5);
+      img.fill(2, 2, 12, 20, c('teal'));
+      img.fill(2, 2, 12, 2, c('sky'));
+      img.fill(7, 4, 1, 17, c('forest_dark'));
+      for (const y of [6, 8, 10]) {
+        img.fill(3, y, 3, 1, c('forest_dark'));
+        img.fill(9, y, 3, 1, c('forest_dark'));
+      }
+      img.set(6, 14, c('stone_light'));
+      img.set(9, 14, c('stone_light'));
+      img.fill(13, 2, 1, 20, c('forest_dark'));
+    },
+  },
+  {
+    file: 'medical_cabinet',
+    width: 16,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 22.5, 7, 1.5);
+      img.fill(2, 2, 12, 20, c('cream'));
+      img.fill(2, 2, 12, 2, c('parchment'));
+      img.fill(3, 12, 10, 1, c('stone_light'));
+      img.fill(7, 5, 2, 6, c('red'));
+      img.fill(5, 7, 6, 2, c('red'));
+      img.fill(3, 14, 10, 7, c('parchment'));
+      img.set(11, 17, c('stone'));
+      img.fill(13, 2, 1, 20, c('stone_light'));
+    },
+  },
+];
+
+const PHASE10A_ICONS: Sprite[] = [
+  {
+    file: 'electronics',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 4, 12, 8, c('forest'));
+      img.fill(2, 4, 12, 1, c('grass'));
+      img.fill(4, 6, 3, 3, c('ink'));
+      img.fill(9, 7, 3, 2, c('stone_light'));
+      for (const x of [3, 6, 9, 12]) img.set(x, 11, c('gold'));
+      img.fill(7, 10, 5, 1, c('gold'));
+    },
+  },
+  {
+    file: 'chemicals',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(7, 2, 2, 4, c('ice'));
+      img.ellipse(8, 10, 5, 4.5, c('ice'));
+      img.ellipse(8, 11, 4, 3, c('lime'));
+      img.set(6, 10, c('cream'));
+      img.fill(6, 1, 4, 1, c('stone'));
+    },
+  },
+  {
+    file: 'medkit',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 4, 12, 10, c('cream'));
+      img.fill(2, 4, 12, 1, c('parchment'));
+      img.fill(6, 2, 4, 2, c('stone'));
+      img.fill(7, 6, 2, 6, c('red'));
+      img.fill(5, 8, 6, 2, c('red'));
+    },
+  },
+  {
+    file: 'leather_jacket',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(4, 4, 8, 10, c('bark'));
+      img.fill(1, 4, 3, 7, c('bark'));
+      img.fill(12, 4, 3, 7, c('bark_dark'));
+      img.fill(6, 4, 4, 2, c('wood')); // gola
+      img.fill(8, 6, 1, 8, c('bark_dark'));
+      img.set(7, 8, c('stone_light'));
+      img.set(7, 11, c('stone_light'));
+    },
+  },
+  {
+    file: 'leather_pants',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(4, 2, 8, 3, c('bark'));
+      img.fill(4, 5, 3, 9, c('bark'));
+      img.fill(9, 5, 3, 9, c('bark_dark'));
+      img.fill(4, 2, 8, 1, c('wood'));
+      img.set(8, 3, c('gold'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -1740,12 +1897,14 @@ for (const [dir, list] of [
   [outDir, PHASE8],
   [outDir, PHASE8B],
   [outDir, PHASE9],
+  [outDir, PHASE10A],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
   [iconDir, FOOD_ICONS],
   [iconDir, NOTE_ICONS],
   [iconDir, IRON_ICONS],
   [iconDir, PHASE9_ICONS],
+  [iconDir, PHASE10A_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -1756,7 +1915,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

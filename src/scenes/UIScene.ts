@@ -83,6 +83,8 @@ export class UIScene extends Phaser.Scene {
   private fishing: FishingUI | null = null;
   private levelUp: LevelUpUI | null = null;
   private levelLabel: Label | null = null;
+  /** "A sangrar" (por baixo da barra de XP), a piscar. */
+  private bleedLabel: Label | null = null;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
   private hordeLabel: Label | null = null;
   private xpFill: Phaser.GameObjects.Rectangle | null = null;
@@ -170,6 +172,7 @@ export class UIScene extends Phaser.Scene {
       this.levelUp = null;
       this.levelLabel = null;
       this.hordeLabel = null;
+      this.bleedLabel = null;
       this.xpFill = null;
       this.actionButton = [];
       this.buildButton = null;
@@ -207,6 +210,7 @@ export class UIScene extends Phaser.Scene {
     const pad = (n: number): string => String(n).padStart(2, '0');
     this.clock?.setText(t('hud.clock', { day: clock.day, time: `${pad(clock.hour)}:${pad(clock.minute)}` }));
     this.hordeLabel?.setText(this.hordeStatus());
+    this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
   }
 
   /** Texto do aviso da horda (vazio se as hordas estiverem desligadas ou ainda longe). */
@@ -248,6 +252,9 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'needs_item')
           this.showNotice(t('msg.needs_item', { item: itemName(item ?? '') }));
         else this.showNotice(t(tool === 'pickaxe' ? 'msg.needs_pickaxe' : 'msg.needs_axe'));
+      }),
+      eventBus.on('player:bleeding', () => {
+        this.showNotice(t('msg.bleeding'));
       }),
       eventBus.on('horde:started', ({ size }) => {
         this.showNotice(t('horde.started', { n: size }));
@@ -305,6 +312,12 @@ export class UIScene extends Phaser.Scene {
     this.levelLabel = new Label(this, HUD_MARGIN, y - 2, '', { size: 7, color: 'gold', bold: true });
     this.add.rectangle(BAR_X - 1, y, BAR_WIDTH + 2, 4, paletteNumber('ink')).setOrigin(0);
     this.xpFill = this.add.rectangle(BAR_X, y + 1, 0, 2, paletteNumber('gold')).setOrigin(0);
+    this.bleedLabel = new Label(this, HUD_MARGIN, y + 6, t('hud.bleeding'), {
+      size: 7,
+      color: 'red',
+      bold: true,
+      stroke: true,
+    }).setVisible(false);
   }
 
   /** Botão de velocidade (x1 → x2 → x3 → x1), por baixo do relógio. */
