@@ -22,12 +22,26 @@ Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
 | `npm run format`        | Formata tudo com o Prettier                                                  |
 | `npm run validate-data` | Valida paleta, manifest de assets e i18n (e, no futuro, os JSON de conteúdo) |
 | `npm run palette`       | Regenera `public/assets/palette.png` a partir de `src/assets/palette.json`   |
+| `npm run tiles`         | Regenera o tileset placeholder `public/assets/tiles/base_tiles.png`          |
+| `npm run map:base`      | Gera o mapa inicial da base (não substitui um existente sem `-- --force`)    |
 
 ## Debug
 
 - **F3** mostra/esconde o overlay de debug (FPS, tick, posição, cena, escala).
 - `?debug` na URL mostra o overlay logo ao arrancar (útil no telemóvel, sem teclado).
 - `?lang=en` força a língua inglesa.
+
+## Controlos (Fase 1)
+
+- **PC:** WASD ou setas para andar (8 direções).
+- **Telemóvel:** joystick virtual — tocar e arrastar na metade esquerda do ecrã. O jogo só funciona
+  na horizontal; ao alto aparece o aviso "roda o dispositivo" e o jogo fica em pausa.
+
+## Mapas (Tiled)
+
+Os mapas estão em `public/assets/maps/` no formato JSON do [Tiled](https://www.mapeditor.org/).
+Para editar a base, abrir `public/assets/maps/base.json` no Tiled e gravar (JSON, tileset embebido).
+Camadas e nomes dos objetos: ver CLAUDE.md §8.4. Depois de gravar, correr `npm run validate-data`.
 
 ## Assets
 
@@ -41,8 +55,7 @@ falhar), o jogo gera um placeholder colorido com uma letra, usando só cores da 
 O workflow `.github/workflows/deploy.yml` corre lint, testes e build em cada push/PR e publica o
 `dist/` no GitHub Pages a cada push para `main`. Para ativar:
 
-1. Criar o repositório no GitHub e fazer push deste projeto para a branch `main`.
-2. No repositório: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. O URL do preview aparece no resumo do workflow (ambiente `github-pages`).
+Preview: https://phreezi.github.io/refugio/ (ativo; configurado em **Settings → Pages → Source:
+GitHub Actions** do repositório).
 
 No plano gratuito do GitHub, o Pages só funciona em repositórios públicos.

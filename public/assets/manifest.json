@@ -2,34 +2,18 @@
   "$comment": "Chave → asset. 'file' é relativo a public/assets/; sem 'file' (ou se o ficheiro falhar) o PreloadScene gera o placeholder. Cores = nomes de src/assets/palette.json. Validar com: npm run validate-data",
   "version": 1,
   "assets": {
-    "tile_grass": { "type": "image", "placeholder": { "width": 16, "height": 16, "color": "grass" } },
-    "tile_dirt": { "type": "image", "placeholder": { "width": 16, "height": 16, "color": "wood" } },
-    "tile_sand": { "type": "image", "placeholder": { "width": 16, "height": 16, "color": "sand" } },
-    "tile_water": { "type": "image", "placeholder": { "width": 16, "height": 16, "color": "water" } },
-    "tile_road": { "type": "image", "placeholder": { "width": 16, "height": 16, "color": "stone_dark" } },
-    "tile_floor_wood": {
+    "tileset_base": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "wood_light" }
-    },
-    "tile_floor_concrete": {
-      "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "stone_light" }
-    },
-    "tile_wall": {
-      "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "stone", "border": "stone_dark", "letter": "M" }
-    },
-    "tile_fence": {
-      "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "bark", "border": "bark_dark", "letter": "V" }
-    },
-    "tile_boulder": {
-      "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "stone_dark", "border": "shadow", "letter": "R" }
+      "file": "tiles/base_tiles.png",
+      "placeholder": { "width": 176, "height": 16, "color": "grass" }
     },
     "player": {
-      "type": "image",
-      "placeholder": { "width": 16, "height": 32, "color": "sky", "border": "ink", "letter": "J" }
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 7,
+      "rows": 4,
+      "placeholder": { "width": 16, "height": 32, "color": "sky", "border": "ink", "style": "character" }
     },
     "zombie_walker": {
       "type": "image",

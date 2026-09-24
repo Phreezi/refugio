@@ -110,14 +110,14 @@ refugio/
 ├── tsconfig.json
 ├── eslint.config.js          # flat config + regras de arquitetura (core/ sem Phaser, src/ sem Node)
 ├── .github/workflows/deploy.yml  # lint + testes + build; publica no GitHub Pages (push para main)
-├── scripts/                  # TypeScript corrido pelo Node: validate-data.ts, generate-palette.ts
+├── scripts/                  # TypeScript corrido pelo Node: validate-data, generate-palette/tiles/base-map, png.ts
 ├── public/
 │   └── assets/
 │       ├── manifest.json     # chave → ficheiro + especificação do placeholder
 │       ├── palette.png       # gerado de src/assets/palette.json (npm run palette)
 │       ├── sprites/          # spritesheets (placeholder agora)
-│       ├── tiles/            # tilesets
-│       ├── maps/             # mapas Tiled (.json)
+│       ├── tiles/            # tilesets (base_tiles.png gerado por `npm run tiles`)
+│       ├── maps/             # mapas Tiled (.json, tileset embebido; fora do Prettier)
 │       ├── ui/
 │       ├── audio/
 │       └── LICENSES.md
@@ -128,8 +128,10 @@ refugio/
 │   ├── assets/
 │   │   ├── manifest.ts       # tipos + validação do manifest (puro; também usado por scripts/)
 │   │   ├── palette.json/.ts  # paleta de 32 cores (fonte de verdade)
+│   │   ├── characterSheet.ts # layout das spritesheets de personagem + desenho do placeholder
 │   │   └── placeholders.ts   # texturas placeholder geradas por código
-│   ├── display/              # escala inteira em píxeis do dispositivo
+│   ├── display/              # escala inteira em píxeis do dispositivo + aviso "roda o ecrã"
+│   ├── world/                # mapas: tileset.ts, zoneMap.ts (validação Tiled, puro), content.ts
 │   ├── debug/                # overlay F3 (DOM)
 │   ├── scenes/
 │   │   ├── keys.ts           # chaves das cenas
@@ -148,6 +150,7 @@ refugio/
 │   │   ├── Clock.ts          # tempo de jogo, dia/noite
 │   │   └── Rng.ts            # RNG com seed
 │   ├── systems/              # lógica pura, SEM dependências do Phaser sempre que possível
+│   │   ├── movement/         # CollisionWorld, movimento com deslize, direção do sprite
 │   │   ├── survival/         # fome, sede, vida
 │   │   ├── inventory/
 │   │   ├── crafting/
@@ -159,7 +162,7 @@ refugio/
 │   │   └── travel/
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
 │   ├── ui/                   # componentes de HUD e menus
-│   ├── input/                # teclado, rato, touch, joystick virtual
+│   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
 │   ├── save/
 │   │   ├── SaveManager.ts
 │   │   ├── schema.ts         # tipos + versão do save
@@ -170,6 +173,8 @@ refugio/
 │   │       ├── CapacitorAdapter.ts      # Fase 13
 │   │       └── YouTubePlayablesAdapter.ts # Fase 14
 │   ├── data/                 # JSON data-driven
+│   │   ├── types.ts          # tipos + validação (puro; também usado por scripts/)
+│   │   ├── resources.json    # nós de recurso (Fase 1: sprite + footprint)
 │   │   ├── items.json
 │   │   ├── recipes.json
 │   │   ├── structures.json
@@ -233,6 +238,8 @@ npm run format     # prettier --write
 npm run typecheck
 npm run validate-data   # valida referências cruzadas entre JSONs (paleta, manifest, i18n; depois items/recipes/…)
 npm run palette    # regenera public/assets/palette.png
+npm run tiles      # regenera public/assets/tiles/base_tiles.png (ordem = src/world/tileset.ts)
+npm run map:base   # gera maps/base.json (recusa substituir sem `-- --force`: o mapa edita-se no Tiled)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -445,6 +452,10 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - Camadas: `ground`, `decor_low`, `collision`, `decor_high` (por cima do jogador), `objects`.
 - Camada `objects` contém pontos de spawn: `player_spawn`, `exit`, `resource:<id>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
 - Cada zona tem **pelo menos 2 saídas** para o mapa-mundo e uma área segura perto da entrada.
+- Nomes dos objetos (campo *Name* no Tiled) com esse formato; o ponto de um `resource:<id>` são os **pés** do recurso (meio da base do sprite).
+- A camada `collision` é desenhada (paredes, vedações, água, rochedos) e qualquer tile nela bloqueia. Os recursos bloqueiam com o `footprint` de `resources.json`.
+- Tilesets **embebidos** no mapa (o Phaser não lê `.tsx` externos); o tileset `base_tiles` aponta para `../tiles/base_tiles.png`. Acrescentar tiles só no fim, para não baralhar os gids.
+- O `validate-data` e o arranque do jogo validam o mapa (camadas, gids, spawn único fora das colisões, ≥ 2 saídas, ids de recursos).
 - Mapas desenhados à mão; a **variação** vem da posição aleatória (com seed) de parte dos recursos e contentores entre os pontos candidatos.
 - Distância média entrada → ponto mais valioso: 30–60 s a andar.
 
@@ -606,7 +617,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [x] `assets/manifest.json` + gerador de placeholders por código.
 - [x] `EventBus`, `GameState` vazio, `config.ts`.
 - [x] Overlay de debug (FPS, posição, tick) com tecla F3.
-- [ ] Deploy automático de preview (ex.: GitHub Pages) para testar no telemóvel. **Workflow pronto** (`.github/workflows/deploy.yml`, testado localmente com o build servido em subpasta). Repositório: `Phreezi/refugio` (público); URL do preview: https://phreezi.github.io/refugio/. Falta só ativar Settings → Pages → Source: GitHub Actions (o `GITHUB_TOKEN` do workflow não o pode fazer) e voltar a correr o workflow.
+- [x] Deploy automático de preview no GitHub Pages para testar no telemóvel (`.github/workflows/deploy.yml`: lint + testes + build; publica a cada push para `main`). Preview: https://phreezi.github.io/refugio/ (repositório `Phreezi/refugio`).
 
 **Aceitação:** `npm run dev` abre um menu "Novo jogo" que leva a um ecrã verde com um quadrado; build de produção funciona no browser do telemóvel.
 
@@ -616,12 +627,12 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** andar num mapa real com colisões.
 
-- [ ] Primeiro mapa Tiled da **Base** (48×48) com tileset placeholder.
-- [ ] Jogador com movimento 8 direções, animação placeholder, colisão com a camada `collision`.
-- [ ] Câmara a seguir o jogador, limitada aos bordos do mapa.
-- [ ] Ordenação por profundidade (Y-sort) para o jogador passar atrás de árvores.
-- [ ] Input: teclado + **joystick virtual** touch.
-- [ ] Ecrã "roda o dispositivo" em retrato.
+- [x] Primeiro mapa Tiled da **Base** (48×48) com tileset placeholder (`public/assets/maps/base.json`, gerado uma vez por `npm run map:base`; daí em diante edita-se no Tiled).
+- [x] Jogador com movimento 8 direções, animação placeholder, colisão com a camada `collision` (e com a caixa dos recursos).
+- [x] Câmara a seguir o jogador, limitada aos bordos do mapa.
+- [x] Ordenação por profundidade (Y-sort) para o jogador passar atrás de árvores.
+- [x] Input: teclado + **joystick virtual** touch.
+- [x] Ecrã "roda o dispositivo" em retrato.
 
 **Aceitação:** anda-se pela base no PC e no telemóvel a 60 FPS, sem atravessar paredes, com o jogador corretamente por trás/à frente dos objetos.
 
@@ -896,3 +907,7 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Manifest com especificação do placeholder por chave; `file` opcional | Trocar arte = pôr ficheiro + `file` no manifest. Sem ficheiro (ou 404), usa-se o placeholder; o `validate-data` falha se um `file` não existir (distingue maiúsculas, como o GitHub Pages) |
 | 2026-09-24 | Paleta própria de 32 cores em `src/assets/palette.json` (+ `palette.png` gerado) | Placeholders só com cores da paleta (letras binarizadas, sem antialias). Sem licenças de terceiros |
 | 2026-09-24 | Scripts de dados em TypeScript corridos pelo Node (type stripping) | Sem `tsx`/`ts-node`; os módulos partilhados com `scripts/` não podem importar outros `.ts` em runtime |
+| 2026-09-24 | Colisões próprias (`systems/movement`) em vez da física Arcade do Phaser | O movimento corre no passo fixo de 50 ms, sem Phaser, testável em Vitest e determinista. Caixa dos pés (10×6 px) contra tiles `collision` + footprints; eixo X depois Y (desliza nas paredes); o render interpola entre ticks |
+| 2026-09-24 | Mapa da base gerado por script uma vez, depois editado no Tiled | Não há Tiled no ambiente do agente; o script descreve o layout em código e produz JSON do Tiled válido. Não reescreve sem `--force` |
+| 2026-09-24 | Jogador como spritesheet 7×4 (parado, andar ×4, atacar ×2 por direção) com placeholder desenhado por código (`style: "character"`) | Animação visível desde já; trocar pela arte final = pôr o PNG com o mesmo layout e `file` no manifest |
+| 2026-09-24 | Joystick virtual flutuante na metade esquerda (só toque), 8 direções, zona morta 25% | Metade direita fica livre para o botão de ação (Fase 3). O teclado tem prioridade sobre o joystick |

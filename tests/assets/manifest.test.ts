@@ -102,3 +102,52 @@ describe('parseManifest', () => {
     expect(problemsOf(withLetter(' '))).toHaveLength(1);
   });
 });
+
+describe('parseManifest: spritesheets', () => {
+  const sheet = (patch: Record<string, unknown> = {}, placeholder: Record<string, unknown> = {}) => ({
+    version: 1,
+    assets: {
+      hero: {
+        type: 'spritesheet',
+        frameWidth: 16,
+        frameHeight: 32,
+        columns: 7,
+        rows: 4,
+        placeholder: {
+          width: 16,
+          height: 32,
+          color: 'sky',
+          border: 'ink',
+          style: 'character',
+          ...placeholder,
+        },
+        ...patch,
+      },
+    },
+  });
+
+  it('aceita uma folha de personagem com o layout certo', () => {
+    const entry = parseManifest(sheet(), PALETTE_NAMES).assets.hero;
+    expect(entry?.type).toBe('spritesheet');
+  });
+
+  it('o placeholder tem de ter o tamanho de um frame', () => {
+    expect(problemsOf(sheet({}, { width: 32 }))).toContainEqual(
+      expect.stringContaining('tamanho de um frame'),
+    );
+  });
+
+  it('style "character" exige a grelha das personagens', () => {
+    expect(problemsOf(sheet({ columns: 4 }))).toEqual([expect.stringContaining('style "character"')]);
+  });
+
+  it('style só é permitido em spritesheets', () => {
+    const image = {
+      version: 1,
+      assets: {
+        rock: { type: 'image', placeholder: { width: 16, height: 16, color: 'stone', style: 'character' } },
+      },
+    };
+    expect(problemsOf(image)).toEqual([expect.stringContaining('só se usa em spritesheets')]);
+  });
+});
