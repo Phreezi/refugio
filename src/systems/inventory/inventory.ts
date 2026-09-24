@@ -168,3 +168,50 @@ export function storeSimilar(from: Container, to: Container, defs: ItemDefs): nu
   }
   return moved;
 }
+
+/** Ordem das categorias ao ordenar (ferramentas e armas primeiro, recursos no fim). */
+const SORT_ORDER: readonly string[] = [
+  'tool',
+  'weapon',
+  'armor',
+  'backpack',
+  'consumable',
+  'resource',
+  'key',
+];
+
+/**
+ * "Ordenar": junta os stacks do mesmo item (ex.: 1 + 4 + 7 + 2 + 6 madeiras → 20 num slot) e
+ * arruma por categoria, depois pela ordem de `items.json`; os slots vazios ficam no fim.
+ * Itens com durabilidade não se juntam (os mais gastos ficam depois).
+ * @returns true se algo mudou.
+ */
+export function sortContainer(container: Container, defs: ItemDefs): boolean {
+  const before = JSON.stringify(container);
+  const order = Object.keys(defs);
+  const totals = new Map<string, number>();
+  const singles: Slot[] = [];
+  for (const slot of container) {
+    if (!slot) continue;
+    if (!defs[slot[0]] || !stackable(defs, slot[0])) singles.push(slot);
+    else totals.set(slot[0], (totals.get(slot[0]) ?? 0) + slot[1]);
+  }
+  const merged: Slot[] = [...singles];
+  for (const [id, total] of totals) {
+    const stack = stackOf(defs, id);
+    for (let left = total; left > 0; left -= stack) merged.push([id, Math.min(stack, left)]);
+  }
+  const rank = (slot: Slot): [number, number] => {
+    const type = defs[slot[0]]?.type ?? '';
+    const category = SORT_ORDER.indexOf(type);
+    return [category < 0 ? SORT_ORDER.length : category, order.indexOf(slot[0])];
+  };
+  merged.sort((a, b) => {
+    const [ca, ia] = rank(a);
+    const [cb, ib] = rank(b);
+    // Mesmo item: stacks maiores primeiro; com durabilidade, os menos gastos primeiro.
+    return ca - cb || ia - ib || b[1] - a[1] || (b[2] ?? 0) - (a[2] ?? 0);
+  });
+  for (let i = 0; i < container.length; i++) container[i] = merged[i] ?? null;
+  return JSON.stringify(container) !== before;
+}

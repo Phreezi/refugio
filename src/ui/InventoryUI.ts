@@ -7,7 +7,7 @@ import { BALANCE } from '../data/balance';
 import { getView } from '../display/view';
 import { itemName, t } from '../i18n';
 import { content } from '../world/content';
-import { Button } from './Button';
+import { Button, CLOSE_ICON } from './Button';
 import { SLOT_GAP, SLOT_SIZE, SlotView, slotSize } from './SlotView';
 import { Label } from './text';
 import { uiState } from './uiState';
@@ -282,7 +282,26 @@ export class InventoryUI {
       gy: number,
       title: string,
     ): void => {
-      add(new Label(scene, gx, gy, title, { size: 8, bold: true, color: 'wheat' })).setDepth(DEPTH.slots);
+      const label = add(new Label(scene, gx, gy, title, { size: 8, bold: true, color: 'wheat' })).setDepth(
+        DEPTH.slots,
+      );
+      // Ordenar: junta os itens iguais e agrupa por categoria.
+      const sortWidth = 40;
+      add(
+        new Button(
+          scene,
+          gx + Math.ceil(label.text.width) + 6 + sortWidth / 2,
+          gy + 5,
+          t('inv.sort'),
+          { width: sortWidth, height: 12, fontSize: 7, style: 'secondary' },
+          () => {
+            this.scene.time.delayedCall(0, () => {
+              if (this.actions.sort(ref)) this.selected = null;
+              if (this.isOpen) this.buildPanel();
+            });
+          },
+        ),
+      ).setDepth(DEPTH.slots);
       for (let i = 0; i < slots; i++) {
         const sx = gx + (i % cols) * (size + SLOT_GAP);
         const sy = gy + TITLE_H + Math.floor(i / cols) * (size + SLOT_GAP);
@@ -306,7 +325,7 @@ export class InventoryUI {
         scene,
         x + w - 10,
         y + 9,
-        '×',
+        CLOSE_ICON,
         { width: 12, height: 12, fontSize: 9, style: 'secondary' },
         () => {
           this.scene.time.delayedCall(0, () => {

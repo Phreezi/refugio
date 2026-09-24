@@ -1,6 +1,13 @@
 import type { ItemDefs } from '../data/types';
 import { BALANCE } from '../data/balance';
-import { addItem, moveSlot, splitSlot, storeSimilar, type Container } from '../systems/inventory/inventory';
+import {
+  addItem,
+  moveSlot,
+  sortContainer,
+  splitSlot,
+  storeSimilar,
+  type Container,
+} from '../systems/inventory/inventory';
 import type { EventBus, GameEvents } from './EventBus';
 import { chestContents, type GameState } from './GameState';
 
@@ -85,6 +92,13 @@ export class PlayerActions {
     const done = splitSlot(this.container(ref.container), ref.index);
     if (done) this.changed();
     return done;
+  }
+
+  /** Ordenar a mochila ou um baú: junta itens iguais e arruma por categoria. */
+  sort(ref: ContainerRef): boolean {
+    const changed = sortContainer(this.container(ref), this.items());
+    if (changed) this.changed();
+    return changed;
   }
 
   /** "Guardar tudo semelhante" da mochila para o baú. @returns quantidade movida. */

@@ -341,7 +341,7 @@ A **ação contextual** escolhe automaticamente o alvo mais próximo em frente (
 - Stacks: recursos 50, consumíveis 10, munições 100, ferramentas/armas 1.
 - Slots de equipamento: arma, cabeça, corpo, pernas, pés, mochila.
 - Baús na base: 24 slots cada, sem limite de baús (limitado por recursos).
-- Ações: mover, dividir stack, largar, usar, "guardar tudo semelhante" no baú (qualidade de vida).
+- Ações: mover, dividir stack, largar, usar, "guardar tudo semelhante" no baú e **ordenar** (mochila e baú: junta os itens iguais em stacks cheios e agrupa por categoria — ferramentas, armas, armadura, mochilas, consumíveis, recursos, chaves) (qualidade de vida).
 
 ### 7.4 Recolha
 
@@ -783,7 +783,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [ ] Armadilhas de caça simples.
 - [ ] Hordas opcionais (desligadas por defeito) com aviso e recompensa.
 - [ ] Durabilidade de estruturas **apenas** em hordas; reparação barata.
-- [ ] Qualidade de vida: "guardar tudo semelhante", ordenar baús, filtros.
+- [ ] Qualidade de vida: filtros. *("Guardar semelhantes" e "Ordenar" já existem desde a Fase 3/4.)*
 
 **Aceitação:** com hordas ligadas, uma base de pedra com 2 armadilhas aguenta uma horda de 8 zombies sem intervenção perfeita do jogador.
 
@@ -954,3 +954,4 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Joystick virtual flutuante (só toque), 8 direções, zona morta 25% | Primeiro só na metade esquerda; o jogador preferiu poder tocar em qualquer lado (fora dos botões/hotbar), sem joystick parado no canto. O teclado tem prioridade |
 | 2026-09-24 | Ficheiros de `public/` pedidos com `?v=<build>` (`versioned()` em config.ts) | O browser juntou JS novo com um manifest antigo em cache (GitHub Pages: 10 min) e o arranque falhou |
 | 2026-09-24 | Slots ×2 (ícones 32 px) no painel da mochila/baú em ecrãs táteis, quando cabe | Pedido do jogador: no telemóvel ao alto os slots eram pequenos para os dedos |
+| 2026-09-24 | Botão "Ordenar" na mochila e no baú; "×" de fechar desenhado em píxeis | Pedido do jogador. O glifo "×" da fonte não ficava centrado no botão |

@@ -6,6 +6,7 @@ import {
   moveSlot,
   removeItem,
   spaceFor,
+  sortContainer,
   splitSlot,
   storeSimilar,
 } from '../../src/systems/inventory/inventory';
@@ -92,5 +93,37 @@ describe('inventário', () => {
     expect(storeSimilar(bag, chest, items)).toBe(23);
     expect(chest).toEqual([['wood', 50], ['berries', 4], ['wood', 15], null]);
     expect(bag).toEqual([null, ['stone', 5], null, null]);
+  });
+
+  it('ordenar junta os itens iguais e agrupa por categoria', () => {
+    const bag = createContainer(8);
+    bag[0] = ['wood', 1];
+    bag[1] = ['berries', 3];
+    bag[2] = ['wood', 4];
+    bag[3] = ['stone_axe', 1, 50];
+    bag[4] = ['wood', 7];
+    bag[6] = ['wood', 2];
+    bag[7] = ['wood', 6];
+    bag[5] = ['stone_axe', 1, 120];
+    expect(sortContainer(bag, items)).toBe(true);
+    expect(bag).toEqual([
+      ['stone_axe', 1, 120],
+      ['stone_axe', 1, 50],
+      ['berries', 3],
+      ['wood', 20],
+      null,
+      null,
+      null,
+      null,
+    ]);
+    expect(sortContainer(bag, items)).toBe(false);
+  });
+
+  it('ordenar respeita o tamanho dos stacks', () => {
+    const bag = createContainer(4);
+    bag[0] = ['wood', 30];
+    bag[2] = ['wood', 30];
+    sortContainer(bag, items);
+    expect(bag).toEqual([['wood', 50], ['wood', 10], null, null]);
   });
 });
