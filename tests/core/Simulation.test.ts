@@ -128,3 +128,14 @@ describe('Simulation: velocidade do jogo', () => {
     expect(fast.state.data.world.tick).toBe(normal.state.data.world.tick * 3);
   });
 });
+
+describe('Simulation: agachado', () => {
+  it('anda a metade da velocidade (sneakMultiplier)', () => {
+    const { state, sim } = setup();
+    sim.setWorld(worldWithWall());
+    sim.setMoveIntent({ x: 0, y: 1 }, true);
+    for (let i = 0; i < 20; i++) sim.update(FIXED_STEP_MS);
+    expect(state.data.player.y).toBeCloseTo(40 + BALANCE.playerSpeed * BALANCE.sneakMultiplier);
+    expect(sim.playerSneaking).toBe(true);
+  });
+});

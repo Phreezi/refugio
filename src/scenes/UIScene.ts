@@ -22,6 +22,8 @@ const JOYSTICK_RADIUS = 24;
 const KNOB_RADIUS = 10;
 /** Fração do raio sem movimento (evita andar com um toque acidental). */
 const JOYSTICK_DEAD_ZONE = 0.25;
+/** Até esta fração do raio anda-se agachado (devagar); acima, a correr normal. */
+const JOYSTICK_SNEAK_ZONE = 0.55;
 /** Margem entre o joystick em repouso e os cantos do ecrã. */
 const JOYSTICK_MARGIN = 12;
 const IDLE_ALPHA = 0.35;
@@ -337,9 +339,16 @@ export class UIScene extends Phaser.Scene {
       }
       if (pointer.id !== this.joystickPointer) return;
       const center = this.joystickCenter;
-      const reading = readJoystick(p.x - center.x, p.y - center.y, JOYSTICK_RADIUS, JOYSTICK_DEAD_ZONE);
+      const reading = readJoystick(
+        p.x - center.x,
+        p.y - center.y,
+        JOYSTICK_RADIUS,
+        JOYSTICK_DEAD_ZONE,
+        JOYSTICK_SNEAK_ZONE,
+      );
       this.joystickKnob?.setPosition(center.x + reading.knob.x, center.y + reading.knob.y);
       moveInput.joystick = reading.direction;
+      moveInput.joystickSneak = reading.sneak;
     });
     const release = (pointer: Phaser.Input.Pointer): void => {
       const p = this.toGame(pointer);
@@ -357,6 +366,7 @@ export class UIScene extends Phaser.Scene {
     if (this.joystickPointer === null) return;
     this.joystickPointer = null;
     moveInput.joystick = { x: 0, y: 0 };
+    moveInput.joystickSneak = false;
     this.placeJoystick(this.restPosition());
     this.setJoystickVisible(true, IDLE_ALPHA);
   }

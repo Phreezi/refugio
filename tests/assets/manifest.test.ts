@@ -111,7 +111,7 @@ describe('parseManifest: spritesheets', () => {
         type: 'spritesheet',
         frameWidth: 16,
         frameHeight: 32,
-        columns: 7,
+        columns: 10,
         rows: 4,
         placeholder: {
           width: 16,

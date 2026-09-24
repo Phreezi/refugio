@@ -31,6 +31,7 @@ export class Simulation {
   private world: CollisionWorld | null = null;
   private respawnPoint: Vec2 | null = null;
   private intent: Vec2 = ZERO;
+  private sneaking = false;
   private previous: Vec2 = ZERO;
   private moved = false;
 
@@ -67,9 +68,18 @@ export class Simulation {
     this.respawnPoint = point;
   }
 
-  /** Direção pedida pelo input (é normalizada: nunca anda mais depressa na diagonal). */
-  setMoveIntent(intent: Vec2): void {
+  /**
+   * Direção pedida pelo input (é normalizada: nunca anda mais depressa na diagonal).
+   * @param sneak agachado: anda a `sneakMultiplier` da velocidade (CLAUDE.md §7.8).
+   */
+  setMoveIntent(intent: Vec2, sneak = false): void {
     this.intent = normalize(intent);
+    this.sneaking = sneak;
+  }
+
+  /** O jogador está agachado (para a animação; e, na Fase 6, para o raio de deteção). */
+  get playerSneaking(): boolean {
+    return this.sneaking;
   }
 
   /** @returns número de ticks executados. */
@@ -148,7 +158,8 @@ export class Simulation {
     if (this.world === null || isZero(this.intent)) return;
 
     player.facing = facingFromIntent(this.intent, player.facing);
-    const step = (BALANCE.playerSpeed * FIXED_STEP_MS) / 1000;
+    const speed = BALANCE.playerSpeed * (this.sneaking ? BALANCE.sneakMultiplier : 1);
+    const step = (speed * FIXED_STEP_MS) / 1000;
     const delta = { x: this.intent.x * step, y: this.intent.y * step };
     const next = moveWithCollision(player, PLAYER_FOOTPRINT, delta, this.world);
     this.moved = next.x !== player.x || next.y !== player.y;

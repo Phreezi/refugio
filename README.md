@@ -37,6 +37,7 @@ Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
 - **PC:** WASD ou setas para andar (8 direções).
 - **Telemóvel:** joystick virtual — tocar e arrastar na metade esquerda do ecrã. Funciona na
   horizontal e na vertical.
+- **Agachar** (anda devagar): Shift no PC; no telemóvel, empurrar o joystick só um pouco.
 - **Zoom:** Ctrl + roda do rato ou teclas +/− no PC; pinça com dois dedos no telemóvel (até metade).
 - **Ação** (cortar, apanhar, abrir o baú, beber no poço): Espaço ou clique no PC; botão "Ação" no
   telemóvel. A seta indica o alvo. Manter premido repete golpes.

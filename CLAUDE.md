@@ -290,7 +290,7 @@ Objetivo: **só o necessário para testar**. A arte final vem depois (Fase 12+).
 |---|---|---|
 | Tiles chão | relva, terra, areia, água, estrada, chão madeira, chão betão | 16×16 |
 | Tiles obstáculo | muro, vedação, rocha grande | 16×16 |
-| Jogador | 4 direções × (parado, andar 4 frames, atacar 2 frames) | 16×32 |
+| Jogador | 4 direções × (parado, andar 4 frames, atacar 2 frames, agachado parado + andar 2 frames) = 10 colunas | 16×32 |
 | Zombies | walker, runner, tank (cor diferente cada) | 16×32 (tank 24×32) |
 | Recursos | árvore (2 tamanhos), pedra, arbusto de bagas, erva/fibra, minério | 16×16 a 32×32 |
 | Contentores | caixa, armário, carro abandonado, mochila caída | 16×16 a 32×16 |
@@ -321,6 +321,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Ação | Teclado/rato | Touch |
 |---|---|---|
 | Mover | WASD / setas | Joystick virtual (lado esquerdo) |
+| Andar agachado (metade da velocidade) | Shift | Joystick pouco empurrado (até 55% do raio) |
 | Zoom (até metade) | Ctrl + roda do rato, +/− | Pinça com 2 dedos |
 | Velocidade do jogo x1/x2/x3 | Botão por baixo do relógio | Idem |
 | Ação contextual (bater, recolher, abrir, atacar) | Espaço / clique | Botão grande (lado direito) |
@@ -380,7 +381,7 @@ Os nós de recurso reaparecem (ver zonas).
 - **Corpo a corpo**: cada arma tem dano, velocidade, alcance, durabilidade.
 - **Distância** (Fase 10): pistola/besta com munição; mira automática ao inimigo mais próximo.
 - Inimigos **telegrafam** ataques (0,4 s de aviso com piscar) — dá para recuar.
-- Furtividade simples: andar devagar (segurar Shift / joystick parcial) reduz raio de deteção para metade.
+- Furtividade simples: andar devagar (segurar Shift / joystick parcial) reduz raio de deteção para metade. *(Andar agachado já existe desde a Fase 3: `sneakMultiplier`, frames próprios do boneco; o raio de deteção entra na Fase 6.)*
 - Armadura reduz dano em percentagem (máx. 60%).
 
 ### 7.9 Inimigos
@@ -941,5 +942,6 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Save v2: inventário, hotbar, baús, recursos apanhados por zona (id do objeto → tick de respawn), `world.rng` | Formato compacto (§10.5); migração v1 → v2 com teste |
 | 2026-09-24 | Zoom no PC só com Ctrl + roda (preventDefault para o browser não ampliar a página) | Pedido do jogador; a roda sozinha fica livre |
 | 2026-09-24 | Botão de velocidade x1/x2/x3 | Pedido do jogador: acelera todo o tempo de jogo (útil para testar e para esperas) |
+| 2026-09-24 | Andar agachado com Shift / joystick pouco empurrado (pedido do jogador) | Antecipa a furtividade da Fase 6; spritesheet da personagem passa a 10 colunas (frames agachados) |
 | 2026-09-24 | Cópia de emergência síncrona (localStorage) ao esconder/fechar a página | Testado: ao recarregar, o Chrome corta a escrita assíncrona no IndexedDB e perdiam-se os últimos segundos |
 | 2026-09-24 | Joystick virtual flutuante na metade esquerda (só toque), 8 direções, zona morta 25% | Metade direita fica livre para o botão de ação (Fase 3). O teclado tem prioridade sobre o joystick |
