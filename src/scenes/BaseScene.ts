@@ -5,6 +5,7 @@ import { BASE_MAP_KEY } from '../config';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
 import { simulation } from '../core/Simulation';
 import { getView } from '../display/view';
+import { onWorldZoomChange, stepWorldZoom, worldZoomFor } from '../display/worldZoom';
 import { keyboardDirection } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
 import { autosave } from '../save';
@@ -18,6 +19,8 @@ import { SceneKey } from './keys';
 const PLAYER_TEXTURE = 'player';
 const TILESET_TEXTURE = 'tileset_base';
 const WALK_FRAME_RATE = 8;
+/** Intervalo mínimo entre passos de zoom com a roda do rato. */
+const WHEEL_COOLDOWN_MS = 150;
 
 /**
  * Profundidades: as camadas de chão ficam por baixo de tudo, `decor_high` por cima de tudo, e
@@ -47,10 +50,16 @@ export class BaseScene extends Phaser.Scene {
     const zone = content.zoneMap(BASE_ZONE_ID);
     this.createMap();
 
-    for (const placement of zone.resources) {
-      const def = content.resources[placement.id];
-      if (!def) continue; // impossível: o mapa foi validado contra resources.json
-      this.add.image(placement.x, placement.y, def.sprite).setOrigin(0.5, 1).setDepth(placement.y);
+    // Recursos e obstáculos: pés no ponto do mapa (arredondado: posições inteiras), Y-sort.
+    const objects = [
+      ...zone.resources.map((p) => ({ p, def: content.resources[p.id] })),
+      ...zone.props.map((p) => ({ p, def: content.props[p.id] })),
+    ];
+    for (const { p, def } of objects) {
+      if (!def) continue; // impossível: o mapa foi validado contra resources.json/props.json
+      const x = Math.round(p.x);
+      const y = Math.round(p.y);
+      this.add.image(x, y, def.sprite).setOrigin(0.5, 1).setDepth(y);
     }
 
     this.createPlayerAnimations();
@@ -62,27 +71,27 @@ export class BaseScene extends Phaser.Scene {
       .setDepth(y);
 
     const camera = this.cameras.main;
-    // Em ecrãs mais largos do que o mapa, o que fica fora dele é "noite".
+    // Fora do mapa (ecrãs maiores do que ele, ou zoom afastado) vê-se "noite".
     camera.setBackgroundColor(PALETTE.ink);
-    camera.setBounds(0, 0, zone.width * zone.tileSize, zone.height * zone.tileSize);
-    // Zoom inteiro (px do dispositivo por px de jogo). Com zoom o Phaser não arredonda: o jogador
-    // e tudo o resto ficam em posições inteiras (ver renderPlayer), e a vista tem tamanho par.
-    camera.setZoom(getView().zoom);
     camera.startFollow(this.player, true);
-    const onResize = (): void => {
-      camera.setZoom(getView().zoom);
+    const applyZoom = (): void => {
+      this.applyCameraZoom(zone.width * zone.tileSize, zone.height * zone.tileSize);
     };
-    this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
+    applyZoom();
+    this.scale.on(Phaser.Scale.Events.RESIZE, applyZoom);
+    const offZoom = onWorldZoomChange(applyZoom);
+    this.listenForZoomInput();
 
     this.keys = this.createMoveKeys();
-    simulation.setWorld(CollisionWorld.fromZone(zone, content.resources));
+    simulation.setWorld(CollisionWorld.fromZone(zone, content.resources, content.props));
     simulation.setRespawnPoint(zone.playerSpawn);
     simulation.reset();
     autosave.start();
     this.scene.launch(SceneKey.UI, {});
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
+      this.scale.off(Phaser.Scale.Events.RESIZE, applyZoom);
+      offZoom();
       this.scene.stop(SceneKey.UI);
       autosave.stop();
       void autosave.flush();
@@ -101,6 +110,46 @@ export class BaseScene extends Phaser.Scene {
     // 16,7 ms com a janela sem foco, o que atrasaria o relógio do jogo.
     simulation.update(this.game.loop.rawDelta);
     this.renderPlayer();
+  }
+
+  /**
+   * Zoom inteiro escolhido pelo jogador (ver display/worldZoom.ts). Com zoom o Phaser não
+   * arredonda: o jogador e tudo o resto ficam em posições inteiras (ver renderPlayer) e a vista
+   * tem tamanho par, por isso cada píxel de jogo cai em píxeis inteiros do dispositivo.
+   * Se se vê mais do que o mapa, os limites alargam-se para o mapa ficar centrado.
+   */
+  private applyCameraZoom(mapWidth: number, mapHeight: number): void {
+    const view = getView();
+    const zoom = worldZoomFor(view.zoom);
+    const visibleWidth = (view.width * view.zoom) / zoom;
+    const visibleHeight = (view.height * view.zoom) / zoom;
+    const bx = Math.min(0, (mapWidth - visibleWidth) / 2);
+    const by = Math.min(0, (mapHeight - visibleHeight) / 2);
+    const camera = this.cameras.main;
+    camera.setZoom(zoom);
+    camera.setBounds(bx, by, Math.max(mapWidth, visibleWidth), Math.max(mapHeight, visibleHeight));
+  }
+
+  /** Roda do rato e teclas +/− (a pinça com 2 dedos está na UIScene, que recebe os toques). */
+  private listenForZoomInput(): void {
+    let lastWheel = 0;
+    this.input.on(
+      Phaser.Input.Events.POINTER_WHEEL,
+      (_pointer: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number) => {
+        // Um "clique" da roda gera vários eventos (sobretudo em touchpads): um passo por 150 ms.
+        if (dy === 0 || this.time.now - lastWheel < WHEEL_COOLDOWN_MS) return;
+        lastWheel = this.time.now;
+        stepWorldZoom(dy < 0 ? 1 : -1, getView().zoom);
+      },
+    );
+    const zoomIn = (): void => {
+      stepWorldZoom(1, getView().zoom);
+    };
+    const zoomOut = (): void => {
+      stepWorldZoom(-1, getView().zoom);
+    };
+    for (const key of ['PLUS', 'NUMPAD_ADD']) this.input.keyboard?.on(`keydown-${key}`, zoomIn);
+    for (const key of ['MINUS', 'NUMPAD_SUBTRACT']) this.input.keyboard?.on(`keydown-${key}`, zoomOut);
   }
 
   private createMap(): void {

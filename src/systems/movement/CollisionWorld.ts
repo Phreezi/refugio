@@ -1,4 +1,4 @@
-import type { ResourceDefs } from '../../data/types';
+import type { WorldObjectDef } from '../../data/types';
 import type { ZoneMap } from '../../world/zoneMap';
 import { footprintRect, overlaps, type Rect } from './geometry';
 
@@ -30,12 +30,20 @@ export class CollisionWorld {
     this.obstacles = obstacles;
   }
 
-  static fromZone(map: ZoneMap, resources: ResourceDefs): CollisionWorld {
+  static fromZone(
+    map: ZoneMap,
+    resources: Readonly<Record<string, WorldObjectDef>>,
+    props: Readonly<Record<string, WorldObjectDef>> = {},
+  ): CollisionWorld {
     const obstacles: Rect[] = [];
-    for (const placement of map.resources) {
-      const footprint = resources[placement.id]?.footprint;
-      if (footprint) obstacles.push(footprintRect(placement, footprint));
-    }
+    const add = (placements: ZoneMap['resources'], defs: Readonly<Record<string, WorldObjectDef>>): void => {
+      for (const placement of placements) {
+        const footprint = defs[placement.id]?.footprint;
+        if (footprint) obstacles.push(footprintRect(placement, footprint));
+      }
+    };
+    add(map.resources, resources);
+    add(map.props, props);
     return new CollisionWorld(map.width, map.height, map.tileSize, map.solid, obstacles);
   }
 

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { computePixelScale, type PixelScaleOptions } from '../../src/display/pixelScale';
 
-const OPTIONS: PixelScaleOptions = { targetHeight: 400, minHeight: 240, minAspect: 4 / 3, maxAspect: 21 / 9 };
+const OPTIONS: PixelScaleOptions = {
+  targetHeight: 400,
+  minHeight: 240,
+  minAspect: 9 / 21,
+  maxAspect: 21 / 9,
+};
 const TOUCH: PixelScaleOptions = { ...OPTIONS, targetHeight: 320 };
 
 describe('computePixelScale', () => {
@@ -89,17 +94,28 @@ describe('computePixelScale', () => {
     expect(s.offsetX).toBe(40);
   });
 
-  it('janela estreita: altura reduzida para manter pelo menos 4:3', () => {
-    const s = computePixelScale(800, 900, 1, OPTIONS);
-    expect(s.gameWidth / s.gameHeight).toBeGreaterThanOrEqual(4 / 3 - 0.01);
+  it('telemóvel ao alto (412×915 @ 2,625): o alvo aplica-se ao lado curto, vê-se uma área alta', () => {
+    const s = computePixelScale(412, 915, 2.625, { ...OPTIONS, targetHeight: 270 });
+    expect(s.deviceZoom).toBe(4);
+    expect(s.gameWidth).toBe(270);
+    expect(s.gameHeight).toBe(600);
+    expect(s.offsetX).toBe(0);
+  });
+
+  it('janela extremamente estreita: barras em cima e em baixo para não passar de 9:21', () => {
+    const s = computePixelScale(300, 2000, 1, OPTIONS);
+    expect(s.gameWidth / s.gameHeight).toBeGreaterThanOrEqual(9 / 21 - 0.01);
     expect(s.offsetY).toBeGreaterThan(0);
   });
 
-  it('ecrã minúsculo → tamanho mínimo com zoom fracionário', () => {
+  it('ecrã minúsculo → lado curto mínimo com zoom fracionário (também ao alto)', () => {
     const s = computePixelScale(320, 180, 1, OPTIONS);
     expect(s.gameHeight).toBe(240);
     expect(s.deviceZoom).toBeCloseTo(0.75);
     expect(s.cssHeight).toBeCloseTo(180);
+    const tall = computePixelScale(180, 320, 1, OPTIONS);
+    expect(tall.gameWidth).toBe(240);
+    expect(tall.cssWidth).toBeCloseTo(180);
   });
 
   it('valores inválidos não rebentam', () => {

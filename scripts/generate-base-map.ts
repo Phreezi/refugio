@@ -104,19 +104,23 @@ for (const [x, y] of [
   collision[at(x, y)] = 'boulder';
 }
 
-// Objetos: recursos espalhados em tiles livres, longe do caminho, da casa e da entrada.
+// Objetos: posição livre (não presa à grelha), para parecer natural. O ponto são os pés.
 interface Placement {
   name: string;
-  tx: number;
-  ty: number;
+  x: number;
+  y: number;
 }
 const placements: Placement[] = [];
 const taken = new Set<number>();
-function free(tx: number, ty: number, clearance: number): boolean {
-  if (tx < 2 || ty < 2 || tx > W - 3 || ty > H - 3) return false;
-  if (Math.abs(tx - SPAWN.tx) <= 4 && Math.abs(ty - SPAWN.ty) <= 4) return false;
-  for (let y = ty - clearance; y <= ty + clearance; y++) {
-    for (let x = tx - clearance; x <= tx + clearance; x++) {
+
+/** Área (em tiles) livre de colisões, caminho, casa, outros objetos e da zona de entrada? */
+function freeArea(x0: number, y0: number, x1: number, y1: number, nearSpawnOk = false): boolean {
+  if (x0 < 2 || y0 < 1 || x1 > W - 3 || y1 > H - 3) return false;
+  if (!nearSpawnOk && Math.abs((x0 + x1) / 2 - SPAWN.tx) <= 4 && Math.abs((y0 + y1) / 2 - SPAWN.ty) <= 4) {
+    return false;
+  }
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
       const i = at(x, y);
       if (taken.has(i) || collision[i] !== null) return false;
       const g = ground[i];
@@ -125,23 +129,65 @@ function free(tx: number, ty: number, clearance: number): boolean {
   }
   return true;
 }
-function scatter(id: string, count: number, clearance: number): void {
+
+function take(x0: number, y0: number, x1: number, y1: number): void {
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) taken.add(at(x, y));
+}
+
+/** Pés num ponto aleatório dentro do tile (sem encostar às arestas). */
+function feetIn(tx: number, ty: number): { x: number; y: number } {
+  return { x: tx * TILE + 4 + Math.floor(random() * 9), y: (ty + 1) * TILE - 1 - Math.floor(random() * 4) };
+}
+
+/**
+ * Obstáculo colocado à mão. `wTiles`/`hTiles` = tamanho aproximado do sprite em tiles; a área
+ * ocupada fica reservada. Lança erro se o sítio não estiver livre (mapa mal desenhado).
+ */
+function place(id: string, tx: number, ty: number, wTiles: number, hTiles: number): void {
+  const x0 = tx - Math.floor((wTiles - 1) / 2);
+  const x1 = x0 + wTiles - 1;
+  const y0 = ty - hTiles + 1;
+  if (!freeArea(x0 - 1, y0, x1 + 1, ty + 1, true))
+    throw new Error(`prop:${id} em (${String(tx)}, ${String(ty)}) não cabe`);
+  take(x0 - 1, y0, x1 + 1, ty + 1);
+  const offset = wTiles % 2 === 0 ? TILE / 2 : 0; // largura par: centro na aresta entre tiles
+  placements.push({ name: `prop:${id}`, x: tx * TILE + TILE / 2 + offset, y: (ty + 1) * TILE - 2 });
+}
+
+/** Espalha `count` objetos por tiles livres (com `clearance` tiles à volta). */
+function scatter(kind: 'resource' | 'prop', id: string, count: number, clearance: number, hTiles = 1): void {
   let placed = 0;
-  for (let attempt = 0; placed < count && attempt < count * 200; attempt++) {
+  for (let attempt = 0; placed < count && attempt < count * 300; attempt++) {
     const tx = 2 + Math.floor(random() * (W - 4));
     const ty = 2 + Math.floor(random() * (H - 4));
-    if (!free(tx, ty, clearance)) continue;
-    taken.add(at(tx, ty));
-    placements.push({ name: `resource:${id}`, tx, ty });
+    const box = [tx - clearance, ty - hTiles + 1 - clearance, tx + clearance, ty + clearance] as const;
+    if (!freeArea(...box)) continue;
+    take(tx, ty - hTiles + 1, tx, ty);
+    placements.push({ name: `${kind}:${id}`, ...feetIn(tx, ty) });
     placed++;
   }
   if (placed < count) throw new Error(`Só coube ${String(placed)}/${String(count)} de ${id}`);
 }
-scatter('tree_large', 8, 2);
-scatter('tree_small', 22, 1);
-scatter('rock', 8, 1);
-scatter('bush_berries', 6, 1);
-scatter('tall_grass', 14, 0);
+
+// Obstáculos à mão: o poço junto à casa, um carro abandonado perto do caminho, cantos com tralha.
+place('well', 34, 17, 2, 2);
+place('car_wreck', 37, 31, 3, 2);
+place('crate', 32, 22, 1, 1);
+place('barrel', 35, 23, 1, 2);
+place('crate', 17, 21, 1, 1);
+place('log', 13, 34, 3, 1);
+place('log', 40, 9, 3, 1);
+place('fence_broken', 5, 21, 2, 1);
+place('fence_broken', 29, 40, 2, 1);
+place('fence_broken', 42, 20, 2, 1);
+
+scatter('resource', 'tree_large', 8, 2, 3);
+scatter('resource', 'tree_small', 22, 1, 2);
+scatter('prop', 'stump', 5, 1);
+scatter('resource', 'rock', 8, 1);
+scatter('resource', 'bush_berries', 6, 1);
+scatter('resource', 'tall_grass', 14, 0);
+scatter('prop', 'pebbles', 12, 0);
 
 const gid = (tile: BaseTile | null): number => (tile === null ? 0 : baseTileIndex(tile) + 1);
 let nextObjectId = 1;
@@ -158,14 +204,11 @@ const point = (name: string, x: number, y: number) => ({
   visible: true,
 });
 
-// Recursos: o ponto são os pés (meio do fundo do tile, 2 px acima da aresta).
 const objects = [
   point('player_spawn', SPAWN.tx * TILE + TILE / 2, SPAWN.ty * TILE + TILE / 2),
   point('exit', (W - 1) * TILE + TILE / 2, PATH_Y[1] * TILE),
   point('exit', PATH_X[1] * TILE, (H - 1) * TILE + TILE / 2),
-  ...placements
-    .sort((a, b) => a.ty - b.ty || a.tx - b.tx)
-    .map((p) => point(p.name, p.tx * TILE + TILE / 2, (p.ty + 1) * TILE - 2)),
+  ...placements.sort((a, b) => a.y - b.y || a.x - b.x).map((p) => point(p.name, p.x, p.y)),
 ];
 
 let nextLayerId = 1;

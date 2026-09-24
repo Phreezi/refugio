@@ -39,6 +39,8 @@ export interface ZoneMap {
   playerSpawn: Point;
   exits: readonly Point[];
   resources: readonly ResourcePlacement[];
+  /** Obstáculos/decoração `prop:<id>` (posição livre; ponto = pés). */
+  props: readonly ResourcePlacement[];
   containers: readonly TaggedPoint[];
   enemySpawns: readonly TaggedPoint[];
 }
@@ -49,6 +51,8 @@ export interface ZoneMapRules {
   tilesets: Readonly<Record<string, number>>;
   /** Ids válidos em `resource:<id>`. */
   resourceIds: Iterable<string>;
+  /** Ids válidos em `prop:<id>`. */
+  propIds: Iterable<string>;
 }
 
 export class ZoneMapError extends Error {
@@ -194,6 +198,8 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
   }
 
   const resourceIds = new Set(rules.resourceIds);
+  const propIds = new Set(rules.propIds);
+  const props: ResourcePlacement[] = [];
   const spawns: Point[] = [];
   const exits: Point[] = [];
   const resources: ResourcePlacement[] = [];
@@ -225,11 +231,14 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
       else if (kind === 'resource' && id !== null) {
         if (resourceIds.has(id)) resources.push({ id, ...point });
         else problems.push(`${label}: recurso desconhecido "${id}"`);
+      } else if (kind === 'prop' && id !== null) {
+        if (propIds.has(id)) props.push({ id, ...point });
+        else problems.push(`${label}: obstáculo desconhecido "${id}"`);
       } else if (kind === 'container' && id) containers.push({ id, ...point });
       else if (kind === 'enemy_spawn' && id) enemySpawns.push({ id, ...point });
       else {
         problems.push(
-          `${label}: nome inválido (player_spawn, exit, resource:<id>, container:<id>, enemy_spawn:<id>)`,
+          `${label}: nome inválido (player_spawn, exit, resource:<id>, prop:<id>, container:<id>, enemy_spawn:<id>)`,
         );
       }
     }
@@ -254,6 +263,7 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
     playerSpawn: spawn,
     exits,
     resources,
+    props,
     containers,
     enemySpawns,
   };

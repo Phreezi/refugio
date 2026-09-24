@@ -5,6 +5,7 @@ import { eventBus } from '../core/EventBus';
 import { gameState, type PlayerState } from '../core/GameState';
 import { BALANCE } from '../data/balance';
 import { getView, setupFixedCamera } from '../display/view';
+import { pinchStep, stepWorldZoom } from '../display/worldZoom';
 import { t, type MessageKey } from '../i18n';
 import { readJoystick } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
@@ -157,8 +158,26 @@ export class UIScene extends Phaser.Scene {
     this.placeJoystick(this.restPosition());
     this.setJoystickVisible(this.sys.game.device.input.touch, IDLE_ALPHA);
 
+    // Dedos no ecrã (px do dispositivo), para a pinça: com 2 dedos o joystick larga e faz-se zoom.
+    const touches = new Map<number, { x: number; y: number }>();
+    let pinching = false;
+    let pinchDistance = 0;
+    const distance = (): number => {
+      const [a, b] = [...touches.values()];
+      return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+    };
+
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
-      if (!pointer.wasTouch || this.joystickPointer !== null) return;
+      if (!pointer.wasTouch) return;
+      touches.set(pointer.id, { x: pointer.x, y: pointer.y });
+      if (touches.size >= 2) {
+        // Segundo dedo: começa a pinça (até levantar todos os dedos, não há joystick).
+        pinching = true;
+        pinchDistance = distance();
+        this.releaseJoystick();
+        return;
+      }
+      if (pinching || this.joystickPointer !== null) return;
       const p = this.toGame(pointer);
       if (p.x >= getView().width / 2) return; // metade direita: botão de ação (Fase 3)
       this.joystickPointer = pointer.id;
@@ -166,6 +185,16 @@ export class UIScene extends Phaser.Scene {
       this.setJoystickVisible(true, ACTIVE_ALPHA);
     });
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointer: Phaser.Input.Pointer) => {
+      if (touches.has(pointer.id)) touches.set(pointer.id, { x: pointer.x, y: pointer.y });
+      if (pinching && touches.size >= 2) {
+        const now = distance();
+        const step = pinchStep(pinchDistance, now);
+        if (step !== 0) {
+          stepWorldZoom(step, getView().zoom);
+          pinchDistance = now;
+        }
+        return;
+      }
       if (pointer.id !== this.joystickPointer) return;
       const p = this.toGame(pointer);
       const center = this.joystickCenter;
@@ -174,14 +203,20 @@ export class UIScene extends Phaser.Scene {
       moveInput.joystick = reading.direction;
     });
     const release = (pointer: Phaser.Input.Pointer): void => {
-      if (pointer.id !== this.joystickPointer) return;
-      this.joystickPointer = null;
-      moveInput.joystick = { x: 0, y: 0 };
-      this.placeJoystick(this.restPosition());
-      this.setJoystickVisible(true, IDLE_ALPHA);
+      touches.delete(pointer.id);
+      if (touches.size === 0) pinching = false;
+      if (pointer.id === this.joystickPointer) this.releaseJoystick();
     };
     this.input.on(Phaser.Input.Events.POINTER_UP, release);
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, release);
+  }
+
+  private releaseJoystick(): void {
+    if (this.joystickPointer === null) return;
+    this.joystickPointer = null;
+    moveInput.joystick = { x: 0, y: 0 };
+    this.placeJoystick(this.restPosition());
+    this.setJoystickVisible(true, IDLE_ALPHA);
   }
 
   /** Coordenadas do ponteiro em píxeis de jogo (o canvas está em píxeis do dispositivo). */

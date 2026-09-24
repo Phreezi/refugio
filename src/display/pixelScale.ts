@@ -7,7 +7,7 @@ export interface PixelScaleOptions {
    * dela; a largura acompanha o formato do ecrã. Mais alto = mais tiles no ecrã, tudo mais pequeno.
    */
   targetHeight: number;
-  /** Abaixo disto o zoom passa a fracionário (ecrãs minúsculos), para a UI caber sempre. */
+  /** Lado curto mínimo: abaixo disto o zoom passa a fracionário (ecrãs minúsculos), para a UI caber. */
   minHeight: number;
   /** Proporção largura/altura permitida; fora dela ficam barras (ex.: janelas estreitas, ultrawide). */
   minAspect: number;
@@ -55,23 +55,34 @@ export function computePixelScale(
   const deviceHeight = Math.floor(valid(viewportCssHeight) * dpr + EPSILON);
   const { targetHeight, minHeight, minAspect, maxAspect } = options;
 
-  let deviceZoom = Math.max(1, Math.round(deviceHeight / targetHeight));
+  // O alvo aplica-se ao lado MAIS CURTO: ao alto (telemóvel na vertical) as coisas ficam do
+  // mesmo tamanho e vê-se uma área mais alta do que larga.
+  const shortSide = Math.min(deviceWidth, deviceHeight);
+  let deviceZoom = Math.max(1, Math.round(shortSide / targetHeight));
   let gameHeight = Math.floor(deviceHeight / deviceZoom);
   let gameWidth = Math.floor(deviceWidth / deviceZoom);
 
-  // Janela mais estreita do que minAspect: o jogo fica mais baixo (barras em cima e em baixo).
-  if (gameWidth < gameHeight * minAspect) gameHeight = Math.floor(gameWidth / minAspect);
+  // Proporções extremas (janelas muito estreitas/largas): barras em vez de esticar a vista.
+  gameHeight = Math.min(gameHeight, Math.floor(gameWidth / minAspect));
   gameWidth = Math.min(gameWidth, Math.floor(gameHeight * maxAspect));
   gameWidth -= gameWidth % 2;
   gameHeight -= gameHeight % 2;
 
-  // Ecrã minúsculo (ou inválido): tamanho mínimo, reduzido com zoom fracionário.
-  if (gameHeight < minHeight) {
-    gameHeight = minHeight;
-    gameWidth = Math.max(
-      Math.round(minHeight * minAspect),
-      Math.min(gameWidth, Math.floor(minHeight * maxAspect)),
-    );
+  // Ecrã minúsculo (ou inválido): o lado curto fica com o mínimo, com zoom fracionário.
+  if (Math.min(gameWidth, gameHeight) < minHeight) {
+    const portrait = deviceHeight > deviceWidth;
+    const ratio = deviceWidth > 0 && deviceHeight > 0 ? deviceWidth / deviceHeight : 16 / 9;
+    const aspect = Math.max(minAspect, Math.min(maxAspect, ratio));
+    // Arredondar para baixo (e para par): o lado longo nunca obriga a reduzir mais o zoom.
+    if (portrait) {
+      gameWidth = minHeight;
+      gameHeight = Math.floor(minHeight / aspect);
+    } else {
+      gameHeight = minHeight;
+      gameWidth = Math.floor(minHeight * aspect);
+    }
+    gameWidth -= gameWidth % 2;
+    gameHeight -= gameHeight % 2;
     const fit = Math.min(deviceWidth / gameWidth, deviceHeight / gameHeight);
     deviceZoom = fit > 0 ? Math.min(1, fit) : 1;
   }

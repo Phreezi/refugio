@@ -4,7 +4,6 @@
   "menu.hint": "Tap the button or press Enter",
   "boot.loading": "Loading…",
   "boot.error": "Error while starting the game:",
-  "display.rotate": "⟳\nRotate your device\nto play in landscape",
   "menu.continue": "Continue (day {day})",
   "menu.confirm_new": "Erase and restart?",
   "save.export": "Export",
