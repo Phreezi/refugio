@@ -80,6 +80,15 @@ function stone(
   img.ellipse(cx - rx * 0.35, cy - ry * 0.45, rx * 0.35, ry * 0.3, c(light));
 }
 
+/** Garrafa (ícones de água); `water` = cor do conteúdo, null = vazia. */
+function bottle(img: Bitmap, water: string | null): void {
+  img.fill(6, 2, 4, 2, c('bark')); // rolha
+  img.fill(6, 4, 4, 2, c('ice'));
+  img.ellipse(8, 10, 4.5, 4.5, c('ice'));
+  if (water) img.ellipse(8, 11, 3.5, 3, c(water));
+  img.fill(6, 8, 1, 3, c('cream')); // reflexo
+}
+
 interface Sprite {
   file: string;
   width: number;
@@ -376,19 +385,224 @@ const SPRITES: Sprite[] = [
       img.fill(13, 10, 5, 4, c('wood_light'));
     },
   },
+
+  {
+    file: 'chest',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 14.5, 7, 1.5);
+      img.fill(2, 4, 12, 10, c('wood'));
+      img.fill(2, 4, 12, 4, c('wood_light')); // tampa
+      img.fill(2, 8, 12, 1, c('bark_dark'));
+      img.fill(2, 13, 12, 1, c('bark'));
+      img.fill(2, 4, 1, 10, c('bark'));
+      img.fill(13, 4, 1, 10, c('bark_dark'));
+      img.fill(7, 7, 2, 3, c('gold')); // fecho
+      img.set(7, 9, c('amber'));
+    },
+  },
+];
+
+/** Ícones de itens (16×16, sem sombra). */
+const ICONS: Sprite[] = [
+  {
+    file: 'wood',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (const [y, x] of [
+        [9, 2],
+        [5, 5],
+      ] as const) {
+        img.fill(x, y, 9, 4, c('bark'));
+        img.fill(x, y, 9, 1, c('wood'));
+        img.ellipse(x + 9, y + 2, 1.8, 2.2, c('wood_light'));
+        img.set(x + 9, y + 2, c('wood'));
+      }
+    },
+  },
+  {
+    file: 'stone',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      stone(img, 6, 10, 4.5, 3.5);
+      stone(img, 11, 7, 3.5, 3);
+    },
+  },
+  {
+    file: 'fiber',
+    width: 16,
+    height: 16,
+    outline: 'forest_dark',
+    paint: (img) => {
+      for (let i = 0; i < 5; i++) {
+        for (let y = 2; y < 14; y++) img.set(4 + i * 2 + (y < 7 ? 1 : 0), y, c(i % 2 ? 'lime' : 'leaf'));
+      }
+      img.fill(3, 9, 11, 2, c('wheat')); // atilho
+    },
+  },
+  {
+    file: 'berries',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (const [x, y] of [
+        [5, 9],
+        [9, 10],
+        [7, 6],
+        [11, 6],
+      ] as const) {
+        img.ellipse(x, y, 2.5, 2.5, c('red'));
+        img.set(x - 1, y - 1, c('rose'));
+      }
+      img.fill(8, 2, 1, 3, c('forest'));
+      img.fill(9, 2, 3, 1, c('leaf'));
+    },
+  },
+  {
+    file: 'water_clean',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      bottle(img, 'sky');
+    },
+  },
+  {
+    file: 'water_dirty',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      bottle(img, 'teal');
+    },
+  },
+  {
+    file: 'empty_bottle',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      bottle(img, null);
+    },
+  },
+  {
+    file: 'stone_axe',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 11; i++) img.set(3 + i, 13 - i, c('wood')); // cabo
+      for (let i = 0; i < 10; i++) img.set(4 + i, 13 - i, c('bark'));
+      stone(img, 11, 5, 3.5, 3);
+    },
+  },
+  {
+    file: 'stone_pickaxe',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 10; i++) img.fill(7 + (i > 6 ? 0 : 0), 4 + i, 2, 1, c(i % 3 ? 'wood' : 'bark'));
+      for (let x = 2; x < 14; x++) img.set(x, 4 - Math.round(Math.abs(x - 8) / 3), c('stone'));
+      for (let x = 3; x < 13; x++) img.set(x, 5 - Math.round(Math.abs(x - 8) / 3), c('stone_dark'));
+    },
+  },
+  {
+    file: 'raw_meat',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 8, 5.5, 4.5, c('red'));
+      img.ellipse(7, 7, 3.5, 2.5, c('rose'));
+      img.ellipse(11, 10, 1.5, 1.5, c('cream')); // osso
+    },
+  },
+  {
+    file: 'cooked_meat',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 8, 5.5, 4.5, c('bark'));
+      img.ellipse(7, 7, 3.5, 2.5, c('wood'));
+      img.ellipse(11, 10, 1.5, 1.5, c('cream'));
+    },
+  },
+  {
+    file: 'wood_plank',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (const y of [4, 8]) {
+        img.fill(2, y, 12, 3, c('wood_light'));
+        img.fill(2, y + 2, 12, 1, c('wood'));
+        img.set(4, y + 1, c('bark'));
+      }
+    },
+  },
+  {
+    file: 'rope',
+    width: 16,
+    height: 16,
+    outline: 'bark_dark',
+    paint: (img) => {
+      img.ellipse(8, 8, 5.5, 4.5, c('wheat'));
+      img.ellipse(8, 8, 3, 2, c('sand'));
+      img.ellipse(8, 8, 1.5, 1, c('wheat'));
+    },
+  },
+  {
+    file: 'canned_food',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(4, 4, 8, 10, c('stone_light'));
+      img.fill(4, 6, 8, 5, c('red'));
+      img.fill(6, 7, 4, 3, c('wheat'));
+      img.ellipse(8, 4, 4, 1.5, c('stone'));
+    },
+  },
+  {
+    file: 'iron_ore',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      stone(img, 8, 9, 5.5, 4.5, ['shadow', 'stone_dark', 'stone']);
+      img.set(6, 8, c('orange'));
+      img.set(9, 10, c('orange'));
+      img.set(10, 7, c('amber'));
+    },
+  },
 ];
 
 const outDir = new URL('public/assets/sprites/', ROOT);
-mkdirSync(outDir, { recursive: true });
+const iconDir = new URL('icons/', outDir);
+mkdirSync(iconDir, { recursive: true });
 const rendered: Bitmap[] = [];
-for (const sprite of SPRITES) {
-  const img = new Bitmap(sprite.width, sprite.height);
-  sprite.paint(img);
-  if (sprite.outline) img.outline(c(sprite.outline));
-  writeFileSync(new URL(`${sprite.file}.png`, outDir), img.toPng());
-  rendered.push(img);
+for (const [dir, list] of [
+  [outDir, SPRITES],
+  [iconDir, ICONS],
+] as const) {
+  for (const sprite of list) {
+    const img = new Bitmap(sprite.width, sprite.height);
+    sprite.paint(img);
+    if (sprite.outline) img.outline(c(sprite.outline));
+    writeFileSync(new URL(`${sprite.file}.png`, dir), img.toPng());
+    rendered.push(img);
+  }
 }
-console.log(`sprites/: ${String(SPRITES.length)} sprites`);
+console.log(`sprites/: ${String(SPRITES.length)} sprites + ${String(ICONS.length)} ícones`);
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).
 const previewIndex = process.argv.indexOf('--preview');

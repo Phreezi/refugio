@@ -1,0 +1,221 @@
+{
+  "$comment": "Itens (CLAUDE.md §9). name = chave i18n; icon = chave do manifest. Validado no arranque e no validate-data.",
+  "wood": {
+    "name": "item.wood",
+    "icon": "icon_wood",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common"
+  },
+  "stone": {
+    "name": "item.stone",
+    "icon": "icon_stone",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common"
+  },
+  "fiber": {
+    "name": "item.fiber",
+    "icon": "icon_fiber",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common"
+  },
+  "clay": {
+    "name": "item.clay",
+    "icon": "icon_clay",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common"
+  },
+  "iron_ore": {
+    "name": "item.iron_ore",
+    "icon": "icon_iron_ore",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "uncommon"
+  },
+  "scrap_metal": {
+    "name": "item.scrap_metal",
+    "icon": "icon_scrap_metal",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common"
+  },
+  "nails": {
+    "name": "item.nails",
+    "icon": "icon_nails",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common"
+  },
+  "cloth": {
+    "name": "item.cloth",
+    "icon": "icon_cloth",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common"
+  },
+  "leather": {
+    "name": "item.leather",
+    "icon": "icon_leather",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "uncommon"
+  },
+  "wood_plank": {
+    "name": "item.wood_plank",
+    "icon": "icon_wood_plank",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common"
+  },
+  "rope": {
+    "name": "item.rope",
+    "icon": "icon_rope",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "common"
+  },
+  "berries": {
+    "name": "item.berries",
+    "icon": "icon_berries",
+    "type": "consumable",
+    "stack": 20,
+    "rarity": "common",
+    "effects": {
+      "hunger": 8,
+      "thirst": 2
+    }
+  },
+  "raw_meat": {
+    "name": "item.raw_meat",
+    "icon": "icon_raw_meat",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "common",
+    "effects": {
+      "hunger": 5,
+      "hp": -2
+    }
+  },
+  "cooked_meat": {
+    "name": "item.cooked_meat",
+    "icon": "icon_cooked_meat",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "common",
+    "effects": {
+      "hunger": 30
+    }
+  },
+  "fish": {
+    "name": "item.fish",
+    "icon": "icon_fish",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "common",
+    "effects": {
+      "hunger": 6
+    }
+  },
+  "canned_food": {
+    "name": "item.canned_food",
+    "icon": "icon_canned_food",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "uncommon",
+    "effects": {
+      "hunger": 25,
+      "thirst": 5
+    }
+  },
+  "water_dirty": {
+    "name": "item.water_dirty",
+    "icon": "icon_water_dirty",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "common",
+    "effects": {
+      "thirst": 15,
+      "hp": -3
+    },
+    "returns": "empty_bottle"
+  },
+  "water_clean": {
+    "name": "item.water_clean",
+    "icon": "icon_water_clean",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "common",
+    "effects": {
+      "thirst": 35
+    },
+    "returns": "empty_bottle"
+  },
+  "bandage": {
+    "name": "item.bandage",
+    "icon": "icon_bandage",
+    "type": "consumable",
+    "stack": 10,
+    "rarity": "uncommon",
+    "effects": {
+      "hp": 20
+    }
+  },
+  "empty_bottle": {
+    "name": "item.empty_bottle",
+    "icon": "icon_empty_bottle",
+    "type": "tool",
+    "stack": 10,
+    "rarity": "common"
+  },
+  "stone_axe": {
+    "name": "item.stone_axe",
+    "icon": "icon_stone_axe",
+    "type": "tool",
+    "stack": 1,
+    "rarity": "common",
+    "toolKind": "axe",
+    "gatherPower": 2,
+    "damage": 8,
+    "durability": 120
+  },
+  "stone_pickaxe": {
+    "name": "item.stone_pickaxe",
+    "icon": "icon_stone_pickaxe",
+    "type": "tool",
+    "stack": 1,
+    "rarity": "common",
+    "toolKind": "pickaxe",
+    "gatherPower": 2,
+    "damage": 7,
+    "durability": 120
+  },
+  "wooden_club": {
+    "name": "item.wooden_club",
+    "icon": "icon_wooden_club",
+    "type": "weapon",
+    "stack": 1,
+    "rarity": "common",
+    "damage": 10,
+    "durability": 100
+  },
+  "cloth_shirt": {
+    "name": "item.cloth_shirt",
+    "icon": "icon_cloth_shirt",
+    "type": "armor",
+    "stack": 1,
+    "rarity": "common",
+    "durability": 150,
+    "armor": 5
+  },
+  "small_backpack": {
+    "name": "item.small_backpack",
+    "icon": "icon_small_backpack",
+    "type": "backpack",
+    "stack": 1,
+    "rarity": "uncommon",
+    "slots": 10
+  }
+}

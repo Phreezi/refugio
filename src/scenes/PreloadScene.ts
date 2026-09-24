@@ -4,9 +4,10 @@ import { paletteNumber } from '../assets/palette';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
 import { BASE_MAP_FILE, BASE_MAP_KEY, TILE_SIZE } from '../config';
 import { BASE_ZONE_ID } from '../core/GameState';
+import itemsJson from '../data/items.json';
 import propsJson from '../data/props.json';
 import resourcesJson from '../data/resources.json';
-import { parseProps, parseResources } from '../data/types';
+import { parseItems, parseProps, parseResources } from '../data/types';
 import { getView, setupFixedCamera } from '../display/view';
 import { t } from '../i18n';
 import { Label } from '../ui/text';
@@ -90,7 +91,9 @@ export class PreloadScene extends Phaser.Scene {
 
   /** Valida o conteúdo data-driven (recursos, mapas) e deixa-o pronto para as cenas. */
   private loadContent(manifest: AssetManifest): void {
-    const resources = parseResources(resourcesJson, Object.keys(manifest.assets));
+    const items = parseItems(itemsJson, Object.keys(manifest.assets));
+    content.setItems(items);
+    const resources = parseResources(resourcesJson, Object.keys(manifest.assets), Object.keys(items));
     content.setResources(resources);
     const props = parseProps(propsJson, Object.keys(manifest.assets));
     content.setProps(props);

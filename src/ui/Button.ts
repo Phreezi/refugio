@@ -24,6 +24,7 @@ export interface ButtonOptions {
  * E acabar no botão.
  */
 export class Button {
+  private readonly border: Phaser.GameObjects.Rectangle;
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly label: Label;
   private style: ButtonStyle;
@@ -41,7 +42,7 @@ export class Button {
     const height = options.height + (options.height % 2);
     this.style = options.style ?? 'primary';
     const colors = COLORS[this.style];
-    scene.add.rectangle(x, y, width + 2, height + 2, paletteNumber('bark_dark'));
+    this.border = scene.add.rectangle(x, y, width + 2, height + 2, paletteNumber('bark_dark'));
     this.fill = scene.add.rectangle(x, y, width, height, paletteNumber(colors.fill));
     this.label = new Label(
       scene,
@@ -71,6 +72,19 @@ export class Button {
         if (pressed) onClick();
         pressed = false;
       });
+  }
+
+  setDepth(depth: number): this {
+    this.border.setDepth(depth);
+    this.fill.setDepth(depth);
+    this.label.setDepth(depth);
+    return this;
+  }
+
+  destroy(): void {
+    this.border.destroy();
+    this.fill.destroy();
+    this.label.destroy();
   }
 
   setText(text: string): this {

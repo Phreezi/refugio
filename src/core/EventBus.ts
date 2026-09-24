@@ -11,6 +11,22 @@ export interface GameEvents {
   'world:tick': { tick: number };
   /** A vida chegou a 0; o jogador já reapareceu na base (CLAUDE.md §7.12). */
   'player:died': { zoneId: string };
+  /** O jogador fez a ação contextual (para a animação de ataque/recolha). */
+  'player:action': { kind: 'gather' | 'use' | 'open' | 'swing' };
+  /** Um recurso levou um golpe (hp restante; 0 = apanhado). */
+  'resource:hit': { zoneId: string; objectId: number; hp: number; maxHp: number };
+  'resource:respawned': { zoneId: string; objectId: number };
+  /** Itens ganhos num sítio do mundo (texto flutuante). */
+  'item:gained': { item: string; qty: number; x: number; y: number };
+  /** Algum contentor do jogador ou baú mudou (a UI redesenha-se). */
+  'inventory:changed': Record<string, never>;
+  /** Uma ferramenta chegou a 0 de durabilidade e partiu-se. */
+  'item:broken': { item: string };
+  'player:consumed': { item: string };
+  /** A ação não foi possível (a UI mostra o motivo). */
+  'action:blocked': { reason: 'needs_tool' | 'inventory_full'; tool?: string };
+  /** Abrir o baú `chestId` (a UI mostra-o ao lado da mochila). */
+  'container:open': { chestId: string };
 }
 
 /** Emissor de eventos tipado e sem dependências do Phaser (testável com Vitest). */

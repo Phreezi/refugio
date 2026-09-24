@@ -4,12 +4,22 @@ import { BASE_ZONE_ID, GameState, createNewGameState } from '../../src/core/Game
 const SPAWN = { x: 392, y: 392 };
 
 describe('GameState', () => {
-  it('um jogo novo começa na base, no ponto de spawn, virado para baixo, no tick 0', () => {
+  it('um jogo novo começa na base, no spawn, com mochila vazia e um pouco de comida e água', () => {
     const state = createNewGameState(SPAWN);
-    expect(state).toEqual({
-      player: { x: 392, y: 392, facing: 'down', zoneId: BASE_ZONE_ID, hp: 100, hunger: 100, thirst: 100 },
-      world: { tick: 0 },
+    expect(state.player).toMatchObject({
+      x: 392,
+      y: 392,
+      facing: 'down',
+      zoneId: BASE_ZONE_ID,
+      hp: 100,
+      hunger: 100,
+      thirst: 100,
     });
+    expect(state.world).toEqual({ tick: 0, rng: 1 });
+    expect(state.player.inventory).toHaveLength(20);
+    expect(state.player.hotbar).toEqual([['berries', 5], ['water_clean', 2], null, null]);
+    expect(state.base).toEqual({ chests: {} });
+    expect(state.zones).toEqual({});
   });
 
   it('o estado é serializável em JSON sem perdas', () => {

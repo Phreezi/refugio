@@ -1,9 +1,45 @@
 {
-  "$comment": "Nós de recurso. Fase 1: só aspeto e colisão. 'footprint' = caixa sólida na base do sprite, centrada nos pés (em px); omisso = atravessável. Vida, ferramenta e drops chegam na Fase 3.",
-  "tree_small": { "sprite": "tree_small", "footprint": { "width": 8, "height": 6 } },
-  "tree_large": { "sprite": "tree_large", "footprint": { "width": 14, "height": 8 } },
-  "rock": { "sprite": "rock", "footprint": { "width": 14, "height": 8 } },
-  "bush_berries": { "sprite": "bush_berries", "footprint": { "width": 12, "height": 6 } },
-  "tall_grass": { "sprite": "tall_grass" },
-  "iron_vein": { "sprite": "iron_vein", "footprint": { "width": 14, "height": 8 } }
+  "$comment": "Nós de recurso (CLAUDE.md §7.4). hp = golpes à mão; com a ferramenta certa cada golpe tira o gatherPower dela. drops = [[item, min, max]]. respawnSec = segundos de jogo até reaparecer. 'footprint' = caixa sólida centrada nos pés (px); omisso = atravessável.",
+  "tree_small": {
+    "sprite": "tree_small",
+    "footprint": { "width": 8, "height": 6 },
+    "hp": 6,
+    "tool": "axe",
+    "drops": [["wood", 2, 3]],
+    "respawnSec": 1200
+  },
+  "tree_large": {
+    "sprite": "tree_large",
+    "footprint": { "width": 14, "height": 8 },
+    "hp": 10,
+    "tool": "axe",
+    "toolRequired": true,
+    "drops": [["wood", 4, 6]],
+    "respawnSec": 1800
+  },
+  "rock": {
+    "sprite": "rock",
+    "footprint": { "width": 14, "height": 8 },
+    "hp": 6,
+    "tool": "pickaxe",
+    "drops": [["stone", 2, 3]],
+    "respawnSec": 1200
+  },
+  "bush_berries": {
+    "sprite": "bush_berries",
+    "footprint": { "width": 12, "height": 6 },
+    "hp": 1,
+    "drops": [["berries", 2, 4]],
+    "respawnSec": 600
+  },
+  "tall_grass": { "sprite": "tall_grass", "hp": 1, "drops": [["fiber", 1, 2]], "respawnSec": 300 },
+  "iron_vein": {
+    "sprite": "iron_vein",
+    "footprint": { "width": 14, "height": 8 },
+    "hp": 10,
+    "tool": "pickaxe",
+    "toolRequired": true,
+    "drops": [["iron_ore", 2, 3]],
+    "respawnSec": 2400
+  }
 }

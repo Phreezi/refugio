@@ -19,9 +19,14 @@ export interface Point {
   y: number;
 }
 
-/** Objeto `resource:<id>`: ponto = pés do recurso (meio da base do sprite). */
+/** Objeto `resource:<id>`/`prop:<id>`/`chest:<id>`: ponto = pés (meio da base do sprite). */
 export interface ResourcePlacement extends Point {
   id: string;
+  /**
+   * Id do objeto no Tiled (único e estável no mapa). O save guarda os recursos apanhados por
+   * este id, por isso não se deve reutilizar ids ao editar (o Tiled nunca o faz).
+   */
+  objectId: number;
 }
 
 /** Objetos das fases seguintes (`container:<lootTableId>`, `enemy_spawn:<groupId>`). */
@@ -41,6 +46,8 @@ export interface ZoneMap {
   resources: readonly ResourcePlacement[];
   /** Obstáculos/decoração `prop:<id>` (posição livre; ponto = pés). */
   props: readonly ResourcePlacement[];
+  /** Baús (`chest:<id>`): o id é a chave do conteúdo em `base.chests` no save. */
+  chests: readonly ResourcePlacement[];
   containers: readonly TaggedPoint[];
   enemySpawns: readonly TaggedPoint[];
 }
@@ -200,6 +207,8 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
   const resourceIds = new Set(rules.resourceIds);
   const propIds = new Set(rules.propIds);
   const props: ResourcePlacement[] = [];
+  const chests: ResourcePlacement[] = [];
+  const objectIds = new Set<number>();
   const spawns: Point[] = [];
   const exits: Point[] = [];
   const resources: ResourcePlacement[] = [];
@@ -225,20 +234,27 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
         continue;
       }
       const point = { x, y };
+      const objectId = typeof obj.id === 'number' && Number.isInteger(obj.id) && obj.id > 0 ? obj.id : 0;
+      if (objectId === 0 || objectIds.has(objectId))
+        problems.push(`${label}: id de objeto inválido ou repetido`);
+      objectIds.add(objectId);
       const [kind, id] = splitName(name);
       if (kind === 'player_spawn' && id === null) spawns.push(point);
       else if (kind === 'exit' && id === null) exits.push(point);
       else if (kind === 'resource' && id !== null) {
-        if (resourceIds.has(id)) resources.push({ id, ...point });
+        if (resourceIds.has(id)) resources.push({ id, objectId, ...point });
         else problems.push(`${label}: recurso desconhecido "${id}"`);
       } else if (kind === 'prop' && id !== null) {
-        if (propIds.has(id)) props.push({ id, ...point });
+        if (propIds.has(id)) props.push({ id, objectId, ...point });
         else problems.push(`${label}: obstáculo desconhecido "${id}"`);
+      } else if (kind === 'chest' && id) {
+        if (chests.some((c) => c.id === id)) problems.push(`${label}: baú "${id}" repetido`);
+        else chests.push({ id, objectId, ...point });
       } else if (kind === 'container' && id) containers.push({ id, ...point });
       else if (kind === 'enemy_spawn' && id) enemySpawns.push({ id, ...point });
       else {
         problems.push(
-          `${label}: nome inválido (player_spawn, exit, resource:<id>, prop:<id>, container:<id>, enemy_spawn:<id>)`,
+          `${label}: nome inválido (player_spawn, exit, resource:<id>, prop:<id>, chest:<id>, container:<id>, enemy_spawn:<id>)`,
         );
       }
     }
@@ -264,6 +280,7 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
     exits,
     resources,
     props,
+    chests,
     containers,
     enemySpawns,
   };

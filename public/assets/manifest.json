@@ -123,6 +123,7 @@
     },
     "chest": {
       "type": "image",
+      "file": "sprites/chest.png",
       "placeholder": {
         "width": 16,
         "height": 16,
@@ -236,6 +237,271 @@
         "color": "stone",
         "border": "stone_dark",
         "letter": "P"
+      }
+    },
+    "icon_wood": {
+      "type": "image",
+      "file": "sprites/icons/wood.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_stone": {
+      "type": "image",
+      "file": "sprites/icons/stone.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone",
+        "border": "ink",
+        "letter": "P"
+      }
+    },
+    "icon_fiber": {
+      "type": "image",
+      "file": "sprites/icons/fiber.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "lime",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
+    "icon_clay": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "orange",
+        "border": "ink",
+        "letter": "A"
+      }
+    },
+    "icon_iron_ore": {
+      "type": "image",
+      "file": "sprites/icons/iron_ore.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_dark",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_scrap_metal": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_light",
+        "border": "ink",
+        "letter": "S"
+      }
+    },
+    "icon_nails": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_light",
+        "border": "ink",
+        "letter": "P"
+      }
+    },
+    "icon_cloth": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "parchment",
+        "border": "ink",
+        "letter": "T"
+      }
+    },
+    "icon_leather": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_wood_plank": {
+      "type": "image",
+      "file": "sprites/icons/wood_plank.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood_light",
+        "border": "ink",
+        "letter": "T"
+      }
+    },
+    "icon_rope": {
+      "type": "image",
+      "file": "sprites/icons/rope.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wheat",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_berries": {
+      "type": "image",
+      "file": "sprites/icons/berries.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "red",
+        "border": "ink",
+        "letter": "B"
+      }
+    },
+    "icon_raw_meat": {
+      "type": "image",
+      "file": "sprites/icons/raw_meat.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "rose",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_cooked_meat": {
+      "type": "image",
+      "file": "sprites/icons/cooked_meat.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_fish": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "sky",
+        "border": "ink",
+        "letter": "P"
+      }
+    },
+    "icon_canned_food": {
+      "type": "image",
+      "file": "sprites/icons/canned_food.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_light",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_water_dirty": {
+      "type": "image",
+      "file": "sprites/icons/water_dirty.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "teal",
+        "border": "ink",
+        "letter": "Á"
+      }
+    },
+    "icon_water_clean": {
+      "type": "image",
+      "file": "sprites/icons/water_clean.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "sky",
+        "border": "ink",
+        "letter": "Á"
+      }
+    },
+    "icon_bandage": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "cream",
+        "border": "ink",
+        "letter": "L"
+      }
+    },
+    "icon_empty_bottle": {
+      "type": "image",
+      "file": "sprites/icons/empty_bottle.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "ice",
+        "border": "ink",
+        "letter": "G"
+      }
+    },
+    "icon_stone_axe": {
+      "type": "image",
+      "file": "sprites/icons/stone_axe.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_stone_pickaxe": {
+      "type": "image",
+      "file": "sprites/icons/stone_pickaxe.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone",
+        "border": "ink",
+        "letter": "P"
+      }
+    },
+    "icon_wooden_club": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_cloth_shirt": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "parchment",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_small_backpack": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark",
+        "border": "ink",
+        "letter": "M"
       }
     }
   }

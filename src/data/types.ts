@@ -14,10 +14,83 @@ export interface WorldObjectDef {
   footprint?: Footprint;
 }
 
-export type ResourceDef = WorldObjectDef;
+export type ToolKind = 'axe' | 'pickaxe';
+export const TOOL_KINDS: readonly ToolKind[] = ['axe', 'pickaxe'];
+
+export interface Drop {
+  item: string;
+  min: number;
+  max: number;
+}
+
+/** Nó de recurso (CLAUDE.md §7.4): árvore, pedra, arbusto… */
+export interface ResourceDef extends WorldObjectDef {
+  /** Vida: golpes à mão (poder 1). Com a ferramenta certa, cada golpe tira `gatherPower`. */
+  hp: number;
+  /** Ferramenta que acelera a recolha. */
+  tool?: ToolKind;
+  /** Sem a ferramenta não se consegue recolher (ex.: árvore grande, filão de ferro). */
+  toolRequired: boolean;
+  drops: readonly Drop[];
+  /** Segundos de jogo até reaparecer depois de recolhido. */
+  respawnSec: number;
+}
+
 export type ResourceDefs = Readonly<Record<string, ResourceDef>>;
+export type PropAction = 'drink';
+const PROP_ACTIONS: readonly PropAction[] = ['drink'];
+
+/** Obstáculo/decoração; alguns têm uma ação contextual (ex.: beber no poço). */
+export interface PropDef extends WorldObjectDef {
+  action?: PropAction;
+}
+
 /** Obstáculos e decoração (`props.json`): troncos, caixotes, carros abandonados… */
-export type PropDefs = Readonly<Record<string, WorldObjectDef>>;
+export type PropDefs = Readonly<Record<string, PropDef>>;
+
+export type ItemType = 'resource' | 'consumable' | 'tool' | 'weapon' | 'armor' | 'backpack' | 'key';
+const ITEM_TYPES: readonly ItemType[] = [
+  'resource',
+  'consumable',
+  'tool',
+  'weapon',
+  'armor',
+  'backpack',
+  'key',
+];
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
+const RARITIES: readonly Rarity[] = ['common', 'uncommon', 'rare', 'epic'];
+
+export interface ItemEffects {
+  hp?: number;
+  hunger?: number;
+  thirst?: number;
+}
+
+/** Item (CLAUDE.md §9.2). */
+export interface ItemDef {
+  /** Chave i18n do nome. */
+  name: string;
+  /** Chave de textura (16×16) no manifest. */
+  icon: string;
+  type: ItemType;
+  /** Máximo por slot (ferramentas/armas: 1). */
+  stack: number;
+  rarity: Rarity;
+  effects?: ItemEffects;
+  /** Item devolvido ao consumir (ex.: a garrafa vazia depois de beber). */
+  returns?: string;
+  toolKind?: ToolKind;
+  gatherPower?: number;
+  damage?: number;
+  /** Durabilidade máxima (só itens com stack 1). */
+  durability?: number;
+  armor?: number;
+  /** Slots extra (mochilas). */
+  slots?: number;
+}
+
+export type ItemDefs = Readonly<Record<string, ItemDef>>;
 
 export class DataError extends Error {
   readonly problems: readonly string[];
@@ -40,28 +113,97 @@ function isSize(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_FOOTPRINT;
 }
 
-/**
- * Valida `resources.json`.
- * @param spriteKeys chaves de textura existentes no manifest.
- */
-export function parseResources(input: unknown, spriteKeys: Iterable<string>): ResourceDefs {
-  return parseWorldObjects(input, spriteKeys, 'resources.json');
+function isPositiveInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+function describe(value: unknown): string {
+  return value === undefined ? 'em falta' : JSON.stringify(value);
 }
 
 /** Valida `props.json`. */
 export function parseProps(input: unknown, spriteKeys: Iterable<string>): PropDefs {
-  return parseWorldObjects(input, spriteKeys, 'props.json');
+  return parseWorldObjects(
+    input,
+    spriteKeys,
+    'props.json',
+    ['action'],
+    (id, raw, problems): { action?: PropAction } => {
+      if (raw.action === undefined) return {};
+      const action = PROP_ACTIONS.find((a) => a === raw.action);
+      if (!action) problems.push(`"${id}": action desconhecida ${describe(raw.action)}`);
+      return action ? { action } : {};
+    },
+  );
 }
 
-function parseWorldObjects(
+/**
+ * Valida `resources.json`.
+ * @param spriteKeys chaves de textura existentes no manifest.
+ * @param itemIds ids de itens existentes (para os drops).
+ */
+export function parseResources(
+  input: unknown,
+  spriteKeys: Iterable<string>,
+  itemIds: Iterable<string>,
+): ResourceDefs {
+  const items = new Set(itemIds);
+  return parseWorldObjects(
+    input,
+    spriteKeys,
+    'resources.json',
+    ['hp', 'tool', 'toolRequired', 'drops', 'respawnSec'],
+    (id, raw, problems) => {
+      if (!isPositiveInt(raw.hp))
+        problems.push(`"${id}": hp tem de ser um inteiro > 0 (${describe(raw.hp)})`);
+      if (!isPositiveInt(raw.respawnSec)) problems.push(`"${id}": respawnSec tem de ser um inteiro > 0`);
+      const tool = raw.tool;
+      if (tool !== undefined && !TOOL_KINDS.includes(tool as ToolKind)) {
+        problems.push(`"${id}": tool desconhecida ${describe(tool)} (${TOOL_KINDS.join(', ')})`);
+      }
+      const toolRequired = raw.toolRequired === true;
+      if (raw.toolRequired !== undefined && typeof raw.toolRequired !== 'boolean') {
+        problems.push(`"${id}": toolRequired tem de ser true/false`);
+      }
+      if (toolRequired && tool === undefined) problems.push(`"${id}": toolRequired sem tool`);
+      const drops: Drop[] = [];
+      if (!Array.isArray(raw.drops) || raw.drops.length === 0) {
+        problems.push(`"${id}": drops tem de ser uma lista [[item, min, max], …]`);
+      } else {
+        for (const entry of raw.drops as unknown[]) {
+          const [item, min, max] = Array.isArray(entry) ? (entry as unknown[]) : [];
+          if (typeof item !== 'string' || !items.has(item)) {
+            problems.push(`"${id}": drop com item desconhecido ${describe(item)}`);
+          } else if (!isPositiveInt(min) || !isPositiveInt(max) || max < min) {
+            problems.push(`"${id}": drop ${item} com min/max inválidos`);
+          } else {
+            drops.push({ item, min, max });
+          }
+        }
+      }
+      return {
+        hp: isPositiveInt(raw.hp) ? raw.hp : 1,
+        ...(tool === undefined ? {} : { tool: tool as ToolKind }),
+        toolRequired,
+        drops,
+        respawnSec: isPositiveInt(raw.respawnSec) ? raw.respawnSec : 1,
+      };
+    },
+  );
+}
+
+function parseWorldObjects<Extra extends object>(
   input: unknown,
   spriteKeys: Iterable<string>,
   file: string,
-): Readonly<Record<string, WorldObjectDef>> {
+  extraKeys: readonly string[],
+  parseExtra: (id: string, raw: Record<string, unknown>, problems: string[]) => Extra,
+): Readonly<Record<string, WorldObjectDef & Extra>> {
   if (!isObject(input)) throw new DataError(file, ['tem de ser um objeto id → definição']);
   const sprites = new Set(spriteKeys);
+  const allowed = new Set(['sprite', 'footprint', ...extraKeys]);
   const problems: string[] = [];
-  const defs: Record<string, WorldObjectDef> = {};
+  const defs: Record<string, WorldObjectDef & Extra> = {};
   for (const [id, raw] of Object.entries(input)) {
     if (id === '$comment') continue;
     if (!ID_PATTERN.test(id)) problems.push(`"${id}": o id tem de estar em snake_case`);
@@ -70,7 +212,7 @@ function parseWorldObjects(
       continue;
     }
     for (const key of Object.keys(raw)) {
-      if (key !== 'sprite' && key !== 'footprint') problems.push(`"${id}": campo desconhecido "${key}"`);
+      if (!allowed.has(key)) problems.push(`"${id}": campo desconhecido "${key}"`);
     }
     const sprite = typeof raw.sprite === 'string' ? raw.sprite : '';
     if (!sprites.has(sprite)) problems.push(`"${id}": sprite "${sprite}" não existe no manifest`);
@@ -85,8 +227,103 @@ function parseWorldObjects(
         );
       }
     }
-    defs[id] = def;
+    defs[id] = { ...def, ...parseExtra(id, raw, problems) };
   }
   if (problems.length > 0) throw new DataError(file, problems);
+  return defs;
+}
+
+const ITEM_KEYS = new Set([
+  'name',
+  'icon',
+  'type',
+  'stack',
+  'rarity',
+  'effects',
+  'returns',
+  'toolKind',
+  'gatherPower',
+  'damage',
+  'durability',
+  'armor',
+  'slots',
+]);
+const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
+const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots'] as const;
+
+/**
+ * Valida `items.json`.
+ * @param iconKeys chaves de textura existentes no manifest.
+ */
+export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs {
+  if (!isObject(input)) throw new DataError('items.json', ['tem de ser um objeto id → item']);
+  const icons = new Set(iconKeys);
+  const ids = new Set(Object.keys(input).filter((id) => id !== '$comment'));
+  const problems: string[] = [];
+  const defs: Record<string, ItemDef> = {};
+  for (const [id, raw] of Object.entries(input)) {
+    if (id === '$comment') continue;
+    if (!ID_PATTERN.test(id)) problems.push(`"${id}": o id tem de estar em snake_case`);
+    if (!isObject(raw)) {
+      problems.push(`"${id}": tem de ser um objeto`);
+      continue;
+    }
+    for (const key of Object.keys(raw)) {
+      if (!ITEM_KEYS.has(key)) problems.push(`"${id}": campo desconhecido "${key}"`);
+    }
+    const name = typeof raw.name === 'string' ? raw.name : '';
+    if (name !== `item.${id}`) problems.push(`"${id}": name tem de ser "item.${id}"`);
+    const icon = typeof raw.icon === 'string' ? raw.icon : '';
+    if (!icons.has(icon)) problems.push(`"${id}": ícone "${icon}" não existe no manifest`);
+    const type = ITEM_TYPES.find((t) => t === raw.type);
+    if (!type) problems.push(`"${id}": type inválido ${describe(raw.type)}`);
+    const rarity = RARITIES.find((r) => r === raw.rarity);
+    if (!rarity) problems.push(`"${id}": rarity inválida ${describe(raw.rarity)}`);
+    if (!isPositiveInt(raw.stack)) problems.push(`"${id}": stack tem de ser um inteiro > 0`);
+    const def: ItemDef = {
+      name,
+      icon,
+      type: type ?? 'resource',
+      stack: isPositiveInt(raw.stack) ? raw.stack : 1,
+      rarity: rarity ?? 'common',
+    };
+    if (raw.effects !== undefined) {
+      if (!isObject(raw.effects)) problems.push(`"${id}": effects tem de ser um objeto`);
+      else {
+        const effects: ItemEffects = {};
+        for (const [key, value] of Object.entries(raw.effects)) {
+          if (!EFFECT_KEYS.has(key) || typeof value !== 'number' || !Number.isInteger(value)) {
+            problems.push(`"${id}": efeito inválido ${key}=${describe(value)}`);
+          } else {
+            effects[key as keyof ItemEffects] = value;
+          }
+        }
+        def.effects = effects;
+      }
+      if (def.type !== 'consumable') problems.push(`"${id}": só consumíveis têm effects`);
+    }
+    if (def.type === 'consumable' && raw.effects === undefined)
+      problems.push(`"${id}": consumível sem effects`);
+    if (raw.returns !== undefined) {
+      if (typeof raw.returns === 'string' && ids.has(raw.returns)) def.returns = raw.returns;
+      else problems.push(`"${id}": returns aponta para um item desconhecido ${describe(raw.returns)}`);
+    }
+    if (raw.toolKind !== undefined) {
+      const kind = TOOL_KINDS.find((k) => k === raw.toolKind);
+      if (kind) def.toolKind = kind;
+      else problems.push(`"${id}": toolKind inválido ${describe(raw.toolKind)}`);
+      if (raw.gatherPower === undefined) problems.push(`"${id}": ferramenta sem gatherPower`);
+    }
+    for (const key of OPTIONAL_NUMBERS) {
+      const value = raw[key];
+      if (value === undefined) continue;
+      if (isPositiveInt(value)) def[key] = value;
+      else problems.push(`"${id}": ${key} tem de ser um inteiro > 0`);
+    }
+    if (def.durability !== undefined && def.stack !== 1)
+      problems.push(`"${id}": itens com durabilidade têm stack 1`);
+    defs[id] = def;
+  }
+  if (problems.length > 0) throw new DataError('items.json', problems);
   return defs;
 }

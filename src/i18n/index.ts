@@ -37,3 +37,16 @@ export function t(key: MessageKey, params?: Readonly<Record<string, string | num
     return value === undefined ? match : String(value);
   });
 }
+
+/**
+ * Texto para chaves construídas em runtime (ex.: `item.${id}`). O `validate-data` garante que
+ * existem; se faltar alguma, mostra a própria chave (erro visível, sem rebentar).
+ */
+export function tKey(key: string, params?: Readonly<Record<string, string | number>>): string {
+  return key in dictionaries[current] ? t(key as MessageKey, params) : key;
+}
+
+/** Nome traduzido de um item. */
+export function itemName(id: string): string {
+  return tKey(`item.${id}`);
+}
