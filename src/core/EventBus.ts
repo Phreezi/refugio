@@ -16,6 +16,9 @@ export interface GameEvents {
   /** Um golpe acertou num inimigo. */
   'enemy:hit': { uid: number; damage: number; x: number; y: number };
   'enemy:killed': { uid: number; enemy: string; x: number; y: number };
+  /** Um inchado foi derrotado e vai rebentar (aviso). */
+  'enemy:dying': { uid: number };
+  'enemy:exploded': { x: number; y: number; radius: number };
   /** Mochilas no chão de uma zona mudaram. */
   'bag:changed': { zoneId: string };
   /** O jogador pisou uma saída: vai para a zona `to` (null = abre o mapa-mundo). */

@@ -1,10 +1,28 @@
 {
   "$comment": "Estações de crafting (CLAUDE.md §7.5). Na base são construídas (structures.json, com o mesmo id); noutros mapas podem estar colocadas como objetos station:<id>. 'hands' (craft no inventário) não é uma estação física.",
-  "campfire": { "sprite": "campfire", "footprint": { "width": 12, "height": 6 }, "queue": 3 },
+  "campfire": {
+    "sprite": "campfire",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "queue": 3
+  },
   "wood_bench": {
     "sprite": "wood_bench",
-    "footprint": { "width": 22, "height": 6 },
+    "footprint": {
+      "width": 22,
+      "height": 6
+    },
     "queue": 3,
     "repair": true
+  },
+  "furnace": {
+    "sprite": "furnace",
+    "footprint": {
+      "width": 14,
+      "height": 6
+    },
+    "queue": 3
   }
 }

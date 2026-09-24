@@ -441,6 +441,20 @@ export class ZoneScene extends Phaser.Scene {
           },
         });
       }),
+      eventBus.on('enemy:exploded', ({ x, y, radius }) => {
+        const blast = this.add
+          .circle(Math.round(x), Math.round(y) - 6, radius, paletteNumber('orange'), 0.55)
+          .setDepth(LAYER_DEPTH.decor_high + 1);
+        this.tweens.add({
+          targets: blast,
+          alpha: 0,
+          duration: 350,
+          onComplete: () => {
+            blast.destroy();
+          },
+        });
+        this.cameras.main.shake(160, 0.006);
+      }),
       eventBus.on('player:damaged', ({ amount, x, y }) => {
         this.floatText(`-${String(amount)}`, Math.round(x), Math.round(y) - 34, 'red');
         this.hurtUntil = this.time.now + 150;
@@ -516,8 +530,13 @@ export class ZoneScene extends Phaser.Scene {
         .setPosition(x, y - bob)
         .setDepth(y)
         .setFlipX(enemy.flip);
-      // Aviso de ataque (§7.8): pisca a branco durante o windup.
-      if (enemy.state === 'windup') {
+      // A rebentar (inchado): pisca a vermelho, cada vez mais depressa.
+      if (enemy.dying > 0) {
+        const fast = Math.floor(now / (enemy.dying > 8 ? 90 : 45)) % 2 === 0;
+        if (fast) view.sprite.setTint(0xdd6f38).setTintMode(Phaser.TintModes.FILL);
+        else view.sprite.clearTint();
+      } else if (enemy.state === 'windup') {
+        // Aviso de ataque (§7.8): pisca a branco durante o windup.
         if (Math.floor(now / 70) % 2 === 0) view.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
         else view.sprite.clearTint();
       } else if (view.sprite.tintMode === Phaser.TintModes.FILL && enemy.stun === 0) {

@@ -112,5 +112,21 @@
       ["wood", 2]
     ],
     "unlockLevel": 2
+  },
+  "furnace": {
+    "sprite": "furnace",
+    "layer": "top",
+    "station": "furnace",
+    "footprint": {
+      "width": 14,
+      "height": 6
+    },
+    "needsFoundation": true,
+    "light": 40,
+    "unlockLevel": 9,
+    "cost": [
+      ["stone", 12],
+      ["clay", 6]
+    ]
   }
 }

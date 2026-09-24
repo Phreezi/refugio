@@ -1343,6 +1343,127 @@ const NOTE_ICONS: Sprite[] = [
   },
 ];
 
+/** Fase 8 (parte B): inchado, javali, fornalha e ferramentas de ferro. */
+const PHASE8B: Sprite[] = [
+  {
+    file: 'zombie_bloated',
+    width: 16,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 30.5, 7, 1.5);
+      img.fill(4, 25, 3, 5, c('shadow'));
+      img.fill(9, 25, 3, 5, c('shadow'));
+      // Barriga inchada, esverdeada, com manchas.
+      img.ellipse(8, 19, 7, 7, c('leaf'));
+      img.ellipse(7, 18, 5, 5, c('lime'));
+      for (const [x, y] of [
+        [4, 17],
+        [10, 21],
+        [6, 23],
+        [11, 15],
+      ] as const) {
+        img.fill(x, y, 2, 1, c('plum'));
+      }
+      img.fill(0, 16, 2, 5, c('leaf'));
+      img.fill(14, 16, 2, 5, c('leaf'));
+      // Cabeça pequena em cima.
+      img.fill(5, 5, 6, 7, c('lime'));
+      img.fill(5, 4, 6, 2, c('bark_dark'));
+      img.fill(6, 7, 1, 2, c('ink'));
+      img.fill(9, 7, 1, 2, c('ink'));
+      img.fill(6, 10, 4, 1, c('plum'));
+    },
+  },
+  {
+    file: 'boar',
+    width: 24,
+    height: 20,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 12, 18.5, 9, 1.5);
+      img.ellipse(11, 11, 8, 5, c('bark'));
+      img.ellipse(10, 9.5, 6.5, 3, c('wood'));
+      for (let x = 5; x < 17; x += 2) img.set(x, 6, c('bark_dark')); // crina
+      for (const x of [5, 8, 13, 16]) {
+        img.fill(x, 14, 2, 4, c('bark_dark'));
+      }
+      // Cabeça com focinho e presas, a olhar para a direita.
+      img.ellipse(19, 11, 4, 3.5, c('bark'));
+      img.fill(21, 11, 3, 3, c('rose'));
+      img.set(23, 12, c('ink'));
+      img.set(20, 14, c('cream'));
+      img.set(22, 14, c('cream'));
+      img.set(19, 9, c('ink'));
+      img.fill(17, 6, 2, 3, c('bark_dark'));
+      img.set(1, 9, c('bark_dark'));
+    },
+  },
+  {
+    file: 'furnace',
+    width: 16,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 22.5, 7, 1.5);
+      img.fill(2, 6, 12, 16, c('stone'));
+      img.fill(2, 6, 12, 2, c('stone_light'));
+      for (const [x, y] of [
+        [2, 11],
+        [8, 11],
+        [5, 16],
+        [11, 16],
+      ] as const) {
+        img.fill(x, y, 4, 1, c('stone_dark'));
+      }
+      img.fill(5, 15, 6, 6, c('ink')); // boca
+      img.fill(6, 17, 4, 4, c('orange'));
+      img.fill(7, 18, 2, 3, c('gold'));
+      img.fill(6, 1, 4, 5, c('stone_dark')); // chaminé
+      img.fill(6, 1, 4, 1, c('stone'));
+    },
+  },
+];
+
+const IRON_ICONS: Sprite[] = [
+  {
+    file: 'iron_ingot',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 7, 12, 5, c('stone'));
+      img.fill(4, 5, 10, 3, c('stone_light'));
+      img.fill(4, 5, 10, 1, c('cream'));
+      img.fill(2, 11, 12, 1, c('stone_dark'));
+    },
+  },
+  {
+    file: 'iron_axe',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 11; i++) img.set(3 + i, 13 - i, c('wood'));
+      for (let i = 0; i < 10; i++) img.set(4 + i, 13 - i, c('bark'));
+      img.fill(9, 2, 5, 6, c('stone_light'));
+      img.fill(9, 2, 5, 1, c('cream'));
+      img.fill(13, 3, 1, 4, c('stone'));
+    },
+  },
+  {
+    file: 'iron_pickaxe',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 10; i++) img.fill(7, 4 + i, 2, 1, c(i % 3 ? 'wood' : 'bark'));
+      for (let x = 2; x < 14; x++) img.set(x, 4 - Math.round(Math.abs(x - 8) / 3), c('stone_light'));
+      for (let x = 3; x < 13; x++) img.set(x, 5 - Math.round(Math.abs(x - 8) / 3), c('stone'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -1353,10 +1474,12 @@ for (const [dir, list] of [
   [outDir, CREATURES],
   [outDir, ZONE_OBJECTS],
   [outDir, PHASE8],
+  [outDir, PHASE8B],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
   [iconDir, FOOD_ICONS],
   [iconDir, NOTE_ICONS],
+  [iconDir, IRON_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -1367,7 +1490,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

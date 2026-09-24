@@ -147,9 +147,14 @@ export class Combat {
       windupTicks: secondsToTicks(BALANCE.enemyWindupSec),
       sneakDetectMultiplier: BALANCE.sneakDetectMultiplier,
     };
-    for (const enemy of this.enemies) {
+    for (const enemy of [...this.enemies]) {
       const def = enemies[enemy.id];
       if (!def) continue;
+      if (enemy.dying > 0) {
+        enemy.dying -= 1;
+        if (enemy.dying === 0) this.explode(enemy);
+        continue;
+      }
       if (stepEnemy(enemy, def, ctx) === 'attack') this.damagePlayer(def.damage, enemy);
     }
   }
@@ -158,7 +163,7 @@ export class Combat {
   attack(uid: number): boolean {
     const enemy = this.get(uid);
     const def = enemy ? this.content().enemies[enemy.id] : undefined;
-    if (!enemy || !def) return false;
+    if (!enemy || !def || enemy.dying > 0) return false;
     const player = this.state.data.player;
     const { damage } = this.weapon();
     const equipment = player.equipment;
@@ -177,8 +182,27 @@ export class Combat {
     );
     this.bus.emit('enemy:hit', { uid, damage, x: enemy.x, y: enemy.y - BODY_HEIGHT });
     this.state.markDirty();
-    if (died) this.kill(enemy);
+    if (died) {
+      // O inchado não morre logo: incha e rebenta ao fim do aviso (dá tempo de fugir).
+      if (def.explode) {
+        enemy.dying = secondsToTicks(def.explode.delaySec);
+        enemy.stun = 0;
+        this.bus.emit('enemy:dying', { uid });
+      } else this.kill(enemy);
+    }
     return true;
+  }
+
+  /** O inchado rebenta: dano em área (com armadura) e depois conta como derrotado. */
+  private explode(enemy: Enemy): void {
+    const blast = this.content().enemies[enemy.id]?.explode;
+    if (blast) {
+      const player = this.state.data.player;
+      this.bus.emit('enemy:exploded', { x: enemy.x, y: enemy.y, radius: blast.radius });
+      if (Math.hypot(player.x - enemy.x, player.y - enemy.y) <= blast.radius)
+        this.damagePlayer(blast.damage, enemy);
+    }
+    this.kill(enemy);
   }
 
   /** Dano ao jogador (com armadura e invulnerabilidade curta a seguir). */

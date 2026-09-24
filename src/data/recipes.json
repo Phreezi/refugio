@@ -163,5 +163,41 @@
     "qty": 1,
     "timeSec": 8,
     "unlockLevel": 1
+  },
+  {
+    "id": "r_iron_ingot",
+    "station": "furnace",
+    "category": "materials",
+    "inputs": [["iron_ore", 2]],
+    "output": "iron_ingot",
+    "qty": 1,
+    "timeSec": 20,
+    "unlockLevel": 9
+  },
+  {
+    "id": "r_iron_axe",
+    "station": "wood_bench",
+    "category": "tools",
+    "inputs": [
+      ["iron_ingot", 3],
+      ["wood", 2]
+    ],
+    "output": "iron_axe",
+    "qty": 1,
+    "timeSec": 25,
+    "unlockLevel": 10
+  },
+  {
+    "id": "r_iron_pickaxe",
+    "station": "wood_bench",
+    "category": "tools",
+    "inputs": [
+      ["iron_ingot", 3],
+      ["wood", 2]
+    ],
+    "output": "iron_pickaxe",
+    "qty": 1,
+    "timeSec": 25,
+    "unlockLevel": 10
   }
 ]

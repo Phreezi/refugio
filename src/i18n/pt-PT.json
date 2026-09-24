@@ -179,5 +179,15 @@
   "map.locked": "Bloqueada: precisas do nível {level}.",
   "msg.learned": "Aprendeste a fazer: {item}.",
   "msg.note_known": "Já sabes fazer isto.",
-  "craft.locked_msg": "Ainda não sabes fazer isto (nível {level})."
+  "craft.locked_msg": "Ainda não sabes fazer isto (nível {level}).",
+  "item.iron_ingot": "Lingote de ferro",
+  "item.iron_axe": "Machado de ferro",
+  "item.iron_pickaxe": "Picareta de ferro",
+  "structure.furnace": "Fornalha",
+  "station.furnace": "Fornalha",
+  "enemy.zombie_bloated": "Inchado",
+  "enemy.boar": "Javali",
+  "zone.road": "Estrada e Bomba de Gasolina",
+  "zone.village": "Aldeia Deserta",
+  "zone.deep_forest": "Floresta Profunda"
 }

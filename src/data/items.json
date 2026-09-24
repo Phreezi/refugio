@@ -35,6 +35,13 @@
     "stack": 50,
     "rarity": "uncommon"
   },
+  "iron_ingot": {
+    "name": "item.iron_ingot",
+    "icon": "icon_iron_ingot",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "uncommon"
+  },
   "scrap_metal": {
     "name": "item.scrap_metal",
     "icon": "icon_scrap_metal",
@@ -212,6 +219,30 @@
     "gatherPower": 2,
     "damage": 7,
     "durability": 120
+  },
+  "iron_axe": {
+    "name": "item.iron_axe",
+    "icon": "icon_iron_axe",
+    "type": "tool",
+    "stack": 1,
+    "rarity": "uncommon",
+    "toolKind": "axe",
+    "gatherPower": 3,
+    "damage": 12,
+    "attackSec": 0.6,
+    "durability": 220
+  },
+  "iron_pickaxe": {
+    "name": "item.iron_pickaxe",
+    "icon": "icon_iron_pickaxe",
+    "type": "tool",
+    "stack": 1,
+    "rarity": "uncommon",
+    "toolKind": "pickaxe",
+    "gatherPower": 3,
+    "damage": 10,
+    "attackSec": 0.7,
+    "durability": 220
   },
   "wooden_club": {
     "name": "item.wooden_club",

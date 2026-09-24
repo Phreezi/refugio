@@ -264,6 +264,7 @@ npm run map:base   # gera maps/base.json (recusa substituir sem `-- --force`: o 
 npm run map:pine   # gera maps/pine_forest.json (idem)
 npm run map:farm   # gera maps/farm.json (idem; usa scripts/mapgen.ts)
 npm run map:lake   # gera maps/lake.json (idem)
+npm run map:t2     # gera maps/road.json, village.json, deep_forest.json (idem)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -413,11 +414,11 @@ Os nós de recurso reaparecem (ver zonas).
 |---|---|---|---|---|---|
 | zombie_walker | Arrastado | 40 | 6 | 40 px/s | Básico, em grupos de 1–3 |
 | zombie_runner | Corredor | 30 | 5 | 90 px/s | Aparece a partir de T2 |
-| zombie_bloated | Inchado | 60 | 12 (área) | 30 px/s | Explode ao morrer; aviso claro |
+| zombie_bloated | Inchado | 60 | 12 (área) | 30 px/s | Explode ao morrer (0,9 s a piscar a vermelho, raio 30 px); aviso claro |
 | zombie_tank | Brutamontes | 250 | 20 | 35 px/s | T3+, ataque lento e telegrafado |
 | zombie_screamer | Gritador | 35 | 0 | 50 px/s | Chama outros zombies; T3+ |
 | wolf | Lobo | 45 | 8 | 100 px/s | Animal, T2 florestas |
-| boar | Javali | 70 | 10 | carga | Dá carne e couro |
+| boar | Javali | 70 | 10 | carga | Aviso 2× mais longo, depois carga em linha reta (150 px/s, 0,7 s); dá carne e couro |
 | deer | Veado | 30 | 0 | foge | Presa pacífica |
 | boss_* | Chefes de bunker | — | — | — | Fase 10 |
 
@@ -789,9 +790,9 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [x] XP e níveis; receitas, peças e zonas desbloqueadas por nível.
 - [x] Ecrã "Subiste de nível!" com lista do que desbloqueou.
 - [x] Notas/receitas encontradas em loot (desbloqueio alternativo).
-- [ ] Zonas T2: **Estrada e Bomba de Gasolina**, **Aldeia Deserta**, **Floresta Profunda**.
-- [ ] Novos inimigos: bloated, lobos, javalis.
-- [ ] Fornalha, ferro, ferramentas de ferro, tier de pedra nas estruturas.
+- [x] Zonas T2: **Estrada e Bomba de Gasolina**, **Aldeia Deserta**, **Floresta Profunda** (mapas gerados por `npm run map:t2`; editam-se no Tiled).
+- [x] Novos inimigos: bloated (explode ao morrer, com aviso), lobos, javalis (carga anunciada).
+- [x] Fornalha, ferro, ferramentas de ferro, tier de pedra nas estruturas (este já vinha da Fase 5).
 
 **Aceitação:** um jogador novo atinge o nível 10 em ~3 h de jogo, com sensação de progresso constante (testar com 2–3 pessoas).
 
@@ -997,3 +998,6 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | XP atribuída pela `Progression` a ouvir os eventos (recurso apanhado, inimigo derrotado, craft acabado, peça colocada, loot sorteado, peixe) | Os sistemas não precisam de saber da progressão; os valores vêm dos JSON e do balance |
 | 2026-09-24 | "Subiste de nível!" não pausa o jogo e fecha sozinho | O jogo nunca pausa (inimigos continuam); um painel modal podia custar vidas |
 | 2026-09-24 | Noite como RenderTexture escura com luzes "apagadas" (stamp com blend ERASE), em degraus | Pixel art (sem gradientes suaves), barato, e funciona com qualquer zoom |
+| 2026-09-24 | Inchado explode ao fim de um atraso depois de morrer (`explode` em `enemies.json`) | O aviso a piscar dá tempo para fugir; a explosão só magoa o jogador (mais simples e previsível) |
+| 2026-09-24 | Javali com carga (`charge`): aviso longo, corrida em linha reta na direção do jogador | Desviar-se para o lado é a jogada certa; sem perseguição teleguiada |
+| 2026-09-24 | Fornalha (nível 9) funde minério em lingotes; ferramentas de ferro na bancada (nível 10) | Minério só na Floresta Profunda (nível 10), por isso o ferro marca a entrada no meio do jogo |

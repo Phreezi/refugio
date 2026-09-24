@@ -197,15 +197,17 @@ export class Interaction {
 
   /** Inimigos que se podem atacar (área do corpo). */
   private enemyTargets(): Target<TargetData>[] {
-    return this.combat.list.map((enemy) => ({
-      kind: 'enemy' as const,
-      area: this.combat.bodyArea(enemy),
-      data: {
-        type: 'enemy' as const,
-        placement: { id: enemy.id, objectId: 0, x: enemy.x, y: enemy.y },
-        uid: enemy.uid,
-      },
-    }));
+    return this.combat.list
+      .filter((enemy) => enemy.dying === 0)
+      .map((enemy) => ({
+        kind: 'enemy' as const,
+        area: this.combat.bodyArea(enemy),
+        data: {
+          type: 'enemy' as const,
+          placement: { id: enemy.id, objectId: 0, x: enemy.x, y: enemy.y },
+          uid: enemy.uid,
+        },
+      }));
   }
 
   /** Portas, estações e baús construídos. */

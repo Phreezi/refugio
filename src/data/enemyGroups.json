@@ -8,5 +8,12 @@
   "wolf_night": {
     "night": true,
     "members": [["wolf", 1, 2]]
-  }
+  },
+  "bloated": [["zombie_bloated", 1, 1]],
+  "boars": [["boar", 1, 2]],
+  "wolves": [["wolf", 2, 3]],
+  "t2_mixed": [
+    ["zombie_walker", 1, 2],
+    ["zombie_runner", 1, 1]
+  ]
 }
