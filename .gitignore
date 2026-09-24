@@ -1,0 +1,18 @@
+node_modules/
+dist/
+coverage/
+*.local
+.env
+.env.*
+!.env.example
+
+# Definições pessoais do Claude Code (o launch.json é partilhado)
+.claude/settings.local.json
+
+# Editores e sistema
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log

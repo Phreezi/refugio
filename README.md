@@ -1,0 +1,48 @@
+# Refúgio
+
+Jogo de sobrevivência top-down em pixel art, single player, para o browser (HTML5).
+Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
+
+## Requisitos
+
+- Node.js ≥ 22.18 (recomendado 24). Os scripts em `scripts/` são TypeScript executado
+  diretamente pelo Node (type stripping nativo), sem ferramentas extra.
+
+## Comandos
+
+| Comando                 | O que faz                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `npm install`           | Instala as dependências                                                      |
+| `npm run dev`           | Servidor de desenvolvimento (Vite) em http://localhost:5173                  |
+| `npm run dev:host`      | Igual, mas acessível na rede local (para testar no telemóvel)                |
+| `npm run build`         | Typecheck + validação de dados + build de produção em `dist/`                |
+| `npm run preview`       | Serve o `dist/` localmente                                                   |
+| `npm run test`          | Testes unitários (Vitest)                                                    |
+| `npm run lint`          | ESLint + verificação de formatação (Prettier)                                |
+| `npm run format`        | Formata tudo com o Prettier                                                  |
+| `npm run validate-data` | Valida paleta, manifest de assets e i18n (e, no futuro, os JSON de conteúdo) |
+| `npm run palette`       | Regenera `public/assets/palette.png` a partir de `src/assets/palette.json`   |
+
+## Debug
+
+- **F3** mostra/esconde o overlay de debug (FPS, tick, posição, cena, escala).
+- `?debug` na URL mostra o overlay logo ao arrancar (útil no telemóvel, sem teclado).
+- `?lang=en` força a língua inglesa.
+
+## Assets
+
+Todos os assets estão registados em `public/assets/manifest.json`. Sem ficheiro (ou se o ficheiro
+falhar), o jogo gera um placeholder colorido com uma letra, usando só cores da paleta. Trocar a arte
+é pôr o ficheiro em `public/assets/…` e indicar o caminho no manifest. Licenças em
+`public/assets/LICENSES.md`.
+
+## Deploy de preview (GitHub Pages)
+
+O workflow `.github/workflows/deploy.yml` corre lint, testes e build em cada push/PR e publica o
+`dist/` no GitHub Pages a cada push para `main`. Para ativar:
+
+1. Criar o repositório no GitHub e fazer push deste projeto para a branch `main`.
+2. No repositório: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. O URL do preview aparece no resumo do workflow (ambiente `github-pages`).
+
+No plano gratuito do GitHub, o Pages só funciona em repositórios públicos.
