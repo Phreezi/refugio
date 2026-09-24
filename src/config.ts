@@ -4,9 +4,23 @@
 /** Tamanho de um tile, em píxeis de jogo. */
 export const TILE_SIZE = 16;
 
-/** Resolução interna (16:9), escalada por inteiros em píxeis do dispositivo. */
-export const GAME_WIDTH = 480;
-export const GAME_HEIGHT = 270;
+/**
+ * Resolução interna adaptável (CLAUDE.md §3.1): escolhe-se o zoom inteiro (em píxeis do
+ * dispositivo) que deixa o jogo com a altura mais próxima do alvo; a largura acompanha o ecrã.
+ * Com toque (telemóveis) o alvo é mais baixo, para o boneco e os botões não ficarem minúsculos.
+ * Candidato a definição do jogador ("tamanho", Fase 11).
+ */
+export const DISPLAY = {
+  /** Altura-alvo em píxeis de jogo (≈ 25 tiles) com rato. */
+  targetHeight: 400,
+  /** Idem em ecrãs táteis (≈ 20 tiles). */
+  touchTargetHeight: 320,
+  /** Altura mínima (abaixo disto, zoom fracionário): a UI precisa deste espaço. */
+  minHeight: 240,
+  /** Proporções permitidas (largura/altura); fora delas ficam barras. */
+  minAspect: 4 / 3,
+  maxAspect: 21 / 9,
+} as const;
 
 /** Passo fixo da lógica: 50 ms = 20 ticks/s (CLAUDE.md §5.2). */
 export const FIXED_STEP_MS = 50;

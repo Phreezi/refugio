@@ -23,11 +23,16 @@ export class MainMenuScene extends Phaser.Scene {
     const cx = Math.round(width / 2);
     this.cameras.main.setBackgroundColor(PALETTE.night);
 
+    // Posições proporcionais à altura: a resolução do jogo depende do ecrã.
     this.add
-      .text(cx, 64, t('game.title'), { fontFamily: 'monospace', fontSize: 32, color: PALETTE.wheat })
+      .text(cx, Math.round(height * 0.22), t('game.title'), {
+        fontFamily: 'monospace',
+        fontSize: 32,
+        color: PALETTE.wheat,
+      })
       .setOrigin(0.5, 0);
 
-    this.createButton(cx, 150, t('menu.new_game'), () => {
+    this.createButton(cx, Math.round(height * 0.55), t('menu.new_game'), () => {
       this.startNewGame();
     });
 
@@ -45,6 +50,15 @@ export class MainMenuScene extends Phaser.Scene {
         color: PALETTE.stone,
       })
       .setOrigin(1, 0);
+
+    // Mudou a resolução (janela redimensionada, telemóvel rodado): refazer o menu.
+    const onResize = (): void => {
+      this.scene.restart({});
+    };
+    this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
+    });
 
     // Eventos nomeados (sem addKey) não capturam as teclas globalmente.
     this.input.keyboard?.on('keydown-ENTER', () => {

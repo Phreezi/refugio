@@ -33,7 +33,13 @@ export class UIScene extends Phaser.Scene {
   create(): void {
     this.joystickPointer = null;
     this.createJoystick();
+    // A resolução muda com o ecrã: o joystick em repouso acompanha o canto inferior esquerdo.
+    const onResize = (): void => {
+      if (this.joystickPointer === null) this.placeJoystick(this.restPosition());
+    };
+    this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
       moveInput.joystick = { x: 0, y: 0 };
       this.joystickBase = null;
       this.joystickKnob = null;

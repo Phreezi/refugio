@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { computePixelScale, type PixelScale } from './pixelScale';
+import { DISPLAY } from '../config';
+import { computePixelScale, type PixelScale, type PixelScaleOptions } from './pixelScale';
 
-// Escala inteira em píxeis do dispositivo (CLAUDE.md §3.1). O Phaser 4 não tem um modo
-// de escala inteira nem considera o devicePixelRatio, por isso usamos Scale.NONE e
-// controlamos o tamanho CSS via `scale.setZoom(deviceZoom / dpr)` (aceita frações e
-// atualiza o mapeamento do input) e a posição via left/top alinhados ao dispositivo.
+// Resolução adaptável + escala inteira em píxeis do dispositivo (CLAUDE.md §3.1). O Phaser 4 não
+// tem um modo de escala inteira nem considera o devicePixelRatio, por isso usamos Scale.NONE:
+// `scale.resize(w, h)` muda a resolução interna, `scale.setZoom(deviceZoom / dpr)` o tamanho CSS
+// (aceita frações e atualiza o mapeamento do input) e left/top alinham o canvas ao dispositivo.
 
 export interface PixelScaling {
   /** Escala atualmente aplicada. */
@@ -14,29 +14,46 @@ export interface PixelScaling {
   dispose(): void;
 }
 
+function displayOptions(): PixelScaleOptions {
+  const touch = window.matchMedia('(pointer: coarse)').matches;
+  return {
+    targetHeight: touch ? DISPLAY.touchTargetHeight : DISPLAY.targetHeight,
+    minHeight: DISPLAY.minHeight,
+    minAspect: DISPLAY.minAspect,
+    maxAspect: DISPLAY.maxAspect,
+  };
+}
+
+/** Escala para o tamanho atual de `host` (usada também para criar o jogo já com o tamanho certo). */
+export function measurePixelScale(host: HTMLElement): PixelScale {
+  const rect = host.getBoundingClientRect();
+  return computePixelScale(rect.width, rect.height, window.devicePixelRatio || 1, displayOptions());
+}
+
 export function installPixelScaling(game: Phaser.Game, host: HTMLElement): PixelScaling {
-  let current = computePixelScale(GAME_WIDTH, GAME_HEIGHT, 1, GAME_WIDTH, GAME_HEIGHT);
-  let dpr = 1;
-  let applied: { zoom: number; dpr: number; x: number; y: number } | null = null;
+  let current = measurePixelScale(host);
+  let dpr = window.devicePixelRatio || 1;
+  let applied: (PixelScale & { dpr: number }) | null = null;
 
   const apply = (): void => {
     const canvas = game.canvas as HTMLCanvasElement | null;
     if (!canvas) return;
     dpr = window.devicePixelRatio || 1;
-    const rect = host.getBoundingClientRect();
-    current = computePixelScale(rect.width, rect.height, dpr, GAME_WIDTH, GAME_HEIGHT);
+    current = measurePixelScale(host);
 
-    // Só mexe no canvas quando algo muda: setZoom/refresh emitem RESIZE a cada chamada.
-    const zoomChanged = applied?.zoom !== current.deviceZoom || applied.dpr !== dpr;
-    const moved = applied?.x !== current.offsetX || applied.y !== current.offsetY;
-    if (!zoomChanged && !moved) return;
-    applied = { zoom: current.deviceZoom, dpr, x: current.offsetX, y: current.offsetY };
+    // Só mexe no canvas quando algo muda: resize/setZoom/refresh emitem RESIZE a cada chamada.
+    const sizeChanged = applied?.gameWidth !== current.gameWidth || applied.gameHeight !== current.gameHeight;
+    const zoomChanged = applied?.deviceZoom !== current.deviceZoom || applied.dpr !== dpr;
+    const moved = applied?.offsetX !== current.offsetX || applied.offsetY !== current.offsetY;
+    if (!sizeChanged && !zoomChanged && !moved) return;
+    applied = { ...current, dpr };
 
     canvas.style.position = 'absolute';
     canvas.style.left = `${String(current.offsetX)}px`;
     canvas.style.top = `${String(current.offsetY)}px`;
-    if (zoomChanged) game.scale.setZoom(current.deviceZoom / dpr);
-    else game.scale.refresh(); // a posição mudou: atualizar os limites usados pelo input
+    if (sizeChanged) game.scale.resize(current.gameWidth, current.gameHeight);
+    if (sizeChanged || zoomChanged) game.scale.setZoom(current.deviceZoom / dpr);
+    else game.scale.refresh(); // só a posição mudou: atualizar os limites usados pelo input
   };
 
   // O devicePixelRatio muda com o zoom do browser ou ao mudar de monitor; nem sempre há 'resize'.

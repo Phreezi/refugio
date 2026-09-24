@@ -1,6 +1,5 @@
 import type Phaser from 'phaser';
 import { PALETTE } from '../assets/palette';
-import { GAME_WIDTH } from '../config';
 import { t } from '../i18n';
 
 /**
@@ -15,6 +14,6 @@ export function showFatalError(scene: Phaser.Scene, error: unknown): void {
     fontFamily: 'monospace',
     fontSize: 8,
     color: PALETTE.cream,
-    wordWrap: { width: GAME_WIDTH - 16 },
+    wordWrap: { width: scene.scale.width - 16 },
   });
 }
