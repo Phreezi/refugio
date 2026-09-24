@@ -24,5 +24,14 @@
       "height": 6
     },
     "queue": 3
+  },
+  "workbench": {
+    "sprite": "workbench",
+    "footprint": {
+      "width": 22,
+      "height": 6
+    },
+    "queue": 3,
+    "repair": true
   }
 }

@@ -1111,6 +1111,72 @@
         "border": "ink",
         "letter": "C"
       }
+    },
+    "workbench": {
+      "type": "image",
+      "file": "sprites/workbench.png",
+      "placeholder": {
+        "width": 32,
+        "height": 20,
+        "color": "stone",
+        "border": "ink",
+        "letter": "T"
+      }
+    },
+    "icon_crossbow": {
+      "type": "image",
+      "file": "sprites/icons/crossbow.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "B"
+      }
+    },
+    "icon_pistol": {
+      "type": "image",
+      "file": "sprites/icons/pistol.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_dark",
+        "border": "ink",
+        "letter": "P"
+      }
+    },
+    "icon_bolt": {
+      "type": "image",
+      "file": "sprites/icons/bolt.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood_light",
+        "border": "ink",
+        "letter": "V"
+      }
+    },
+    "icon_pistol_ammo": {
+      "type": "image",
+      "file": "sprites/icons/pistol_ammo.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "gold",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_gunpowder": {
+      "type": "image",
+      "file": "sprites/icons/gunpowder.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "shadow",
+        "border": "ink",
+        "letter": "P"
+      }
     }
   }
 }

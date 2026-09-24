@@ -226,5 +226,12 @@
   "zone.industrial": "Zona Industrial",
   "zone.hospital": "Hospital de Campanha",
   "msg.bleeding": "Estás a sangrar! Usa uma ligadura.",
-  "hud.bleeding": "A sangrar"
+  "hud.bleeding": "A sangrar",
+  "item.crossbow": "Besta",
+  "item.pistol": "Pistola",
+  "item.bolt": "Virotes",
+  "item.pistol_ammo": "Balas de pistola",
+  "item.gunpowder": "Pólvora",
+  "station.workbench": "Bancada de trabalho",
+  "structure.workbench": "Bancada de trabalho"
 }

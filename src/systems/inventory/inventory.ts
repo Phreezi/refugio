@@ -183,6 +183,7 @@ export function storeSimilar(from: Container, to: Container, defs: ItemDefs): nu
 const SORT_ORDER: readonly string[] = [
   'tool',
   'weapon',
+  'ammo',
   'armor',
   'backpack',
   'consumable',

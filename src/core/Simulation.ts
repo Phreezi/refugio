@@ -268,6 +268,17 @@ export class Simulation {
       this.nextActionTick = tick + this.actionCooldownTicks;
       return;
     }
+    // Arma à distância: dispara no inimigo mais perto (se houver); senão, a ação normal.
+    const shot = this.combat.shoot();
+    if (shot !== null) {
+      this.nextActionTick = tick + this.combat.attackTicks();
+      if (shot === 'no_ammo') {
+        const ammo = this.combat.weapon().ranged?.ammo;
+        this.bus.emit('action:blocked', { reason: 'needs_item', ...(ammo ? { item: ammo } : {}) });
+        this.actionHeld = false;
+      }
+      return;
+    }
     const done = this.interaction.act(PLAYER_FOOTPRINT);
     if (done === null) return;
     // Golpes (em inimigos ou no ar) seguem o ritmo da arma; o resto, o ritmo normal.

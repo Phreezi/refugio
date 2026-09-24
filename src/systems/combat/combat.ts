@@ -1,5 +1,5 @@
 import { randomInt, type RngState } from '../../core/Rng';
-import type { EnemyDef, ItemDefs } from '../../data/types';
+import type { EnemyDef, ItemDefs, RangedDef } from '../../data/types';
 import type { ItemStack } from '../gathering/gathering';
 import type { Container } from '../inventory/inventory';
 
@@ -11,6 +11,8 @@ export interface WeaponStats {
   attackSec: number;
   /** Alcance do golpe (px). */
   reach: number;
+  /** Arma à distância: munição, alcance e velocidade do projétil. */
+  ranged?: RangedDef;
 }
 
 export interface CombatBalance {
@@ -33,6 +35,7 @@ export function weaponStats(equipment: Container, defs: ItemDefs, balance: Comba
     damage: def.damage,
     attackSec: def.attackSec ?? balance.weaponAttackSec,
     reach: def.reach ?? balance.weaponReachPx,
+    ...(def.ranged ? { ranged: def.ranged } : {}),
   };
 }
 

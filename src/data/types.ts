@@ -50,12 +50,14 @@ export interface PropDef extends WorldObjectDef {
 /** Obstáculos e decoração (`props.json`): troncos, caixotes, carros abandonados… */
 export type PropDefs = Readonly<Record<string, PropDef>>;
 
-export type ItemType = 'resource' | 'consumable' | 'tool' | 'weapon' | 'armor' | 'backpack' | 'key' | 'note';
+export type ItemType =
+  'resource' | 'consumable' | 'tool' | 'weapon' | 'ammo' | 'armor' | 'backpack' | 'key' | 'note';
 const ITEM_TYPES: readonly ItemType[] = [
   'resource',
   'consumable',
   'tool',
   'weapon',
+  'ammo',
   'armor',
   'backpack',
   'key',
@@ -106,6 +108,17 @@ export interface ItemDef {
   waters?: boolean;
   /** Estanca o sangramento ao usar (ligaduras, kits). */
   stopsBleeding?: boolean;
+  /** Arma à distância (Fase 10): gasta 1 de `ammo` por tiro; mira sozinha ao inimigo mais perto. */
+  ranged?: RangedDef;
+}
+
+export interface RangedDef {
+  /** Item de munição (type ammo). */
+  ammo: string;
+  /** Alcance (px) do tiro e da mira automática. */
+  range: number;
+  /** Velocidade do projétil (px/s). */
+  speed: number;
 }
 
 /** Semente: cresce durante `growHours` horas de jogo depois de regada. */
@@ -299,6 +312,7 @@ const ITEM_KEYS = new Set([
   'plant',
   'waters',
   'stopsBleeding',
+  'ranged',
 ]);
 const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
 const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach'] as const;
@@ -392,6 +406,23 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
     }
     if (def.durability !== undefined && def.stack !== 1)
       problems.push(`"${id}": itens com durabilidade têm stack 1`);
+    if (raw.ranged !== undefined) {
+      const r = raw.ranged;
+      if (
+        isObject(r) &&
+        typeof r.ammo === 'string' &&
+        ids.has(r.ammo) &&
+        typeof r.range === 'number' &&
+        r.range > 0 &&
+        r.range <= 320 &&
+        typeof r.speed === 'number' &&
+        r.speed > 0 &&
+        r.speed <= 800
+      )
+        def.ranged = { ammo: r.ammo, range: r.range, speed: r.speed };
+      else problems.push(`"${id}": ranged tem de ser { ammo (item), range ≤ 320, speed ≤ 800 }`);
+      if (raw.damage === undefined) problems.push(`"${id}": uma arma à distância precisa de damage`);
+    }
     if (raw.stopsBleeding !== undefined) {
       if (raw.stopsBleeding === true && def.type === 'consumable') def.stopsBleeding = true;
       else problems.push(`"${id}": stopsBleeding tem de ser true (e só em consumíveis)`);
@@ -410,6 +441,10 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
       }
     }
     defs[id] = def;
+  }
+  for (const [id, def] of Object.entries(defs)) {
+    if (def.ranged && defs[def.ranged.ammo]?.type !== 'ammo')
+      problems.push(`"${id}": a munição "${def.ranged.ammo}" tem de ser do tipo ammo`);
   }
   if (problems.length > 0) throw new DataError('items.json', problems);
   return defs;

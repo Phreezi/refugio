@@ -110,6 +110,8 @@ export class ZoneScene extends Phaser.Scene {
   private resourceSprites = new Map<number, Phaser.GameObjects.Image>();
   /** Sprites das peças construídas, pelo uid. */
   private structureSprites = new Map<number, Phaser.GameObjects.Image>();
+  /** Projéteis em voo (setas, balas), pelo id. */
+  private shotViews = new Map<number, Phaser.GameObjects.Rectangle>();
   /** Plantas dos canteiros da horta, pelo uid do canteiro. */
   private cropSprites = new Map<number, Phaser.GameObjects.Image>();
   private marker: Phaser.GameObjects.Image | null = null;
@@ -236,6 +238,7 @@ export class ZoneScene extends Phaser.Scene {
       this.resourceSprites.clear();
       this.structureSprites.clear();
       this.cropSprites.clear();
+      this.shotViews.clear();
       this.enemyViews.clear();
       this.containerSprites.clear();
       this.night = null;
@@ -268,6 +271,7 @@ export class ZoneScene extends Phaser.Scene {
     if (this.player) this.player.anims.timeScale = speed;
     this.renderPlayer();
     this.renderEnemies();
+    this.renderShots();
     this.renderHomestead();
     this.renderLighting();
     // Com toque, andar volta a pôr a peça à frente do jogador.
@@ -625,6 +629,29 @@ export class ZoneScene extends Phaser.Scene {
   }
 
   /** Inimigos: posição interpolada, andar aos saltinhos, aviso de ataque a piscar, vida. */
+  /** Setas e balas: quadradinhos (a pixel art não roda), interpolados entre ticks. */
+  private renderShots(): void {
+    const alpha = simulation.alpha;
+    const alive = new Set<number>();
+    for (const shot of simulation.combat.shots) {
+      alive.add(shot.id);
+      let view = this.shotViews.get(shot.id);
+      if (!view) {
+        const color = shot.ammo === 'bolt' ? 'wood_light' : 'gold';
+        view = this.add.rectangle(0, 0, 2, 2, paletteNumber(color)).setOrigin(0);
+        this.shotViews.set(shot.id, view);
+      }
+      const x = Math.round(shot.px + (shot.x - shot.px) * alpha);
+      const y = Math.round(shot.py + (shot.y - shot.py) * alpha);
+      view.setPosition(x - 1, y - 1).setDepth(y + 8);
+    }
+    for (const [id, view] of this.shotViews) {
+      if (alive.has(id)) continue;
+      view.destroy();
+      this.shotViews.delete(id);
+    }
+  }
+
   private renderEnemies(): void {
     const alpha = simulation.alpha;
     const now = this.time.now;
