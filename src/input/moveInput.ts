@@ -7,15 +7,25 @@ import { isZero, ZERO, type Vec2 } from '../systems/movement/geometry';
 class MoveInput {
   joystick: Vec2 = ZERO;
   keyboard: Vec2 = ZERO;
+  /** Andar agachado: Shift (teclado) ou joystick pouco empurrado (toque). */
+  keyboardSneak = false;
+  joystickSneak = false;
 
   /** O teclado tem prioridade; senão, o joystick. */
   get direction(): Vec2 {
     return isZero(this.keyboard) ? this.joystick : this.keyboard;
   }
 
+  /** Agachado: Shift premido, ou o joystick (quando é ele que manda) pouco empurrado. */
+  get sneak(): boolean {
+    return this.keyboardSneak || (isZero(this.keyboard) && this.joystickSneak);
+  }
+
   reset(): void {
     this.joystick = ZERO;
     this.keyboard = ZERO;
+    this.keyboardSneak = false;
+    this.joystickSneak = false;
   }
 }
 

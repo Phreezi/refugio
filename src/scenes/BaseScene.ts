@@ -46,8 +46,10 @@ const LAYER_DEPTH: Readonly<Record<TileLayerName, number>> = {
 };
 
 const walkAnimationKey = (facing: Facing): string => `${PLAYER_TEXTURE}_walk_${facing}`;
+const sneakAnimationKey = (facing: Facing): string => `${PLAYER_TEXTURE}_sneak_${facing}`;
+const SNEAK_FRAME_RATE = 4;
 
-type MoveKeys = Record<'up' | 'down' | 'left' | 'right' | 'action', Phaser.Input.Keyboard.Key[]>;
+type MoveKeys = Record<'up' | 'down' | 'left' | 'right' | 'action' | 'sneak', Phaser.Input.Keyboard.Key[]>;
 
 /** A base do jogador: mapa Tiled, recursos, obstáculos, baú e o jogador (andar e recolher). */
 export class BaseScene extends Phaser.Scene {
@@ -143,9 +145,10 @@ export class BaseScene extends Phaser.Scene {
 
   override update(): void {
     moveInput.keyboard = this.readKeyboard();
+    moveInput.keyboardSneak = this.keys?.sneak.some((key) => key.isDown) ?? false;
     // Com a mochila/baú aberto o jogador fica parado.
     const blocked = uiState.modalOpen;
-    simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction);
+    simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction, moveInput.sneak);
     const actionKey = this.keys?.action.some((key) => key.isDown) ?? false;
     simulation.setActionHeld(!blocked && (actionKey || uiState.actionHeld));
     // rawDelta = tempo real entre frames; o delta "suavizado" do Phaser fica limitado a
@@ -320,17 +323,20 @@ export class BaseScene extends Phaser.Scene {
 
   /** As animações são globais (do jogo), por isso só se criam na primeira vez. */
   private createPlayerAnimations(): void {
-    for (const facing of CHARACTER_ROWS) {
-      const key = walkAnimationKey(facing);
-      if (this.anims.exists(key)) continue;
+    const define = (key: string, columns: readonly number[], facing: Facing, frameRate: number): void => {
+      if (this.anims.exists(key)) return;
       this.anims.create({
         key,
         frames: this.anims.generateFrameNumbers(PLAYER_TEXTURE, {
-          frames: CHARACTER_COLUMNS.walk.map((column) => characterFrame(facing, column)),
+          frames: columns.map((column) => characterFrame(facing, column)),
         }),
-        frameRate: WALK_FRAME_RATE,
+        frameRate,
         repeat: -1,
       });
+    };
+    for (const facing of CHARACTER_ROWS) {
+      define(walkAnimationKey(facing), CHARACTER_COLUMNS.walk, facing, WALK_FRAME_RATE);
+      define(sneakAnimationKey(facing), CHARACTER_COLUMNS.sneakWalk, facing, SNEAK_FRAME_RATE);
     }
   }
 
@@ -349,6 +355,7 @@ export class BaseScene extends Phaser.Scene {
       left: add(KeyCodes.A, KeyCodes.LEFT),
       right: add(KeyCodes.D, KeyCodes.RIGHT),
       action: add(KeyCodes.SPACE),
+      sneak: add(KeyCodes.SHIFT),
     };
   }
 
@@ -383,10 +390,12 @@ export class BaseScene extends Phaser.Scene {
       player.stop();
       player.setFrame(characterFrame(state.facing, column));
     } else if (simulation.playerMoved) {
-      player.play(walkAnimationKey(state.facing), true);
+      const sneak = simulation.playerSneaking;
+      player.play(sneak ? sneakAnimationKey(state.facing) : walkAnimationKey(state.facing), true);
     } else {
       player.stop();
-      player.setFrame(characterFrame(state.facing, CHARACTER_COLUMNS.idle));
+      const idle = simulation.playerSneaking ? CHARACTER_COLUMNS.sneakIdle : CHARACTER_COLUMNS.idle;
+      player.setFrame(characterFrame(state.facing, idle));
     }
   }
 }

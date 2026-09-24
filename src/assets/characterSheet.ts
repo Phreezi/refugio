@@ -2,7 +2,7 @@ import type { Facing } from '../systems/movement/movement';
 import type { PaletteColor } from './palette';
 
 // Layout das spritesheets de personagens (CLAUDE.md §6.2: 4 direções × parado, andar 4 frames,
-// atacar 2 frames) e o desenho do placeholder, frame a frame. Lógica pura: devolve retângulos,
+// atacar 2 frames, e agachado: parado + andar 2 frames, §7.8) e o desenho do placeholder, frame a frame. Lógica pura: devolve retângulos,
 // que o placeholders.ts pinta num canvas.
 
 /** Uma linha por direção, por esta ordem. */
@@ -12,9 +12,11 @@ export const CHARACTER_COLUMNS = {
   idle: 0,
   walk: [1, 2, 3, 4],
   attack: [5, 6],
+  sneakIdle: 7,
+  sneakWalk: [8, 9],
 } as const;
 
-export const CHARACTER_COLUMN_COUNT = 7;
+export const CHARACTER_COLUMN_COUNT = 10;
 
 /** Índice do frame (numeração do Phaser: linha a linha, da esquerda para a direita). */
 export function characterFrame(facing: Facing, column: number): number {
@@ -61,31 +63,42 @@ function boxed(
 export function paintCharacterFrame(facing: Facing, column: number, colors: CharacterColors): PaintRect[] {
   const walkIndex = (CHARACTER_COLUMNS.walk as readonly number[]).indexOf(column);
   const attackIndex = (CHARACTER_COLUMNS.attack as readonly number[]).indexOf(column);
+  const sneakWalkIndex = (CHARACTER_COLUMNS.sneakWalk as readonly number[]).indexOf(column);
+  const crouched = column === CHARACTER_COLUMNS.sneakIdle || sneakWalkIndex >= 0;
   // Ao andar, o corpo sobe 1 px nos frames em que as pernas se cruzam.
   const bob = walkIndex === 1 || walkIndex === 3 ? -1 : 0;
+  // Agachado: cabeça e corpo 6 px mais abaixo, tronco mais curto, pernas dobradas e afastadas.
+  const drop = crouched ? 6 : 0;
+  const top = 3 + bob + drop;
   const rects: PaintRect[] = [];
 
-  // Pernas (por baixo do corpo): passo esquerdo (0), passagem (1), passo direito (2), passagem (3).
-  const LIFTS: readonly (readonly [number, number])[] = [
-    [2, 0],
-    [1, 0],
-    [0, 2],
-    [0, 1],
-  ];
-  const [leftLift, rightLift] = LIFTS[walkIndex] ?? [0, 0];
-  rects.push({ x: 4, y: 25, w: 3, h: 7 - leftLift, color: LEGS });
-  rects.push({ x: 9, y: 25, w: 3, h: 7 - rightLift, color: LEGS });
-
-  // Corpo e cabeça.
-  rects.push(...boxed(3, 13 + bob, 10, 13, colors.body, colors.outline));
-  rects.push(...boxed(3, 3 + bob, 10, 11, SKIN, colors.outline));
+  if (crouched) {
+    const [leftLift, rightLift] = sneakWalkIndex === 0 ? [1, 0] : sneakWalkIndex === 1 ? [0, 1] : [0, 0];
+    rects.push({ x: 3, y: 27, w: 4, h: 5 - leftLift, color: LEGS });
+    rects.push({ x: 9, y: 27, w: 4, h: 5 - rightLift, color: LEGS });
+    rects.push(...boxed(3, 13 + drop, 10, 10, colors.body, colors.outline));
+  } else {
+    // Pernas (por baixo do corpo): passo esquerdo (0), passagem (1), passo direito (2), passagem (3).
+    const LIFTS: readonly (readonly [number, number])[] = [
+      [2, 0],
+      [1, 0],
+      [0, 2],
+      [0, 1],
+    ];
+    const [leftLift, rightLift] = LIFTS[walkIndex] ?? [0, 0];
+    rects.push({ x: 4, y: 25, w: 3, h: 7 - leftLift, color: LEGS });
+    rects.push({ x: 9, y: 25, w: 3, h: 7 - rightLift, color: LEGS });
+    rects.push(...boxed(3, 13 + bob, 10, 13, colors.body, colors.outline));
+  }
+  // Cabeça.
+  rects.push(...boxed(3, top, 10, 11, SKIN, colors.outline));
 
   // Cabelo e olhos conforme a direção.
-  const eyeY = 8 + bob;
+  const eyeY = top + 5;
   if (facing === 'up') {
-    rects.push({ x: 4, y: 4 + bob, w: 8, h: 9, color: HAIR });
+    rects.push({ x: 4, y: top + 1, w: 8, h: 9, color: HAIR });
   } else {
-    rects.push({ x: 4, y: 4 + bob, w: 8, h: 3, color: HAIR });
+    rects.push({ x: 4, y: top + 1, w: 8, h: 3, color: HAIR });
     if (facing === 'down') {
       rects.push({ x: 5, y: eyeY, w: 1, h: 2, color: colors.outline });
       rects.push({ x: 10, y: eyeY, w: 1, h: 2, color: colors.outline });
@@ -93,7 +106,7 @@ export function paintCharacterFrame(facing: Facing, column: number, colors: Char
       const eyeX = facing === 'left' ? 4 : 11;
       rects.push({ x: eyeX, y: eyeY, w: 1, h: 2, color: colors.outline });
       // Cabelo na nuca (do lado oposto aos olhos).
-      rects.push({ x: facing === 'left' ? 8 : 4, y: 4 + bob, w: 4, h: 6, color: HAIR });
+      rects.push({ x: facing === 'left' ? 8 : 4, y: top + 1, w: 4, h: 6, color: HAIR });
     }
   }
 

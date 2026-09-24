@@ -29,3 +29,11 @@ describe('keyboardDirection', () => {
     expect(keyboardDirection({ up: true, down: true, left: false, right: false })).toEqual({ x: 0, y: 0 });
   });
 });
+
+describe('readJoystick: agachado', () => {
+  it('pouco empurrado (entre a zona morta e a de agachar) = agachado; mais = normal', () => {
+    expect(readJoystick(10, 0, 24, 0.25, 0.55).sneak).toBe(true);
+    expect(readJoystick(20, 0, 24, 0.25, 0.55).sneak).toBe(false);
+    expect(readJoystick(3, 0, 24, 0.25, 0.55).sneak).toBe(false); // zona morta: parado
+  });
+});

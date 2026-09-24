@@ -21,14 +21,20 @@ describe('characterSheet', () => {
       columns: CHARACTER_COLUMN_COUNT,
       rows: CHARACTER_ROWS.length,
     });
-    const used = [CHARACTER_COLUMNS.idle, ...CHARACTER_COLUMNS.walk, ...CHARACTER_COLUMNS.attack];
-    expect(used.sort()).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    const used = [
+      CHARACTER_COLUMNS.idle,
+      ...CHARACTER_COLUMNS.walk,
+      ...CHARACTER_COLUMNS.attack,
+      CHARACTER_COLUMNS.sneakIdle,
+      ...CHARACTER_COLUMNS.sneakWalk,
+    ];
+    expect(used.sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it('numera os frames linha a linha, como o Phaser', () => {
     expect(characterFrame('down', 0)).toBe(0);
-    expect(characterFrame('left', 1)).toBe(8);
-    expect(characterFrame('up', 6)).toBe(27);
+    expect(characterFrame('left', 1)).toBe(11);
+    expect(characterFrame('up', 6)).toBe(36);
   });
 
   it('todos os frames ficam dentro dos 16×32 px e usam só cores da paleta', () => {
@@ -50,5 +56,19 @@ describe('characterSheet', () => {
     expect(new Set(idle).size).toBe(4);
     const walk = CHARACTER_COLUMNS.walk.map((c) => JSON.stringify(paintCharacterFrame('down', c, COLORS)));
     expect(new Set(walk).size).toBe(4);
+  });
+
+  it('agachado: a cabeça fica mais baixa e os 2 frames de andar são diferentes', () => {
+    const headTop = (column: number) =>
+      Math.min(
+        ...paintCharacterFrame('down', column, COLORS)
+          .filter((r) => r.color === 'peach')
+          .map((r) => r.y),
+      );
+    expect(headTop(CHARACTER_COLUMNS.sneakIdle)).toBeGreaterThan(headTop(CHARACTER_COLUMNS.idle));
+    const [a, b] = CHARACTER_COLUMNS.sneakWalk.map((c) =>
+      JSON.stringify(paintCharacterFrame('left', c, COLORS)),
+    );
+    expect(a).not.toBe(b);
   });
 });

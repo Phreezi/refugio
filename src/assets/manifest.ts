@@ -8,7 +8,7 @@ export const MANIFEST_VERSION = 1;
  * Grelha das spritesheets de personagens (ver `characterSheet.ts`; repetido aqui porque este
  * módulo não pode importar outros em runtime; um teste garante que coincidem).
  */
-export const CHARACTER_SHEET_LAYOUT = { frameWidth: 16, frameHeight: 32, columns: 7, rows: 4 } as const;
+export const CHARACTER_SHEET_LAYOUT = { frameWidth: 16, frameHeight: 32, columns: 10, rows: 4 } as const;
 
 /** Limite de tamanho de um placeholder, em píxeis de jogo. */
 export const MAX_PLACEHOLDER_SIZE = 256;
