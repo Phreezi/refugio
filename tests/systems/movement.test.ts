@@ -90,7 +90,7 @@ describe('CollisionWorld', () => {
     expect(OPEN.isSolidTile(4, 4)).toBe(false);
   });
 
-  it('fromZone junta tiles sólidos e caixas dos recursos com footprint', () => {
+  it('fromZone junta tiles sólidos e caixas dos recursos e obstáculos com footprint', () => {
     const zone = {
       width: 2,
       height: 1,
@@ -102,17 +102,23 @@ describe('CollisionWorld', () => {
         { id: 'tree', x: 8, y: 14 },
         { id: 'grass', x: 4, y: 14 },
       ],
+      props: [{ id: 'crate', x: 24, y: 10 }],
       containers: [],
       enemySpawns: [],
     };
-    const cw = CollisionWorld.fromZone(zone, {
-      tree: { sprite: 'tree', footprint: { width: 4, height: 2 } },
-      grass: { sprite: 'grass' },
-    });
+    const cw = CollisionWorld.fromZone(
+      zone,
+      {
+        tree: { sprite: 'tree', footprint: { width: 4, height: 2 } },
+        grass: { sprite: 'grass' },
+      },
+      { crate: { sprite: 'crate', footprint: { width: 4, height: 4 } } },
+    );
     expect(cw.pixelWidth).toBe(32);
     expect(cw.blocks({ x: 7, y: 12, w: 1, h: 1 })).toBe(true); // árvore
     expect(cw.blocks({ x: 1, y: 12, w: 1, h: 1 })).toBe(false); // erva: atravessável
     expect(cw.blocks({ x: 20, y: 4, w: 1, h: 1 })).toBe(true); // tile sólido
+    expect(cw.blocks({ x: 23, y: 7, w: 1, h: 1 })).toBe(true); // caixote (obstáculo livre)
   });
 
   it('rejeita um mapa de colisões com tamanho errado', () => {

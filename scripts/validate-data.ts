@@ -4,7 +4,13 @@
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { ManifestError, parseManifest } from '../src/assets/manifest.ts';
-import { DataError, parseResources, type ResourceDefs } from '../src/data/types.ts';
+import {
+  DataError,
+  parseProps,
+  parseResources,
+  type PropDefs,
+  type ResourceDefs,
+} from '../src/data/types.ts';
 import { BASE_TILES, BASE_TILESET_NAME } from '../src/world/tileset.ts';
 import { ZoneMapError, parseZoneMap } from '../src/world/zoneMap.ts';
 
@@ -125,9 +131,25 @@ function checkResources(): string[] {
   return Array.isArray(resources) ? resources : [];
 }
 
+function loadProps(): PropDefs | string[] {
+  try {
+    return parseProps(readJson('src/data/props.json'), manifestKeys());
+  } catch (error) {
+    if (error instanceof DataError) return error.problems.map((p) => `props.json: ${p}`);
+    throw error;
+  }
+}
+
+function checkProps(): string[] {
+  const props = loadProps();
+  return Array.isArray(props) ? props : [];
+}
+
 function checkMaps(): string[] {
   const resources = loadResources();
   if (Array.isArray(resources)) return ['resources.json inválido (ver acima)'];
+  const props = loadProps();
+  if (Array.isArray(props)) return ['props.json inválido (ver acima)'];
   const problems: string[] = [];
   for (const file of MAP_FILES) {
     if (!existsExactCase(file, 'public/assets/')) {
@@ -141,6 +163,7 @@ function checkMaps(): string[] {
           tileSize: TILE_SIZE,
           tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
           resourceIds: Object.keys(resources),
+          propIds: Object.keys(props),
         },
         file,
       );
@@ -192,6 +215,7 @@ const checks: [string, () => string[]][] = [
   ['manifest de assets', checkManifest],
   ['balance', checkBalance],
   ['recursos', checkResources],
+  ['obstáculos', checkProps],
   ['mapas', checkMaps],
   ['i18n', checkI18n],
 ];

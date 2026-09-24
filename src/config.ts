@@ -11,14 +11,14 @@ export const TILE_SIZE = 16;
  * Candidato a definição do jogador ("tamanho", Fase 11).
  */
 export const DISPLAY = {
-  /** Altura-alvo em píxeis de jogo (≈ 17 tiles) com rato. */
+  /** Lado curto alvo em píxeis de jogo (≈ 17 tiles) com rato. */
   targetHeight: 270,
   /** Idem em ecrãs táteis (separado para se poder afinar no telemóvel). */
   touchTargetHeight: 270,
   /** Altura mínima (abaixo disto, zoom fracionário): a UI precisa deste espaço. */
   minHeight: 216,
-  /** Proporções permitidas (largura/altura); fora delas ficam barras. */
-  minAspect: 4 / 3,
+  /** Proporções permitidas (largura/altura), do telemóvel ao alto ao ultrawide; fora delas, barras. */
+  minAspect: 9 / 21,
   maxAspect: 21 / 9,
 } as const;
 

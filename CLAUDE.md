@@ -91,12 +91,12 @@ Base (casa) → escolher zona no mapa-mundo → viajar (custa um pouco de comida
 
 - Tamanho de tile: **16×16 px**.
 - Personagens: **16×32 px** (estilo Stardew).
-- Resolução **adaptável ao ecrã** com escala inteira (×2, ×3, ×4…) e `pixelArt: true`: escolhe-se o zoom inteiro (píxeis do dispositivo por píxel de jogo) cuja altura de jogo fica mais perto de **270 px** (≈ 17 tiles, o "zoom" estilo Stardew), e a largura enche o ecrã (proporção entre 4:3 e 21:9; fora disso, barras). A vista tem sempre dimensões **pares**. Ex.: 1920×1080 → 480×270 ×4; janela 1530×790 → 510×262 ×3. Mínimo 216 px (abaixo disso, zoom fracionário). Valores em `DISPLAY` (`src/config.ts`).
+- Resolução **adaptável ao ecrã** com escala inteira (×2, ×3, ×4…) e `pixelArt: true`: escolhe-se o zoom inteiro (píxeis do dispositivo por píxel de jogo) cujo **lado curto** do jogo fica mais perto de **270 px** (≈ 17 tiles, o "zoom" estilo Stardew), e o outro lado enche o ecrã (proporção entre 9:21 e 21:9; fora disso, barras). Funciona **ao alto e ao baixo**: com o telemóvel na vertical vê-se uma área mais alta do que larga (ex.: 270×550). A vista tem sempre dimensões **pares**. Ex.: 1920×1080 → 480×270 ×4; janela 1530×790 → 510×262 ×3. Mínimo 216 px (abaixo disso, zoom fracionário). Valores em `DISPLAY` (`src/config.ts`).
   - O **canvas tem a resolução do dispositivo** e cada câmara amplia o mundo pelo zoom inteiro (`src/display/view.ts`: `getView()`, `setupFixedCamera()`). Assim a pixel art fica exata e o **texto é desenhado à resolução real** (nítido; usar sempre `Label` de `src/ui/text.ts`).
   - Implementação (`src/display/`): `Scale.NONE` + `scale.resize(canvas)` + `scale.setZoom(1 / dpr)`, com a posição do canvas alinhada a píxeis físicos (também com DPR 1,25 ou 2,625).
   - Com zoom na câmara o Phaser **não arredonda** posições: tudo o que se desenha tem de estar em coordenadas **inteiras** de jogo (o jogador interpolado é arredondado em `BaseScene`).
   - **Nenhuma cena pode assumir um tamanho fixo**: usar `getView()` (não `this.scale.width`, que está em píxeis do dispositivo) e reagir a `Phaser.Scale.Events.RESIZE` (removendo o listener no SHUTDOWN). Ponteiros: converter com `camera.getWorldPoint`.
-- Em mobile retrato: mostrar aviso "roda o ecrã" (o jogo é só landscape).
+- **Zoom do jogador** (`src/display/worldZoom.ts`): o zoom da vista é o máximo; pode afastar-se até metade, em níveis inteiros (×4 → ×3 → ×2; ×3 → ×2) para a pixel art continuar exata. Roda do rato ou +/− no PC, pinça com 2 dedos no telemóvel (UIScene). Guardado no localStorage (`refugio.zoomOut`). Só a câmara do mundo muda; o HUD mantém o tamanho. Se se vê mais do que o mapa, este fica centrado.
 - 60 FPS alvo; lógica de jogo com passo fixo (ver 5.2).
 
 ---
@@ -117,7 +117,7 @@ refugio/
 │   └── assets/
 │       ├── manifest.json     # chave → ficheiro + especificação do placeholder
 │       ├── palette.png       # gerado de src/assets/palette.json (npm run palette)
-│       ├── sprites/          # spritesheets (placeholder agora)
+│       ├── sprites/          # recursos e obstáculos (PNG gerados por `npm run sprites`)
 │       ├── tiles/            # tilesets (base_tiles.png gerado por `npm run tiles`)
 │       ├── maps/             # mapas Tiled (.json, tileset embebido; fora do Prettier)
 │       ├── ui/
@@ -132,7 +132,7 @@ refugio/
 │   │   ├── palette.json/.ts  # paleta de 32 cores (fonte de verdade)
 │   │   ├── characterSheet.ts # layout das spritesheets de personagem + desenho do placeholder
 │   │   └── placeholders.ts   # texturas placeholder geradas por código
-│   ├── display/              # escala inteira + vista (view.ts) + aviso "roda o ecrã"
+│   ├── display/              # escala inteira + vista (view.ts) + zoom do jogador (worldZoom.ts)
 │   ├── world/                # mapas: tileset.ts, zoneMap.ts (validação Tiled, puro), content.ts
 │   ├── debug/                # overlay F3 (DOM)
 │   ├── scenes/
@@ -181,6 +181,7 @@ refugio/
 │   ├── data/                 # JSON data-driven
 │   │   ├── types.ts          # tipos + validação (puro; também usado por scripts/)
 │   │   ├── resources.json    # nós de recurso (Fase 1: sprite + footprint)
+│   │   ├── props.json        # obstáculos/decoração livres no mapa (sprite + footprint)
 │   │   ├── items.json
 │   │   ├── recipes.json
 │   │   ├── structures.json
@@ -245,6 +246,7 @@ npm run typecheck
 npm run validate-data   # valida referências cruzadas entre JSONs (paleta, manifest, i18n; depois items/recipes/…)
 npm run palette    # regenera public/assets/palette.png
 npm run tiles      # regenera public/assets/tiles/base_tiles.png (ordem = src/world/tileset.ts)
+npm run sprites    # regenera public/assets/sprites/*.png (pixel art de recursos e obstáculos; `-- --preview f.png`)
 npm run map:base   # gera maps/base.json (recusa substituir sem `-- --force`: o mapa edita-se no Tiled)
 ```
 
@@ -457,9 +459,10 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 ### 8.4 Regras de desenho de mapas (Tiled)
 
 - Camadas: `ground`, `decor_low`, `collision`, `decor_high` (por cima do jogador), `objects`.
-- Camada `objects` contém pontos de spawn: `player_spawn`, `exit`, `resource:<id>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
+- Camada `objects` contém pontos de spawn: `player_spawn`, `exit`, `resource:<id>`, `prop:<id>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
+- **Obstáculos livres** (`prop:<id>`, definidos em `props.json`): troncos, cepos, caixotes, barris, vedação partida, carros abandonados, poço, pedrinhas… Colocam-se em **qualquer posição** (fora da grelha) e bloqueiam com o seu `footprint` (ou são decoração atravessável sem ele). É assim que se dá realismo ao mapa sem mudar a escala.
 - Cada zona tem **pelo menos 2 saídas** para o mapa-mundo e uma área segura perto da entrada.
-- Nomes dos objetos (campo *Name* no Tiled) com esse formato; o ponto de um `resource:<id>` são os **pés** do recurso (meio da base do sprite).
+- Nomes dos objetos (campo *Name* no Tiled) com esse formato; o ponto de um `resource:<id>`/`prop:<id>` são os **pés** do objeto (meio da base do sprite). Posições fracionárias são arredondadas ao desenhar.
 - A camada `collision` é desenhada (paredes, vedações, água, rochedos) e qualquer tile nela bloqueia. Os recursos bloqueiam com o `footprint` de `resources.json`.
 - Tilesets **embebidos** no mapa (o Phaser não lê `.tsx` externos); o tileset `base_tiles` aponta para `../tiles/base_tiles.png`. Acrescentar tiles só no fim, para não baralhar os gids.
 - O `validate-data` e o arranque do jogo validam o mapa (camadas, gids, spawn único fora das colisões, ≥ 2 saídas, ids de recursos).
@@ -640,7 +643,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [x] Câmara a seguir o jogador, limitada aos bordos do mapa.
 - [x] Ordenação por profundidade (Y-sort) para o jogador passar atrás de árvores.
 - [x] Input: teclado + **joystick virtual** touch.
-- [x] Ecrã "roda o dispositivo" em retrato.
+- [x] Ecrã "roda o dispositivo" em retrato. *(Substituído: o jogo passou a funcionar também na vertical.)*
 
 **Aceitação:** anda-se pela base no PC e no telemóvel a 60 FPS, sem atravessar paredes, com o jogador corretamente por trás/à frente dos objetos.
 
@@ -921,5 +924,8 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Resolução interna adaptável (largura enche o ecrã, sem barras) com alvo de **270 px** de altura | O jogador experimentou 400 px (mais tiles, tudo mais pequeno) e preferiu o "zoom" de ~30×17 tiles. O alvo pode vir a ser uma definição ("tamanho", Fase 11) |
 | 2026-09-24 | Canvas à resolução do dispositivo + zoom inteiro nas câmaras (em vez de canvas pequeno ampliado por CSS) | O texto ficava esbatido (desenhado a 8 px e ampliado). Agora é desenhado à resolução real; a pixel art continua exata porque tudo fica em posições inteiras |
 | 2026-09-24 | Realismo com obstáculos livres (objetos de qualquer tamanho, fora da grelha) em vez de tiles mais pequenos | Uma grelha 2× mais fina obrigava a arte com o dobro dos píxeis (≈ 4× trabalho) ou deixava o boneco minúsculo |
+| 2026-09-24 | Sprites de recursos/obstáculos em pixel art gerada por script (`npm run sprites`) | Os retângulos com letra não davam para avaliar o aspeto; continuam a ser placeholders (Fase 12), mas já com sombra, luz e contorno |
+| 2026-09-24 | Zoom do jogador até metade, em níveis inteiros | Pedido do jogador (roda/pinça). Zoom fracionário deixaria píxeis irregulares; num ecrã ×3 o mínimo é ×2 |
+| 2026-09-24 | Jogo também na vertical (alvo no lado curto) em vez do aviso "roda o ecrã" | Pedido do jogador: prefere jogar ao alto, mesmo vendo uma área diferente |
 | 2026-09-24 | Cópia de emergência síncrona (localStorage) ao esconder/fechar a página | Testado: ao recarregar, o Chrome corta a escrita assíncrona no IndexedDB e perdiam-se os últimos segundos |
 | 2026-09-24 | Joystick virtual flutuante na metade esquerda (só toque), 8 direções, zona morta 25% | Metade direita fica livre para o botão de ação (Fase 3). O teclado tem prioridade sobre o joystick |

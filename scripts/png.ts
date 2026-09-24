@@ -54,13 +54,62 @@ export class Bitmap {
     this.data = new Uint8Array(width * height * 4);
   }
 
-  set(x: number, y: number, rgb: Rgb): void {
+  set(x: number, y: number, rgb: Rgb, alpha = 255): void {
     if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
     const i = (y * this.width + x) * 4;
     this.data[i] = rgb[0];
     this.data[i + 1] = rgb[1];
     this.data[i + 2] = rgb[2];
-    this.data[i + 3] = 255;
+    this.data[i + 3] = alpha;
+  }
+
+  /** Opacidade (0–255) do píxel; fora da imagem = 0. */
+  alpha(x: number, y: number): number {
+    if (x < 0 || y < 0 || x >= this.width || y >= this.height) return 0;
+    return this.data[(y * this.width + x) * 4 + 3] ?? 0;
+  }
+
+  /** Elipse cheia (centro e raios em píxeis; aceita meios píxeis). */
+  ellipse(cx: number, cy: number, rx: number, ry: number, rgb: Rgb, alpha = 255): void {
+    for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
+      for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+        const dx = (x + 0.5 - cx) / rx;
+        const dy = (y + 0.5 - cy) / ry;
+        if (dx * dx + dy * dy <= 1) this.set(x, y, rgb, alpha);
+      }
+    }
+  }
+
+  /** Contorno de 1 px por fora de tudo o que é opaco (vizinhança de 4). */
+  outline(rgb: Rgb): void {
+    const edge: [number, number][] = [];
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        if (this.alpha(x, y) === 255) continue;
+        const near = [
+          [x - 1, y],
+          [x + 1, y],
+          [x, y - 1],
+          [x, y + 1],
+        ].some(([nx = 0, ny = 0]) => this.alpha(nx, ny) === 255);
+        if (near) edge.push([x, y]);
+      }
+    }
+    for (const [x, y] of edge) this.set(x, y, rgb);
+  }
+
+  /** Copia outra imagem para (ox, oy), ampliada `scale` vezes (vizinho mais próximo). */
+  blit(src: Bitmap, ox: number, oy: number, scale = 1): void {
+    for (let y = 0; y < src.height * scale; y++) {
+      for (let x = 0; x < src.width * scale; x++) {
+        const sx = Math.floor(x / scale);
+        const sy = Math.floor(y / scale);
+        const i = (sy * src.width + sx) * 4;
+        const a = src.data[i + 3] ?? 0;
+        if (a === 0) continue;
+        this.set(ox + x, oy + y, [src.data[i] ?? 0, src.data[i + 1] ?? 0, src.data[i + 2] ?? 0], a);
+      }
+    }
   }
 
   fill(x: number, y: number, w: number, h: number, rgb: Rgb): void {

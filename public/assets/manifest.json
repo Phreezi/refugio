@@ -5,7 +5,11 @@
     "tileset_base": {
       "type": "image",
       "file": "tiles/base_tiles.png",
-      "placeholder": { "width": 176, "height": 16, "color": "grass" }
+      "placeholder": {
+        "width": 176,
+        "height": 16,
+        "color": "grass"
+      }
     },
     "player": {
       "type": "spritesheet",
@@ -13,55 +17,226 @@
       "frameHeight": 32,
       "columns": 7,
       "rows": 4,
-      "placeholder": { "width": 16, "height": 32, "color": "sky", "border": "ink", "style": "character" }
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "sky",
+        "border": "ink",
+        "style": "character"
+      }
     },
     "zombie_walker": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 32, "color": "lime", "border": "ink", "letter": "Z" }
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "lime",
+        "border": "ink",
+        "letter": "Z"
+      }
     },
     "zombie_runner": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 32, "color": "orange", "border": "ink", "letter": "Z" }
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "orange",
+        "border": "ink",
+        "letter": "Z"
+      }
     },
     "zombie_tank": {
       "type": "image",
-      "placeholder": { "width": 24, "height": 32, "color": "plum", "border": "ink", "letter": "Z" }
+      "placeholder": {
+        "width": 24,
+        "height": 32,
+        "color": "plum",
+        "border": "ink",
+        "letter": "Z"
+      }
     },
     "tree_small": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 32, "color": "forest", "border": "forest_dark", "letter": "Á" }
+      "file": "sprites/tree_small.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "forest",
+        "border": "forest_dark",
+        "letter": "Á"
+      }
     },
     "tree_large": {
       "type": "image",
-      "placeholder": { "width": 32, "height": 32, "color": "forest", "border": "forest_dark", "letter": "Á" }
+      "file": "sprites/tree_large.png",
+      "placeholder": {
+        "width": 32,
+        "height": 48,
+        "color": "forest",
+        "border": "forest_dark",
+        "letter": "Á"
+      }
     },
     "rock": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "stone", "border": "stone_dark", "letter": "P" }
+      "file": "sprites/rock.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone",
+        "border": "stone_dark",
+        "letter": "P"
+      }
     },
     "bush_berries": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "leaf", "border": "forest", "letter": "b" }
+      "file": "sprites/bush_berries.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "leaf",
+        "border": "forest",
+        "letter": "b"
+      }
     },
     "tall_grass": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "lime", "border": "leaf", "letter": "e" }
+      "file": "sprites/tall_grass.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "lime",
+        "border": "leaf",
+        "letter": "e"
+      }
     },
     "iron_vein": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "stone_dark", "border": "blood", "letter": "m" }
+      "file": "sprites/iron_vein.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_dark",
+        "border": "blood",
+        "letter": "m"
+      }
     },
     "chest": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "wood", "border": "bark_dark", "letter": "B" }
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "B"
+      }
     },
     "campfire": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "orange", "border": "bark_dark", "letter": "F" }
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "orange",
+        "border": "bark_dark",
+        "letter": "F"
+      }
     },
     "wood_bench": {
       "type": "image",
-      "placeholder": { "width": 16, "height": 16, "color": "wood_light", "border": "bark", "letter": "T" }
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood_light",
+        "border": "bark",
+        "letter": "T"
+      }
+    },
+    "log": {
+      "type": "image",
+      "file": "sprites/log.png",
+      "placeholder": {
+        "width": 48,
+        "height": 16,
+        "color": "bark",
+        "border": "bark_dark",
+        "letter": "T"
+      }
+    },
+    "stump": {
+      "type": "image",
+      "file": "sprites/stump.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark",
+        "border": "bark_dark",
+        "letter": "C"
+      }
+    },
+    "pebbles": {
+      "type": "image",
+      "file": "sprites/pebbles.png",
+      "placeholder": {
+        "width": 16,
+        "height": 8,
+        "color": "stone",
+        "border": "stone_dark"
+      }
+    },
+    "crate": {
+      "type": "image",
+      "file": "sprites/crate.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "X"
+      }
+    },
+    "barrel": {
+      "type": "image",
+      "file": "sprites/barrel.png",
+      "placeholder": {
+        "width": 16,
+        "height": 20,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "O"
+      }
+    },
+    "fence_broken": {
+      "type": "image",
+      "file": "sprites/fence_broken.png",
+      "placeholder": {
+        "width": 32,
+        "height": 16,
+        "color": "bark",
+        "border": "bark_dark",
+        "letter": "V"
+      }
+    },
+    "car_wreck": {
+      "type": "image",
+      "file": "sprites/car_wreck.png",
+      "placeholder": {
+        "width": 48,
+        "height": 32,
+        "color": "teal",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "well": {
+      "type": "image",
+      "file": "sprites/well.png",
+      "placeholder": {
+        "width": 32,
+        "height": 32,
+        "color": "stone",
+        "border": "stone_dark",
+        "letter": "P"
+      }
     }
   }
 }

@@ -2,9 +2,8 @@ import Phaser from 'phaser';
 import { PALETTE } from './assets/palette';
 import { DEBUG_QUERY_PARAM, LANGUAGE_QUERY_PARAM } from './config';
 import { installDebugOverlay } from './debug/installDebugOverlay';
-import { installOrientationNotice } from './display/orientationNotice';
 import { installPixelScaling, measurePixelScale } from './display/installPixelScaling';
-import { getLanguage, isLanguage, setLanguage, t } from './i18n';
+import { getLanguage, isLanguage, setLanguage } from './i18n';
 import { BaseScene } from './scenes/BaseScene';
 import { BootScene } from './scenes/BootScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
@@ -46,8 +45,5 @@ const game = new Phaser.Game({
 
 const scaling = installPixelScaling(game, host);
 installDebugOverlay(game, scaling, params.has(DEBUG_QUERY_PARAM));
-
-const rotateNotice = document.getElementById('rotate-notice');
-if (rotateNotice) installOrientationNotice(game, rotateNotice, t('display.rotate'));
 
 installSaveOnHide();

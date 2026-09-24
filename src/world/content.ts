@@ -1,4 +1,4 @@
-import type { ResourceDefs } from '../data/types';
+import type { PropDefs, ResourceDefs } from '../data/types';
 import type { ZoneMap } from './zoneMap';
 
 /**
@@ -7,6 +7,7 @@ import type { ZoneMap } from './zoneMap';
  */
 class Content {
   private resourceDefs: ResourceDefs | null = null;
+  private propDefs: PropDefs | null = null;
   private readonly zoneMaps = new Map<string, ZoneMap>();
 
   setResources(defs: ResourceDefs): void {
@@ -16,6 +17,15 @@ class Content {
   get resources(): ResourceDefs {
     if (this.resourceDefs === null) throw new Error('Content: recursos ainda não carregados.');
     return this.resourceDefs;
+  }
+
+  setProps(defs: PropDefs): void {
+    this.propDefs = defs;
+  }
+
+  get props(): PropDefs {
+    if (this.propDefs === null) throw new Error('Content: obstáculos ainda não carregados.');
+    return this.propDefs;
   }
 
   setZoneMap(zoneId: string, map: ZoneMap): void {

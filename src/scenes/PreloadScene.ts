@@ -4,8 +4,9 @@ import { paletteNumber } from '../assets/palette';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
 import { BASE_MAP_FILE, BASE_MAP_KEY, TILE_SIZE } from '../config';
 import { BASE_ZONE_ID } from '../core/GameState';
+import propsJson from '../data/props.json';
 import resourcesJson from '../data/resources.json';
-import { parseResources } from '../data/types';
+import { parseProps, parseResources } from '../data/types';
 import { getView, setupFixedCamera } from '../display/view';
 import { t } from '../i18n';
 import { Label } from '../ui/text';
@@ -91,6 +92,8 @@ export class PreloadScene extends Phaser.Scene {
   private loadContent(manifest: AssetManifest): void {
     const resources = parseResources(resourcesJson, Object.keys(manifest.assets));
     content.setResources(resources);
+    const props = parseProps(propsJson, Object.keys(manifest.assets));
+    content.setProps(props);
 
     const cached: unknown = this.cache.tilemap.get(BASE_MAP_KEY);
     const data = typeof cached === 'object' && cached !== null && 'data' in cached ? cached.data : undefined;
@@ -101,6 +104,7 @@ export class PreloadScene extends Phaser.Scene {
         tileSize: TILE_SIZE,
         tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
         resourceIds: Object.keys(resources),
+        propIds: Object.keys(props),
       },
       BASE_MAP_FILE,
     );

@@ -34,29 +34,10 @@
         display: block;
         image-rendering: pixelated;
       }
-      /* Aviso "roda o ecrã" (src/display/orientationNotice.ts); cores da paleta (ink, cream). */
-      #rotate-notice {
-        position: fixed;
-        inset: 0;
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-        background: #1c1521;
-        color: #fbf3de;
-        font: 20px/1.4 monospace;
-        text-align: center;
-        white-space: pre-line;
-      }
-      #rotate-notice[hidden] {
-        display: none;
-      }
     </style>
   </head>
   <body>
     <div id="game"></div>
-    <div id="rotate-notice" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

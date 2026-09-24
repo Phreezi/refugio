@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import props from '../../src/data/props.json';
 import resources from '../../src/data/resources.json';
 import { BASE_TILES, BASE_TILESET_NAME } from '../../src/world/tileset';
 import { parseZoneMap, ZoneMapError, type ZoneMapRules } from '../../src/world/zoneMap';
@@ -8,6 +9,7 @@ const RULES: ZoneMapRules = {
   tileSize: 16,
   tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
   resourceIds: Object.keys(resources).filter((id) => id !== '$comment'),
+  propIds: Object.keys(props).filter((id) => id !== '$comment'),
 };
 
 /** Mapa 3×2 mínimo válido; `patch` altera partes para testar erros. */
@@ -38,6 +40,7 @@ function tinyMap(patch: (map: Record<string, unknown>) => void = () => undefined
           obj(3, 'exit', 48, 24),
           obj(4, 'resource:rock', 24, 30),
           obj(5, 'container:crate_common', 40, 30),
+          obj(6, 'prop:log', 20.5, 12.25),
         ],
       },
     ],
@@ -64,6 +67,7 @@ describe('parseZoneMap', () => {
     expect(map.exits).toHaveLength(2);
     expect(map.resources).toEqual([{ id: 'rock', x: 24, y: 30 }]);
     expect(map.containers).toEqual([{ id: 'crate_common', x: 40, y: 30 }]);
+    expect(map.props).toEqual([{ id: 'log', x: 20.5, y: 12.25 }]);
   });
 
   it('ignora os bits de rotação/espelho do Tiled nos gids', () => {
@@ -85,6 +89,7 @@ describe('parseZoneMap', () => {
     expect(map.width).toBe(48);
     expect(map.height).toBe(48);
     expect(map.resources.length).toBeGreaterThan(0);
+    expect(map.props.length).toBeGreaterThan(0);
   });
 
   it('reporta camadas em falta, spawn duplicado, recursos desconhecidos e nomes inválidos', () => {
@@ -96,6 +101,7 @@ describe('parseZoneMap', () => {
         objects?.push(
           { id: 9, name: 'player_spawn', x: 1, y: 1 },
           { id: 10, name: 'resource:unicorn', x: 1, y: 1 },
+          { id: 12, name: 'prop:spaceship', x: 1, y: 1 },
           { id: 11, name: 'baú', x: 1, y: 1 },
         );
       }),
@@ -103,6 +109,7 @@ describe('parseZoneMap', () => {
     expect(problems).toEqual([
       expect.stringContaining('"decor_high"'),
       expect.stringContaining('unicorn'),
+      expect.stringContaining('spaceship'),
       expect.stringContaining('nome inválido'),
       expect.stringContaining('player_spawn'),
     ]);

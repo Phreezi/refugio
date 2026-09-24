@@ -6,14 +6,18 @@ export interface Footprint {
   height: number;
 }
 
-export interface ResourceDef {
+/** Objeto do mundo com sprite e (opcional) caixa sólida: recursos e obstáculos/decoração. */
+export interface WorldObjectDef {
   /** Chave de textura no manifest de assets. */
   sprite: string;
   /** Caixa sólida na base do sprite, centrada nos pés. Omisso = atravessável. */
   footprint?: Footprint;
 }
 
+export type ResourceDef = WorldObjectDef;
 export type ResourceDefs = Readonly<Record<string, ResourceDef>>;
+/** Obstáculos e decoração (`props.json`): troncos, caixotes, carros abandonados… */
+export type PropDefs = Readonly<Record<string, WorldObjectDef>>;
 
 export class DataError extends Error {
   readonly problems: readonly string[];
@@ -41,10 +45,23 @@ function isSize(value: unknown): value is number {
  * @param spriteKeys chaves de textura existentes no manifest.
  */
 export function parseResources(input: unknown, spriteKeys: Iterable<string>): ResourceDefs {
-  if (!isObject(input)) throw new DataError('resources.json', ['tem de ser um objeto id → recurso']);
+  return parseWorldObjects(input, spriteKeys, 'resources.json');
+}
+
+/** Valida `props.json`. */
+export function parseProps(input: unknown, spriteKeys: Iterable<string>): PropDefs {
+  return parseWorldObjects(input, spriteKeys, 'props.json');
+}
+
+function parseWorldObjects(
+  input: unknown,
+  spriteKeys: Iterable<string>,
+  file: string,
+): Readonly<Record<string, WorldObjectDef>> {
+  if (!isObject(input)) throw new DataError(file, ['tem de ser um objeto id → definição']);
   const sprites = new Set(spriteKeys);
   const problems: string[] = [];
-  const defs: Record<string, ResourceDef> = {};
+  const defs: Record<string, WorldObjectDef> = {};
   for (const [id, raw] of Object.entries(input)) {
     if (id === '$comment') continue;
     if (!ID_PATTERN.test(id)) problems.push(`"${id}": o id tem de estar em snake_case`);
@@ -57,7 +74,7 @@ export function parseResources(input: unknown, spriteKeys: Iterable<string>): Re
     }
     const sprite = typeof raw.sprite === 'string' ? raw.sprite : '';
     if (!sprites.has(sprite)) problems.push(`"${id}": sprite "${sprite}" não existe no manifest`);
-    const def: ResourceDef = { sprite };
+    const def: WorldObjectDef = { sprite };
     if (raw.footprint !== undefined) {
       const fp = raw.footprint;
       if (isObject(fp) && isSize(fp.width) && isSize(fp.height)) {
@@ -70,6 +87,6 @@ export function parseResources(input: unknown, spriteKeys: Iterable<string>): Re
     }
     defs[id] = def;
   }
-  if (problems.length > 0) throw new DataError('resources.json', problems);
+  if (problems.length > 0) throw new DataError(file, problems);
   return defs;
 }

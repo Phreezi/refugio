@@ -23,6 +23,7 @@ Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
 | `npm run validate-data` | Valida paleta, manifest de assets e i18n (e, no futuro, os JSON de conteúdo) |
 | `npm run palette`       | Regenera `public/assets/palette.png` a partir de `src/assets/palette.json`   |
 | `npm run tiles`         | Regenera o tileset placeholder `public/assets/tiles/base_tiles.png`          |
+| `npm run sprites`       | Regenera os sprites de recursos e obstáculos em `public/assets/sprites/`     |
 | `npm run map:base`      | Gera o mapa inicial da base (não substitui um existente sem `-- --force`)    |
 
 ## Debug
@@ -34,8 +35,9 @@ Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
 ## Controlos (Fase 1)
 
 - **PC:** WASD ou setas para andar (8 direções).
-- **Telemóvel:** joystick virtual — tocar e arrastar na metade esquerda do ecrã. O jogo só funciona
-  na horizontal; ao alto aparece o aviso "roda o dispositivo" e o jogo fica em pausa.
+- **Telemóvel:** joystick virtual — tocar e arrastar na metade esquerda do ecrã. Funciona na
+  horizontal e na vertical.
+- **Zoom:** roda do rato ou teclas +/− no PC; pinça com dois dedos no telemóvel (até metade).
 
 ## Gravação
 
