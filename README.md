@@ -37,6 +37,12 @@ Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
 - **Telemóvel:** joystick virtual — tocar e arrastar na metade esquerda do ecrã. O jogo só funciona
   na horizontal; ao alto aparece o aviso "roda o dispositivo" e o jogo fica em pausa.
 
+## Gravação
+
+O jogo grava sozinho (de 15 em 15 s de jogo, ao morrer e ao esconder/fechar a página) no
+IndexedDB do browser, com duas cópias rotativas e uma cópia de emergência no localStorage. No menu
+inicial: **Continuar**, **Exportar** (descarrega um `.json`), **Importar** e **Apagar**.
+
 ## Mapas (Tiled)
 
 Os mapas estão em `public/assets/maps/` no formato JSON do [Tiled](https://www.mapeditor.org/).

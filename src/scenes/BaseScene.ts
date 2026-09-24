@@ -4,8 +4,10 @@ import { CHARACTER_COLUMNS, CHARACTER_ROWS, characterFrame } from '../assets/cha
 import { BASE_MAP_KEY } from '../config';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
 import { simulation } from '../core/Simulation';
+import { getView } from '../display/view';
 import { keyboardDirection } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
+import { autosave } from '../save';
 import { CollisionWorld } from '../systems/movement/CollisionWorld';
 import type { Facing } from '../systems/movement/movement';
 import { content } from '../world/content';
@@ -63,17 +65,29 @@ export class BaseScene extends Phaser.Scene {
     // Em ecrãs mais largos do que o mapa, o que fica fora dele é "noite".
     camera.setBackgroundColor(PALETTE.ink);
     camera.setBounds(0, 0, zone.width * zone.tileSize, zone.height * zone.tileSize);
-    // O 2.º argumento TEM de ser true: startFollow sobrepõe camera.roundPixels.
+    // Zoom inteiro (px do dispositivo por px de jogo). Com zoom o Phaser não arredonda: o jogador
+    // e tudo o resto ficam em posições inteiras (ver renderPlayer), e a vista tem tamanho par.
+    camera.setZoom(getView().zoom);
     camera.startFollow(this.player, true);
+    const onResize = (): void => {
+      camera.setZoom(getView().zoom);
+    };
+    this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
 
     this.keys = this.createMoveKeys();
     simulation.setWorld(CollisionWorld.fromZone(zone, content.resources));
+    simulation.setRespawnPoint(zone.playerSpawn);
     simulation.reset();
+    autosave.start();
     this.scene.launch(SceneKey.UI, {});
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
       this.scene.stop(SceneKey.UI);
+      autosave.stop();
+      void autosave.flush();
       simulation.setWorld(null);
+      simulation.setRespawnPoint(null);
       moveInput.reset();
       this.player = null;
       this.keys = null;
@@ -150,8 +164,9 @@ export class BaseScene extends Phaser.Scene {
     const state = gameState.data.player;
     const previous = simulation.previousPlayerPosition;
     const alpha = simulation.alpha;
-    const x = previous.x + (state.x - previous.x) * alpha;
-    const y = previous.y + (state.y - previous.y) * alpha;
+    // Arredondado a píxeis de jogo: com zoom na câmara, o Phaser desenharia a meio píxel.
+    const x = Math.round(previous.x + (state.x - previous.x) * alpha);
+    const y = Math.round(previous.y + (state.y - previous.y) * alpha);
     player.setPosition(x, y).setDepth(y);
 
     if (simulation.playerMoved) {

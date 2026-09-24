@@ -1,55 +1,101 @@
 import Phaser from 'phaser';
-import { PALETTE, paletteNumber } from '../assets/palette';
+import { PALETTE } from '../assets/palette';
+import { clockAt } from '../core/Clock';
 import { eventBus } from '../core/EventBus';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
-import { t } from '../i18n';
+import { BALANCE } from '../data/balance';
+import { getView, setupFixedCamera } from '../display/view';
+import { t, type MessageKey } from '../i18n';
+import { autosave, saves } from '../save';
+import type { LoadedSave, LoadResult } from '../save/SaveManager';
+import { SaveError } from '../save/schema';
+import { Button } from '../ui/Button';
+import { downloadText, pickTextFile, saveFileName } from '../ui/fileTransfer';
+import { Label } from '../ui/text';
 import { content } from '../world/content';
 import { SceneKey } from './keys';
 
-const BUTTON_WIDTH = 112;
-const BUTTON_HEIGHT = 22;
+export interface MainMenuData {
+  /** Mensagem a mostrar ao abrir (ex.: depois de importar ou apagar um save). */
+  message?: MessageKey;
+}
 
-/** Menu inicial: título e botão "Novo jogo" (rato, toque, Enter ou Espaço). */
+const MAIN_BUTTON = { width: 136, height: 22 } as const;
+const SMALL_BUTTON = { width: 64, height: 14, fontSize: 8, style: 'secondary' } as const;
+/** Tempo para confirmar uma ação destrutiva (segundo toque no mesmo botão). */
+const CONFIRM_MS = 3000;
+
+/**
+ * Menu inicial: Continuar (se houver save), Novo jogo, e gestão do save
+ * (Exportar/Importar/Apagar, CLAUDE.md §10.3). Rato, toque, Enter ou Espaço.
+ */
 export class MainMenuScene extends Phaser.Scene {
-  private starting = false;
+  private busy = false;
+  private status: Label | null = null;
+  private primaryAction: (() => void) | null = null;
 
   constructor() {
     super(SceneKey.MainMenu);
   }
 
-  create(): void {
-    this.starting = false;
-    const { width, height } = this.scale;
+  create(data: MainMenuData): void {
+    this.busy = false;
+    this.primaryAction = null;
+    const { width, height } = getView();
     const cx = Math.round(width / 2);
+    setupFixedCamera(this.cameras.main);
     this.cameras.main.setBackgroundColor(PALETTE.night);
 
     // Posições proporcionais à altura: a resolução do jogo depende do ecrã.
-    this.add
-      .text(cx, Math.round(height * 0.22), t('game.title'), {
-        fontFamily: 'monospace',
-        fontSize: 32,
-        color: PALETTE.wheat,
-      })
-      .setOrigin(0.5, 0);
+    new Label(
+      this,
+      cx,
+      Math.round(height * 0.2),
+      t('game.title'),
+      { size: 32, color: 'wheat', bold: true },
+      [0.5, 0],
+    );
+    this.status = new Label(
+      this,
+      cx,
+      height - 30,
+      data.message ? t(data.message) : t('menu.hint'),
+      { size: 8, color: 'stone_light', wrap: width - 16, align: 'center' },
+      [0.5, 0],
+    );
+    new Label(
+      this,
+      width - 4,
+      height - 4,
+      `v${__APP_VERSION__} · ${__BUILD_ID__}`,
+      { size: 7, color: 'stone' },
+      [1, 1],
+    );
+    const loading = new Label(
+      this,
+      cx,
+      Math.round(height * 0.5),
+      t('boot.loading'),
+      { size: 8, color: 'stone_light' },
+      [0.5, 0.5],
+    );
 
-    this.createButton(cx, Math.round(height * 0.55), t('menu.new_game'), () => {
-      this.startNewGame();
-    });
-
-    this.add
-      .text(cx, height - 36, t('menu.hint'), {
-        fontFamily: 'monospace',
-        fontSize: 8,
-        color: PALETTE.stone_light,
-      })
-      .setOrigin(0.5, 0);
-    this.add
-      .text(width - 4, height - 12, `v${__APP_VERSION__} · ${__BUILD_ID__}`, {
-        fontFamily: 'monospace',
-        fontSize: 8,
-        color: PALETTE.stone,
-      })
-      .setOrigin(1, 0);
+    // O save lê-se de forma assíncrona; se o menu entretanto reiniciar, ignora-se o resultado.
+    let alive = true;
+    saves.load().then(
+      (result) => {
+        if (!alive) return;
+        loading.destroy();
+        this.buildButtons(result, data.message !== undefined);
+      },
+      (error: unknown) => {
+        if (!alive) return;
+        console.error('[save] não foi possível ler o save:', error);
+        loading.destroy();
+        this.buildButtons({ save: null, corrupted: false }, false);
+        this.setStatus('save.read_failed');
+      },
+    );
 
     // Mudou a resolução (janela redimensionada, telemóvel rodado): refazer o menu.
     const onResize = (): void => {
@@ -57,53 +103,161 @@ export class MainMenuScene extends Phaser.Scene {
     };
     this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      alive = false;
       this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
     });
 
     // Eventos nomeados (sem addKey) não capturam as teclas globalmente.
-    this.input.keyboard?.on('keydown-ENTER', () => {
-      this.startNewGame();
+    const onKey = (): void => {
+      this.primaryAction?.();
+    };
+    this.input.keyboard?.on('keydown-ENTER', onKey);
+    this.input.keyboard?.on('keydown-SPACE', onKey);
+  }
+
+  private buildButtons(result: LoadResult, keepMessage: boolean): void {
+    const { width, height } = getView();
+    const cx = Math.round(width / 2);
+    const y = Math.round(height * 0.5);
+    const save = result.save;
+
+    if (save) {
+      const time = clockAt(save.state.world.tick, BALANCE.dayLengthSec, BALANCE.dayStartHour);
+      this.primaryAction = () => {
+        this.continueGame(save);
+      };
+      new Button(this, cx, y, t('menu.continue', { day: time.day }), MAIN_BUTTON, this.primaryAction);
+      this.confirmButton(
+        cx,
+        y + 30,
+        'menu.new_game',
+        'menu.confirm_new',
+        { ...MAIN_BUTTON, style: 'secondary' },
+        () => {
+          this.startNewGame();
+        },
+      );
+    } else {
+      this.primaryAction = () => {
+        this.startNewGame();
+      };
+      new Button(this, cx, y, t('menu.new_game'), MAIN_BUTTON, this.primaryAction);
+    }
+
+    // Gestão do save: linha de botões pequenos.
+    const rowY = height - 50;
+    const actions: [MessageKey, (x: number) => void][] = [];
+    if (save) {
+      actions.push([
+        'save.export',
+        (x) =>
+          new Button(this, x, rowY, t('save.export'), SMALL_BUTTON, () => {
+            downloadText(saveFileName(new Date()), save.text);
+            this.setStatus('save.exported');
+          }),
+      ]);
+    }
+    actions.push([
+      'save.import',
+      (x) =>
+        new Button(this, x, rowY, t('save.import'), SMALL_BUTTON, () => {
+          void this.importSave();
+        }),
+    ]);
+    if (save) {
+      actions.push([
+        'save.delete',
+        (x) => {
+          this.confirmButton(x, rowY, 'save.delete', 'save.confirm_delete', SMALL_BUTTON, () => {
+            void this.deleteSave();
+          });
+        },
+      ]);
+    }
+    const spacing = SMALL_BUTTON.width + 8;
+    const firstX = cx - Math.round(((actions.length - 1) * spacing) / 2);
+    actions.forEach(([, make], i) => {
+      make(firstX + i * spacing);
     });
-    this.input.keyboard?.on('keydown-SPACE', () => {
-      this.startNewGame();
+
+    if (result.corrupted && !keepMessage) this.setStatus(save ? 'save.recovered' : 'save.corrupt_lost');
+  }
+
+  /** Botão de ação destrutiva: o 1.º toque pede confirmação, o 2.º (em 3 s) executa. */
+  private confirmButton(
+    x: number,
+    y: number,
+    label: MessageKey,
+    confirmLabel: MessageKey,
+    options: ConstructorParameters<typeof Button>[4],
+    onConfirm: () => void,
+  ): void {
+    let armed = false;
+    const button = new Button(this, x, y, t(label), options, () => {
+      if (armed) {
+        onConfirm();
+        return;
+      }
+      armed = true;
+      button.setText(t(confirmLabel)).setStyle('danger');
+      this.time.delayedCall(CONFIRM_MS, () => {
+        armed = false;
+        button.setText(t(label)).setStyle(options.style ?? 'primary');
+      });
     });
   }
 
-  /**
-   * Botão feito de dois retângulos (contorno + fundo), com tamanhos pares e centro
-   * inteiro: as Shapes não são arredondadas ao píxel pelo Phaser 4.
-   */
-  private createButton(x: number, y: number, label: string, onClick: () => void): void {
-    this.add.rectangle(x, y, BUTTON_WIDTH + 2, BUTTON_HEIGHT + 2, paletteNumber('bark_dark'));
-    const fill = this.add.rectangle(x, y, BUTTON_WIDTH, BUTTON_HEIGHT, paletteNumber('wood'));
-    this.add
-      .text(x, y, label, { fontFamily: 'monospace', fontSize: 12, color: PALETTE.cream })
-      .setOrigin(0.5);
+  private setStatus(key: MessageKey): void {
+    this.status?.setText(t(key));
+  }
 
-    // Só conta como clique se o toque começar E acabar no botão.
-    let pressed = false;
-    fill
-      .setInteractive({ useHandCursor: true })
-      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => fill.setFillStyle(paletteNumber('wood_light')))
-      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-        pressed = false;
-        fill.setFillStyle(paletteNumber('wood'));
-      })
-      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
-        pressed = true;
-      })
-      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
-        if (pressed) onClick();
-        pressed = false;
-      });
+  private continueGame(save: LoadedSave): void {
+    if (this.busy) return; // Enter com a tecla presa repete o evento
+    this.busy = true;
+    const state = gameState.load(save.state);
+    eventBus.emit('game:started', { zoneId: state.player.zoneId });
+    this.scene.start(SceneKey.Base, {});
   }
 
   private startNewGame(): void {
-    // Enter com a tecla presa repete o evento; só o primeiro conta.
-    if (this.starting) return;
-    this.starting = true;
+    if (this.busy) return;
+    this.busy = true;
     const state = gameState.newGame(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
+    void autosave.flush(); // o jogo novo substitui já o antigo
     this.scene.start(SceneKey.Base, {});
+  }
+
+  private async importSave(): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      const text = await pickTextFile();
+      if (text === null) return;
+      const parsed = saves.parseImport(text);
+      gameState.load(parsed.state);
+      gameState.markDirty();
+      await autosave.flush();
+      this.scene.restart({ message: 'save.imported' } satisfies MainMenuData);
+    } catch (error) {
+      console.warn('[save] importação recusada:', error);
+      this.setStatus(error instanceof SaveError ? 'save.import_invalid' : 'save.import_failed');
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private async deleteSave(): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      await saves.remove();
+      gameState.clear();
+      this.scene.restart({ message: 'save.deleted' } satisfies MainMenuData);
+    } catch (error) {
+      console.error('[save] não foi possível apagar:', error);
+      this.setStatus('save.delete_failed');
+      this.busy = false;
+    }
   }
 }

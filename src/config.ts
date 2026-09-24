@@ -6,17 +6,17 @@ export const TILE_SIZE = 16;
 
 /**
  * Resolução interna adaptável (CLAUDE.md §3.1): escolhe-se o zoom inteiro (em píxeis do
- * dispositivo) que deixa o jogo com a altura mais próxima do alvo; a largura acompanha o ecrã.
- * Com toque (telemóveis) o alvo é mais baixo, para o boneco e os botões não ficarem minúsculos.
+ * dispositivo) que deixa o jogo com a altura mais próxima do alvo; a largura acompanha o ecrã
+ * (sem barras laterais). Alvo ≈ 17 tiles de altura: o "zoom" estilo Stardew que o jogador prefere.
  * Candidato a definição do jogador ("tamanho", Fase 11).
  */
 export const DISPLAY = {
-  /** Altura-alvo em píxeis de jogo (≈ 25 tiles) com rato. */
-  targetHeight: 400,
-  /** Idem em ecrãs táteis (≈ 20 tiles). */
-  touchTargetHeight: 320,
+  /** Altura-alvo em píxeis de jogo (≈ 17 tiles) com rato. */
+  targetHeight: 270,
+  /** Idem em ecrãs táteis (separado para se poder afinar no telemóvel). */
+  touchTargetHeight: 270,
   /** Altura mínima (abaixo disto, zoom fracionário): a UI precisa deste espaço. */
-  minHeight: 240,
+  minHeight: 216,
   /** Proporções permitidas (largura/altura); fora delas ficam barras. */
   minAspect: 4 / 3,
   maxAspect: 21 / 9,

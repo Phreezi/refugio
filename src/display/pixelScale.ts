@@ -15,9 +15,12 @@ export interface PixelScaleOptions {
 }
 
 export interface PixelScale {
-  /** Tamanho do jogo (resolução interna), em píxeis de jogo. */
+  /** Tamanho do jogo (o que se vê), em píxeis de jogo. Sempre pares: o centro cai num píxel inteiro. */
   gameWidth: number;
   gameHeight: number;
+  /** Tamanho do canvas em píxeis do dispositivo (= jogo × deviceZoom): o render é feito a esta resolução. */
+  canvasWidth: number;
+  canvasHeight: number;
   /** Píxeis do dispositivo por píxel de jogo. Inteiro ≥ 1, exceto em ecrãs muito pequenos. */
   deviceZoom: number;
   /** Tamanho do canvas em píxeis CSS (pode ser fracionário quando devicePixelRatio ≠ 1). */
@@ -59,6 +62,8 @@ export function computePixelScale(
   // Janela mais estreita do que minAspect: o jogo fica mais baixo (barras em cima e em baixo).
   if (gameWidth < gameHeight * minAspect) gameHeight = Math.floor(gameWidth / minAspect);
   gameWidth = Math.min(gameWidth, Math.floor(gameHeight * maxAspect));
+  gameWidth -= gameWidth % 2;
+  gameHeight -= gameHeight % 2;
 
   // Ecrã minúsculo (ou inválido): tamanho mínimo, reduzido com zoom fracionário.
   if (gameHeight < minHeight) {
@@ -71,14 +76,16 @@ export function computePixelScale(
     deviceZoom = fit > 0 ? Math.min(1, fit) : 1;
   }
 
-  const contentWidth = gameWidth * deviceZoom;
-  const contentHeight = gameHeight * deviceZoom;
+  const contentWidth = Math.round(gameWidth * deviceZoom);
+  const contentHeight = Math.round(gameHeight * deviceZoom);
   const margin = (device: number, content: number): number =>
     Math.max(0, Math.floor((device - content) / 2 + EPSILON)) / dpr;
 
   return {
     gameWidth,
     gameHeight,
+    canvasWidth: contentWidth,
+    canvasHeight: contentHeight,
     deviceZoom,
     cssWidth: contentWidth / dpr,
     cssHeight: contentHeight / dpr,

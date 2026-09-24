@@ -3,6 +3,7 @@ import { BALANCE } from '../data/balance';
 import type { CollisionWorld } from '../systems/movement/CollisionWorld';
 import { isZero, ZERO, type Vec2 } from '../systems/movement/geometry';
 import { facingFromIntent, moveWithCollision, normalize } from '../systems/movement/movement';
+import { respawnVitals, survivalRules, tickSurvival } from '../systems/survival/survival';
 import { eventBus, type EventBus, type GameEvents } from './EventBus';
 import { FixedStep } from './FixedStep';
 import { gameState, type GameState } from './GameState';
@@ -15,7 +16,9 @@ export class Simulation {
   private readonly clock = new FixedStep(FIXED_STEP_MS, MAX_STEPS_PER_FRAME);
   private readonly state: GameState;
   private readonly bus: EventBus<GameEvents>;
+  private readonly survival = survivalRules(BALANCE);
   private world: CollisionWorld | null = null;
+  private respawnPoint: Vec2 | null = null;
   private intent: Vec2 = ZERO;
   private previous: Vec2 = ZERO;
   private moved = false;
@@ -28,6 +31,11 @@ export class Simulation {
   /** Geometria da zona onde o jogador está (null = sem movimento, ex.: fora de uma cena de jogo). */
   setWorld(world: CollisionWorld | null): void {
     this.world = world;
+  }
+
+  /** Onde o jogador reaparece se morrer (o `player_spawn` da base). */
+  setRespawnPoint(point: Vec2 | null): void {
+    this.respawnPoint = point;
   }
 
   /** Direção pedida pelo input (é normalizada: nunca anda mais depressa na diagonal). */
@@ -71,8 +79,22 @@ export class Simulation {
   private tick(): void {
     const world = this.state.data.world;
     world.tick += 1;
+    this.state.markDirty(); // o tempo de jogo avançou
     this.movePlayer();
+    if (tickSurvival(this.state.data.player, world.tick, this.survival)) this.respawn();
     this.bus.emit('world:tick', { tick: world.tick });
+  }
+
+  private respawn(): void {
+    const player = this.state.data.player;
+    respawnVitals(player, this.survival);
+    if (this.respawnPoint) {
+      player.x = this.respawnPoint.x;
+      player.y = this.respawnPoint.y;
+      // Sem interpolação: o jogador aparece logo no sítio novo.
+      this.previous = { x: player.x, y: player.y };
+    }
+    this.bus.emit('player:died', { zoneId: player.zoneId });
   }
 
   private movePlayer(): void {

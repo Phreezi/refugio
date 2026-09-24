@@ -10,6 +10,7 @@ import { BootScene } from './scenes/BootScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { UIScene } from './scenes/UIScene';
+import { installSaveOnHide } from './save';
 
 const params = new URLSearchParams(window.location.search);
 const language = params.get(LANGUAGE_QUERY_PARAM);
@@ -33,8 +34,9 @@ const game = new Phaser.Game({
   scale: {
     // Sem modo automático: installPixelScaling aplica a escala inteira em píxeis do dispositivo.
     mode: Phaser.Scale.NONE,
-    width: initial.gameWidth,
-    height: initial.gameHeight,
+    // O canvas tem a resolução do dispositivo; as câmaras ampliam o mundo (src/display/view.ts).
+    width: initial.canvasWidth,
+    height: initial.canvasHeight,
     autoRound: false,
     autoCenter: Phaser.Scale.NO_CENTER,
   },
@@ -47,3 +49,5 @@ installDebugOverlay(game, scaling, params.has(DEBUG_QUERY_PARAM));
 
 const rotateNotice = document.getElementById('rotate-notice');
 if (rotateNotice) installOrientationNotice(game, rotateNotice, t('display.rotate'));
+
+installSaveOnHide();
