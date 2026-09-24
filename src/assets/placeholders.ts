@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
-import type { AssetManifest, PlaceholderSpec } from './manifest';
+import { CHARACTER_ROWS, paintCharacterFrame } from './characterSheet';
+import type { AssetEntry, AssetManifest, PlaceholderSpec } from './manifest';
 import { PALETTE, contrastingColor, hexToRgb, isPaletteColor, type PaletteColor, type Rgb } from './palette';
 
 // Placeholders gerados por código (CLAUDE.md §6.1): retângulo com a cor da paleta,
@@ -95,6 +96,58 @@ export function paintPlaceholder(spec: PlaceholderSpec): HTMLCanvasElement {
   return canvas;
 }
 
+/** Folha de personagem: um frame por (direção, coluna), pintado a partir de retângulos. */
+function paintCharacterSheet(spec: PlaceholderSpec, columns: number, rows: number): HTMLCanvasElement {
+  const { width, height } = spec;
+  const canvas = document.createElement('canvas');
+  canvas.width = width * columns;
+  canvas.height = height * rows;
+  const ctx = context2d(canvas);
+  const colors = { body: paletteColor(spec.color), outline: paletteColor(spec.border ?? 'ink') };
+  for (const [row, facing] of CHARACTER_ROWS.slice(0, rows).entries()) {
+    for (let column = 0; column < columns; column++) {
+      for (const r of paintCharacterFrame(facing, column, colors)) {
+        ctx.fillStyle = PALETTE[r.color];
+        ctx.fillRect(column * width + r.x, row * height + r.y, r.w, r.h);
+      }
+    }
+  }
+  return canvas;
+}
+
+/** Repete o placeholder simples em todos os frames (spritesheets que não são personagens). */
+function paintRepeatedSheet(spec: PlaceholderSpec, columns: number, rows: number): HTMLCanvasElement {
+  const frame = paintPlaceholder(spec);
+  const canvas = document.createElement('canvas');
+  canvas.width = spec.width * columns;
+  canvas.height = spec.height * rows;
+  const ctx = context2d(canvas);
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++)
+      ctx.drawImage(frame, column * spec.width, row * spec.height);
+  }
+  return canvas;
+}
+
+function addPlaceholder(textures: Phaser.Textures.TextureManager, key: string, entry: AssetEntry): boolean {
+  if (entry.type === 'image') return textures.addCanvas(key, paintPlaceholder(entry.placeholder)) !== null;
+
+  const { columns, rows, frameWidth, frameHeight, placeholder } = entry;
+  const canvas =
+    placeholder.style === 'character'
+      ? paintCharacterSheet(placeholder, columns, rows)
+      : paintRepeatedSheet(placeholder, columns, rows);
+  const texture = textures.addCanvas(key, canvas);
+  if (texture === null) return false;
+  // Frames numerados linha a linha, como faz o load.spritesheet do Phaser.
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      texture.add(row * columns + column, 0, column * frameWidth, row * frameHeight, frameWidth, frameHeight);
+    }
+  }
+  return true;
+}
+
 /**
  * Gera texturas placeholder para todas as chaves do manifest que ainda não existam
  * no gestor de texturas (sem ficheiro, ou cujo ficheiro falhou a carregar).
@@ -107,7 +160,7 @@ export function ensurePlaceholderTextures(
   const generated: string[] = [];
   for (const [key, entry] of Object.entries(manifest.assets)) {
     if (textures.exists(key)) continue;
-    if (textures.addCanvas(key, paintPlaceholder(entry.placeholder)) === null) {
+    if (!addPlaceholder(textures, key, entry)) {
       throw new Error(`Placeholder: não foi possível criar a textura "${key}"`);
     }
     generated.push(key);

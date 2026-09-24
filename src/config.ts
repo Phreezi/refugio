@@ -14,8 +14,14 @@ export const FIXED_STEP_MS = 50;
 /** Máximo de ticks por frame; o atraso acima disto é descartado (evita a "espiral da morte"). */
 export const MAX_STEPS_PER_FRAME = 5;
 
-/** Tamanho provisório da base, até existir o mapa Tiled (Fase 1). */
-export const BASE_MAP_TILES = 48;
+/** Caixa de colisão do jogador (px), centrada nos pés: só a base do corpo bate nas coisas. */
+export const PLAYER_FOOTPRINT = { width: 10, height: 6 } as const;
+
+/** Mapa Tiled da base, relativo a `public/assets/`. */
+export const BASE_MAP_FILE = 'maps/base.json';
+
+/** Chave do mapa da base na cache de tilemaps do Phaser. */
+export const BASE_MAP_KEY = 'map_base';
 
 /** Caminho do manifest de assets, relativo ao index.html. */
 export const ASSET_MANIFEST_URL = 'assets/manifest.json';

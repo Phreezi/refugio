@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { PALETTE, paletteNumber } from '../assets/palette';
 import { eventBus } from '../core/EventBus';
-import { gameState } from '../core/GameState';
+import { BASE_ZONE_ID, gameState } from '../core/GameState';
 import { t } from '../i18n';
+import { content } from '../world/content';
 import { SceneKey } from './keys';
 
 const BUTTON_WIDTH = 112;
@@ -87,7 +88,7 @@ export class MainMenuScene extends Phaser.Scene {
     // Enter com a tecla presa repete o evento; só o primeiro conta.
     if (this.starting) return;
     this.starting = true;
-    const state = gameState.newGame();
+    const state = gameState.newGame(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
     this.scene.start(SceneKey.Base, {});
   }

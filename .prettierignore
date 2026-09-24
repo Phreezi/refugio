@@ -4,3 +4,5 @@ node_modules/
 package-lock.json
 # Documento escrito à mão; o Prettier desalinharia as tabelas.
 CLAUDE.md
+# Gerados pelo Tiled (ou por scripts/generate-base-map.ts); o formato é o do Tiled.
+public/assets/maps/

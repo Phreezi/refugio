@@ -4,6 +4,12 @@
 
 export const MANIFEST_VERSION = 1;
 
+/**
+ * Grelha das spritesheets de personagens (ver `characterSheet.ts`; repetido aqui porque este
+ * módulo não pode importar outros em runtime; um teste garante que coincidem).
+ */
+export const CHARACTER_SHEET_LAYOUT = { frameWidth: 16, frameHeight: 32, columns: 7, rows: 4 } as const;
+
 /** Limite de tamanho de um placeholder, em píxeis de jogo. */
 export const MAX_PLACEHOLDER_SIZE = 256;
 
@@ -16,6 +22,11 @@ export interface PlaceholderSpec {
   border?: string;
   /** Um carácter desenhado ao centro (ex.: "Á" para árvore). */
   letter?: string;
+  /**
+   * Só em spritesheets: "character" desenha uma personagem animada (layout de
+   * `characterSheet.ts`) com `color` na roupa e `border` no contorno, em vez de repetir o retângulo.
+   */
+  style?: 'character';
 }
 
 export interface ImageAsset {
@@ -25,7 +36,21 @@ export interface ImageAsset {
   placeholder: PlaceholderSpec;
 }
 
-export type AssetEntry = ImageAsset;
+/**
+ * Folha de frames com a mesma grelha (colunas × linhas). O placeholder tem o tamanho de um
+ * frame; as personagens usam o layout de `characterSheet.ts`.
+ */
+export interface SpritesheetAsset {
+  type: 'spritesheet';
+  file?: string;
+  frameWidth: number;
+  frameHeight: number;
+  columns: number;
+  rows: number;
+  placeholder: PlaceholderSpec;
+}
+
+export type AssetEntry = ImageAsset | SpritesheetAsset;
 
 export interface AssetManifest {
   version: typeof MANIFEST_VERSION;
@@ -45,8 +70,13 @@ export class ManifestError extends Error {
 const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 const FILE_PATTERN = /^[a-z0-9_\-/]+\.(png|webp)$/;
 const TOP_LEVEL_KEYS = new Set(['version', 'assets', '$comment']);
-const ENTRY_KEYS = new Set(['type', 'file', 'placeholder']);
-const PLACEHOLDER_KEYS = new Set(['width', 'height', 'color', 'border', 'letter']);
+const ENTRY_KEYS: Readonly<Record<AssetEntry['type'], ReadonlySet<string>>> = {
+  image: new Set(['type', 'file', 'placeholder']),
+  spritesheet: new Set(['type', 'file', 'placeholder', 'frameWidth', 'frameHeight', 'columns', 'rows']),
+};
+/** Limite de colunas/linhas de uma spritesheet. */
+const MAX_SHEET_CELLS = 32;
+const PLACEHOLDER_KEYS = new Set(['width', 'height', 'color', 'border', 'letter', 'style']);
 
 type JsonObject = Record<string, unknown>;
 
@@ -115,7 +145,30 @@ function parsePlaceholder(
     if (graphemeCount(letter) === 1 && letter.trim() !== '') spec.letter = letter;
     else problems.push(`${where}: letter deve ser um único carácter visível (${describe(raw.letter)})`);
   }
+  if (raw.style !== undefined) {
+    if (raw.style === 'character') spec.style = 'character';
+    else problems.push(`${where}: style só pode ser "character" (${describe(raw.style)})`);
+  }
   return spec;
+}
+
+function parseFile(raw: unknown, where: string, problems: string[]): string | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw === 'string' && FILE_PATTERN.test(raw) && !raw.startsWith('/')) return raw;
+  problems.push(
+    `${where}: file deve ser um caminho relativo a public/assets/, em minúsculas, .png ou .webp (${describe(raw)})`,
+  );
+  return undefined;
+}
+
+function parseCount(value: unknown, field: string, where: string, problems: string[]): number {
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_SHEET_CELLS) {
+    return value;
+  }
+  problems.push(
+    `${where}: ${field} deve ser um inteiro entre 1 e ${String(MAX_SHEET_CELLS)} (${describe(value)})`,
+  );
+  return 1;
 }
 
 function parseEntry(
@@ -130,22 +183,46 @@ function parseEntry(
     problems.push(`${where}: a entrada tem de ser um objeto`);
     return null;
   }
-  checkKeys(raw, ENTRY_KEYS, where, problems);
-  if (raw.type !== 'image') problems.push(`${where}: type tem de ser "image" (${describe(raw.type)})`);
+  if (raw.type !== 'image' && raw.type !== 'spritesheet') {
+    problems.push(`${where}: type tem de ser "image" ou "spritesheet" (${describe(raw.type)})`);
+    parsePlaceholder(raw.placeholder, where, palette, problems); // para reportar tudo de uma vez
+    return null;
+  }
+  checkKeys(raw, ENTRY_KEYS[raw.type], where, problems);
+  const placeholder = parsePlaceholder(raw.placeholder, where, palette, problems);
+  const file = parseFile(raw.file, where, problems);
 
-  const entry: ImageAsset = {
-    type: 'image',
-    placeholder: parsePlaceholder(raw.placeholder, where, palette, problems),
-  };
-  if (raw.file !== undefined) {
-    if (typeof raw.file === 'string' && FILE_PATTERN.test(raw.file) && !raw.file.startsWith('/')) {
-      entry.file = raw.file;
-    } else {
-      problems.push(
-        `${where}: file deve ser um caminho relativo a public/assets/, em minúsculas, .png ou .webp (${describe(raw.file)})`,
-      );
+  let entry: AssetEntry;
+  if (raw.type === 'image') {
+    if (placeholder.style !== undefined) problems.push(`${where}: style só se usa em spritesheets`);
+    entry = { type: 'image', placeholder };
+  } else {
+    entry = {
+      type: 'spritesheet',
+      frameWidth: parseSize(raw.frameWidth, 'frameWidth', where, problems),
+      frameHeight: parseSize(raw.frameHeight, 'frameHeight', where, problems),
+      columns: parseCount(raw.columns, 'columns', where, problems),
+      rows: parseCount(raw.rows, 'rows', where, problems),
+      placeholder,
+    };
+    if (placeholder.width !== entry.frameWidth || placeholder.height !== entry.frameHeight) {
+      problems.push(`${where}: o placeholder tem de ter o tamanho de um frame (frameWidth × frameHeight)`);
+    }
+    if (placeholder.style === 'character') {
+      const layout = CHARACTER_SHEET_LAYOUT;
+      if (
+        entry.frameWidth !== layout.frameWidth ||
+        entry.frameHeight !== layout.frameHeight ||
+        entry.columns !== layout.columns ||
+        entry.rows !== layout.rows
+      ) {
+        problems.push(
+          `${where}: style "character" exige frames de ${String(layout.frameWidth)}×${String(layout.frameHeight)} em ${String(layout.columns)} colunas × ${String(layout.rows)} linhas`,
+        );
+      }
     }
   }
+  if (file !== undefined) entry.file = file;
   return entry;
 }
 

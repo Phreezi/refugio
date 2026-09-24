@@ -1,0 +1,9 @@
+{
+  "$comment": "Nós de recurso. Fase 1: só aspeto e colisão. 'footprint' = caixa sólida na base do sprite, centrada nos pés (em px); omisso = atravessável. Vida, ferramenta e drops chegam na Fase 3.",
+  "tree_small": { "sprite": "tree_small", "footprint": { "width": 8, "height": 6 } },
+  "tree_large": { "sprite": "tree_large", "footprint": { "width": 14, "height": 8 } },
+  "rock": { "sprite": "rock", "footprint": { "width": 14, "height": 8 } },
+  "bush_berries": { "sprite": "bush_berries", "footprint": { "width": 12, "height": 6 } },
+  "tall_grass": { "sprite": "tall_grass" },
+  "iron_vein": { "sprite": "iron_vein", "footprint": { "width": 14, "height": 8 } }
+}

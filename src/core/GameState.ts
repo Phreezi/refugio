@@ -1,4 +1,4 @@
-import { BASE_MAP_TILES, TILE_SIZE } from '../config';
+import type { Facing } from '../systems/movement/movement';
 
 /** Id da zona da base (casa do jogador). */
 export const BASE_ZONE_ID = 'zone_base';
@@ -7,6 +7,7 @@ export interface PlayerState {
   /** Posição dos pés do jogador, em píxeis do mapa da zona atual. */
   x: number;
   y: number;
+  facing: Facing;
   zoneId: string;
 }
 
@@ -24,10 +25,10 @@ export interface GameStateData {
   world: WorldState;
 }
 
-export function createNewGameState(): GameStateData {
-  const center = (BASE_MAP_TILES * TILE_SIZE) / 2;
+/** @param spawn posição inicial dos pés do jogador (o `player_spawn` do mapa da base). */
+export function createNewGameState(spawn: { x: number; y: number }): GameStateData {
   return {
-    player: { x: center, y: center, zoneId: BASE_ZONE_ID },
+    player: { x: spawn.x, y: spawn.y, facing: 'down', zoneId: BASE_ZONE_ID },
     world: { tick: 0 },
   };
 }
@@ -51,8 +52,8 @@ export class GameState {
     return this.current;
   }
 
-  newGame(): GameStateData {
-    this.current = createNewGameState();
+  newGame(spawn: { x: number; y: number }): GameStateData {
+    this.current = createNewGameState(spawn);
     return this.current;
   }
 
