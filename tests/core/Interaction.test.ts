@@ -42,6 +42,7 @@ function setup() {
     () => content.items,
     () => content,
     () => content,
+    () => content,
   );
   const collision = CollisionWorld.fromZone(map, content.resources, content.props);
   sim.setZone({ zoneId: 'zone_test', map, collision, ...content });

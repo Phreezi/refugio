@@ -17,9 +17,11 @@ import { buildMode, pickTile, type Tile } from '../ui/buildMode';
 import { gameSpeed, nextGameSpeed } from '../ui/gameSpeed';
 import { CraftingUI } from '../ui/CraftingUI';
 import { FishingUI } from '../ui/FishingUI';
+import { LevelUpUI } from '../ui/LevelUpUI';
 import { InventoryUI } from '../ui/InventoryUI';
 import { Label } from '../ui/text';
 import { uiState } from '../ui/uiState';
+import { xpToNext } from '../systems/progression/progression';
 import { SceneKey } from './keys';
 
 /** Raio do joystick virtual e do manípulo, em píxeis de jogo. */
@@ -78,6 +80,9 @@ export class UIScene extends Phaser.Scene {
   private crafting: CraftingUI | null = null;
   private build: BuildUI | null = null;
   private fishing: FishingUI | null = null;
+  private levelUp: LevelUpUI | null = null;
+  private levelLabel: Label | null = null;
+  private xpFill: Phaser.GameObjects.Rectangle | null = null;
   /** Botão de ação (toque): escondido no modo construção. */
   private actionButton: { setVisible(visible: boolean): unknown }[] = [];
   /** Botão "Construir": escondido no modo construção (a paleta ocupa o sítio; há o Sair). */
@@ -117,6 +122,7 @@ export class UIScene extends Phaser.Scene {
     this.crafting = new CraftingUI(this, simulation);
     this.build = new BuildUI(this, simulation, this.inventory.hotbarRect().y);
     this.fishing = new FishingUI(this, simulation);
+    this.levelUp = new LevelUpUI(this);
     this.build.onToggle = (open) => {
       for (const obj of this.actionButton) obj.setVisible(!open);
       this.buildButton?.setVisible(!open);
@@ -149,6 +155,10 @@ export class UIScene extends Phaser.Scene {
       this.build = null;
       this.fishing?.destroy();
       this.fishing = null;
+      this.levelUp?.destroy();
+      this.levelUp = null;
+      this.levelLabel = null;
+      this.xpFill = null;
       this.actionButton = [];
       this.buildButton = null;
       this.joystickBase = null;
@@ -173,6 +183,13 @@ export class UIScene extends Phaser.Scene {
       const warn = value <= low;
       bar.fill.setAlpha(warn && blinkOff ? 0.35 : 1);
       bar.label.setColor(warn ? 'gold' : 'cream');
+    }
+    // Nível e XP (barra fina por baixo das outras).
+    this.levelLabel?.setText(t('level.short', { level: player.level }));
+    if (this.xpFill) {
+      const need = xpToNext(player.level, BALANCE.xpCurve);
+      const full = player.level >= BALANCE.maxLevel;
+      this.xpFill.width = full ? BAR_WIDTH : Math.round((BAR_WIDTH * player.xp) / need);
     }
     const clock = clockAt(world.tick, BALANCE.dayLengthSec, BALANCE.dayStartHour);
     const pad = (n: number): string => String(n).padStart(2, '0');
@@ -200,6 +217,13 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'door_blocked') this.showNotice(t('build.problem.door_blocked'));
         else if (reason === 'needs_rod') this.showNotice(t('fish.needs'));
         else this.showNotice(t(tool === 'pickaxe' ? 'msg.needs_pickaxe' : 'msg.needs_axe'));
+      }),
+      eventBus.on('recipe:learned', ({ recipe }) => {
+        const output = content.recipes.find((r) => r.id === recipe)?.output ?? recipe;
+        this.showNotice(t('msg.learned', { item: itemName(output) }));
+      }),
+      eventBus.on('note:known', () => {
+        this.showNotice(t('msg.note_known'));
       }),
       eventBus.on('item:broken', ({ item }) => {
         this.showNotice(t('msg.tool_broken', { item: itemName(item) }));
@@ -234,6 +258,10 @@ export class UIScene extends Phaser.Scene {
         .setOrigin(0);
       return { key: stat.key, label, fill };
     });
+    const y = HUD_MARGIN + STATS.length * BAR_SPACING;
+    this.levelLabel = new Label(this, HUD_MARGIN, y - 2, '', { size: 7, color: 'gold', bold: true });
+    this.add.rectangle(BAR_X - 1, y, BAR_WIDTH + 2, 4, paletteNumber('ink')).setOrigin(0);
+    this.xpFill = this.add.rectangle(BAR_X, y + 1, 0, 2, paletteNumber('gold')).setOrigin(0);
   }
 
   /** Botão de velocidade (x1 → x2 → x3 → x1), por baixo do relógio. */

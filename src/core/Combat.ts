@@ -18,6 +18,7 @@ import type { EventBus, GameEvents } from './EventBus';
 import { zoneState, type GameState, type GroundBag } from './GameState';
 import type { ZoneContext } from './Interaction';
 import type { PlayerActions } from './PlayerActions';
+import { isNight } from './DayNight';
 import { nextRandom, randomInt } from './Rng';
 
 export interface CombatContent {
@@ -75,11 +76,16 @@ export class Combat {
     if (zone.map.enemySpawns.length === 0) return;
     const { enemies, enemyGroups } = this.content();
     const rng = this.state.data.world;
+    // À noite há mais inimigos (e aparecem os grupos só de noite, §7.11).
+    const night = isNight(rng.tick, BALANCE);
+    const multiplier = night ? (zone.nightEnemyMultiplier ?? 1) : 1;
     for (const spawn of zone.map.enemySpawns) {
-      for (const member of enemyGroups[spawn.id] ?? []) {
+      const group = enemyGroups[spawn.id];
+      if (!group || (group.night && !night)) continue;
+      for (const member of group.members) {
         const def = enemies[member.enemy];
         if (!def) continue;
-        const count = randomInt(rng, member.min, member.max);
+        const count = Math.round(randomInt(rng, member.min, member.max) * multiplier);
         for (let i = 0; i < count; i++) {
           const at = {
             x: Math.round(spawn.x + (nextRandom(rng) - 0.5) * 24),

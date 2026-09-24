@@ -193,8 +193,14 @@ function checkCrafting(): string[] {
   if (Array.isArray(items)) return ['items.json inválido (ver acima)'];
   if (Array.isArray(stations)) return stations;
   try {
-    parseRecipes(readJson('src/data/recipes.json'), Object.keys(items), Object.keys(stations));
-    return [];
+    const recipes = parseRecipes(
+      readJson('src/data/recipes.json'),
+      Object.keys(items),
+      Object.keys(stations),
+    );
+    return Object.entries(items)
+      .filter(([, item]) => item.teaches !== undefined && !recipes.some((r) => r.id === item.teaches))
+      .map(([id, item]) => `items.json: "${id}" ensina uma receita que não existe (${String(item.teaches)})`);
   } catch (error) {
     if (error instanceof DataError) return error.problems.map((p) => `recipes.json: ${p}`);
     throw error;

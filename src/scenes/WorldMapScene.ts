@@ -124,7 +124,13 @@ export class WorldMapScene extends Phaser.Scene {
       const here = zoneId === this.from;
       if (here) this.add.circle(x, y, NODE_R + 3, paletteNumber('gold'));
       this.add.circle(x, y, NODE_R + 1, paletteNumber('ink'));
-      const node = this.add.circle(x, y, NODE_R, paletteNumber(DANGER_COLORS[zone.danger] ?? 'red'));
+      const locked = zoneId !== this.from && !simulation.progression.isZoneUnlocked(zoneId);
+      const node = this.add.circle(
+        x,
+        y,
+        NODE_R,
+        paletteNumber(locked ? 'stone' : (DANGER_COLORS[zone.danger] ?? 'red')),
+      );
       node.setInteractive({ useHandCursor: true }).on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
         this.selected = zoneId;
         this.showPanel();
@@ -133,7 +139,7 @@ export class WorldMapScene extends Phaser.Scene {
         this,
         x,
         y,
-        zone.danger === 0 ? 'C' : `T${String(zone.danger)}`,
+        locked ? String(zone.unlockLevel) : zone.danger === 0 ? 'C' : `T${String(zone.danger)}`,
         {
           size: 7,
           bold: true,
@@ -182,7 +188,8 @@ export class WorldMapScene extends Phaser.Scene {
     else if (cost.hunger + cost.thirst === 0) lines.push(t('map.free'));
     else lines.push(t('map.cost', { hunger: cost.hunger, thirst: cost.thirst }));
     if (gameState.data.zones[zoneId]?.bags.some((bag) => bag.death)) lines.push(t('map.bag'));
-    if (zone.unlockLevel > 1) lines.push(t('map.unlock_later', { level: zone.unlockLevel }));
+    const locked = !here && !simulation.progression.isZoneUnlocked(zoneId);
+    if (locked) lines.push(t('map.locked', { level: zone.unlockLevel }));
     add(new Label(this, cx, top, tKey(zone.name), { size: 10, bold: true, color: 'wheat' }, [0.5, 0]));
     add(
       new Label(
@@ -205,9 +212,10 @@ export class WorldMapScene extends Phaser.Scene {
         cx,
         height - 12,
         here ? t('map.back') : t('map.travel'),
-        { width: 80, height: 16, fontSize: 9 },
+        { width: 80, height: 16, fontSize: 9, style: locked ? 'secondary' : 'primary' },
         () => {
           if (here) this.back();
+          else if (locked) this.flash(t('map.locked', { level: zone.unlockLevel }));
           else this.travel(zoneId);
         },
       ),

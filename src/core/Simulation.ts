@@ -11,6 +11,7 @@ import { BASE_ZONE_ID, gameState, type GameState } from './GameState';
 import { Building } from './Building';
 import { Combat, type CombatContent } from './Combat';
 import { Fishing } from './Fishing';
+import { Progression, type ProgressionContent } from './Progression';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
 import { PlayerActions } from './PlayerActions';
@@ -35,6 +36,7 @@ export class Simulation {
   readonly building: Building;
   readonly combat: Combat;
   readonly fishing: Fishing;
+  readonly progression: Progression;
   /** Zona para onde o jogador está a sair (a cena faz a transição). */
   private leavingTo: string | null = null;
   private exits: ZoneMap['exits'] = [];
@@ -66,15 +68,26 @@ export class Simulation {
       enemies: content.enemies,
       enemyGroups: content.enemyGroups,
     }),
+    progression: () => ProgressionContent = () => ({
+      recipes: content.recipes,
+      structures: content.structures,
+      zones: content.zones,
+      resources: content.resources,
+      enemies: content.enemies,
+    }),
   ) {
     this.state = state;
     this.bus = bus;
     this.actions = new PlayerActions(state, bus, items);
+    this.progression = new Progression(state, bus, progression);
+    this.actions.readNote = (recipe) => this.progression.learn(recipe);
     this.building = new Building(state, bus, this.actions);
+    this.building.isUnlocked = (id) => this.progression.isStructureUnlocked(id);
     this.combat = new Combat(state, bus, this.actions, combat);
     this.fishing = new Fishing(state, bus, this.actions, items);
     this.interaction = new Interaction(state, bus, this.actions, this.building, this.combat, this.fishing);
     this.crafting = new Crafting(state, bus, crafting, this.actions);
+    this.crafting.isUnlocked = (recipe) => this.progression.isRecipeUnlocked(recipe);
   }
 
   /** Zona onde o jogador está: colisões, recursos, baús… (null = fora de uma cena de jogo). */

@@ -69,7 +69,7 @@
     "output": "empty_bottle",
     "qty": 1,
     "timeSec": 8,
-    "unlockLevel": 1
+    "unlockLevel": 2
   },
   {
     "id": "r_cooked_meat",
@@ -102,7 +102,7 @@
     "output": "spiked_club",
     "qty": 1,
     "timeSec": 10,
-    "unlockLevel": 1
+    "unlockLevel": 3
   },
   {
     "id": "r_machete",
@@ -116,7 +116,7 @@
     "output": "machete",
     "qty": 1,
     "timeSec": 20,
-    "unlockLevel": 1
+    "unlockLevel": 5
   },
   {
     "id": "r_cloth_shirt",
@@ -129,7 +129,7 @@
     "output": "cloth_shirt",
     "qty": 1,
     "timeSec": 0,
-    "unlockLevel": 1
+    "unlockLevel": 2
   },
   {
     "id": "r_cloth_hat",
@@ -139,7 +139,7 @@
     "output": "cloth_hat",
     "qty": 1,
     "timeSec": 0,
-    "unlockLevel": 1
+    "unlockLevel": 2
   },
   {
     "id": "r_fishing_rod",
@@ -152,7 +152,7 @@
     "output": "fishing_rod",
     "qty": 1,
     "timeSec": 0,
-    "unlockLevel": 1
+    "unlockLevel": 3
   },
   {
     "id": "r_cooked_fish",

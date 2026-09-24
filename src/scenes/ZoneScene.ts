@@ -24,6 +24,8 @@ import type { Facing } from '../systems/movement/movement';
 import { content } from '../world/content';
 import { BASE_TILESET_NAME } from '../world/tileset';
 import { TILE_LAYERS, type TileLayerName } from '../world/zoneMap';
+import { darknessAt } from '../core/DayNight';
+import { BALANCE } from '../data/balance';
 import { SceneKey } from './keys';
 import type { WorldMapData } from './WorldMapScene';
 
@@ -55,6 +57,13 @@ const FOUNDATION_DEPTH = -0.5;
 const GHOST_AREA_DEPTH = FOUNDATION_DEPTH + 0.2;
 const GHOST_OK = 0x78ae48;
 const GHOST_BAD = 0xb33a3a;
+
+/** Véu da noite (§7.11): cor, textura das luzes e margem à volta da vista (a câmara segue). */
+const NIGHT_COLOR = 0x0b0d26;
+const LIGHT_TEXTURE = 'light_soft';
+const LIGHT_RADIUS = 64;
+const NIGHT_MARGIN = 32;
+const NIGHT_DEPTH = 1_000_000 + 5;
 
 /** Transição entre zonas (fade). */
 const FADE_MS = 250;
@@ -88,6 +97,8 @@ export class ZoneScene extends Phaser.Scene {
   /** Contentores com loot, pelo id do objeto (ficam escuros quando vazios). */
   private containerSprites = new Map<number, Phaser.GameObjects.Image>();
   private bagSprites: Phaser.GameObjects.Image[] = [];
+  /** Véu escuro da noite, com as luzes "apagadas" nele. */
+  private night: Phaser.GameObjects.RenderTexture | null = null;
   /** A sair da zona (fade em curso): o jogador fica parado. */
   private leaving = false;
   private hurtUntil = 0;
@@ -157,6 +168,7 @@ export class ZoneScene extends Phaser.Scene {
     camera.startFollow(this.player, true);
     const applyZoom = (): void => {
       this.applyCameraZoom(zone.width * zone.tileSize, zone.height * zone.tileSize);
+      this.createNightLayer();
     };
     applyZoom();
     this.scale.on(Phaser.Scale.Events.RESIZE, applyZoom);
@@ -181,6 +193,7 @@ export class ZoneScene extends Phaser.Scene {
       stations: content.stations,
       structures: content.structures,
       lootTables: content.lootTables,
+      nightEnemyMultiplier: content.zones[this.zoneId]?.nightEnemyMultiplier ?? 1,
       respawnDays: content.zones[this.zoneId]?.respawnDays ?? 1,
     });
     simulation.setRespawnPoint(content.zoneMap(BASE_ZONE_ID).playerSpawn);
@@ -217,6 +230,7 @@ export class ZoneScene extends Phaser.Scene {
       this.structureSprites.clear();
       this.enemyViews.clear();
       this.containerSprites.clear();
+      this.night = null;
       this.bagSprites = [];
       this.marker = null;
       this.ghost = null;
@@ -246,6 +260,7 @@ export class ZoneScene extends Phaser.Scene {
     if (this.player) this.player.anims.timeScale = speed;
     this.renderPlayer();
     this.renderEnemies();
+    this.renderLighting();
     // Com toque, andar volta a pôr a peça à frente do jogador.
     if (simulation.playerMoved && buildMode.pickedBy === 'touch') {
       buildMode.picked = null;
@@ -526,6 +541,78 @@ export class ZoneScene extends Phaser.Scene {
       else this.player.clearTint();
       this.player.setAlpha(simulation.combat.playerInvulnerable && Math.floor(now / 80) % 2 === 0 ? 0.4 : 1);
     }
+  }
+
+  /**
+   * Véu da noite do tamanho máximo que a câmara pode mostrar (zoom afastado = metade), mais uma
+   * margem; recria-se quando a vista muda.
+   */
+  private createNightLayer(): void {
+    this.night?.destroy();
+    const view = getView();
+    const w = view.width * 2 + NIGHT_MARGIN * 2;
+    const h = view.height * 2 + NIGHT_MARGIN * 2;
+    this.night = this.add.renderTexture(0, 0, w, h).setOrigin(0).setDepth(NIGHT_DEPTH).setVisible(false);
+    this.lightTexture();
+  }
+
+  /** Círculo de luz em degraus (pixel art): opaco ao centro, a desvanecer para fora. */
+  private lightTexture(): void {
+    if (this.textures.exists(LIGHT_TEXTURE)) return;
+    const size = LIGHT_RADIUS * 2;
+    const canvas = this.textures.createCanvas(LIGHT_TEXTURE, size, size);
+    const ctx = canvas?.getContext();
+    if (!canvas || !ctx) return;
+    const image = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const d = Math.hypot(x + 0.5 - LIGHT_RADIUS, y + 0.5 - LIGHT_RADIUS) / LIGHT_RADIUS;
+        const alpha = d < 0.55 ? 1 : d < 0.7 ? 0.8 : d < 0.82 ? 0.55 : d < 0.93 ? 0.28 : 0;
+        const i = (y * size + x) * 4;
+        image.data[i] = 255;
+        image.data[i + 1] = 255;
+        image.data[i + 2] = 255;
+        image.data[i + 3] = Math.round(alpha * 255);
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+    canvas.refresh();
+  }
+
+  /**
+   * Dia e noite (CLAUDE.md §7.11): à noite escurece tudo, menos à volta do jogador e das
+   * peças com luz (fogueiras, tochas), que tremeluzem.
+   */
+  private renderLighting(): void {
+    const night = this.night;
+    if (!night) return;
+    const darkness = darknessAt(gameState.data.world.tick, BALANCE);
+    if (darkness <= 0.01) {
+      night.setVisible(false);
+      return;
+    }
+    const view = this.cameras.main.worldView;
+    const x0 = Math.floor(view.x) - NIGHT_MARGIN;
+    const y0 = Math.floor(view.y) - NIGHT_MARGIN;
+    night.setPosition(x0, y0).setVisible(true);
+    night.clear();
+    night.fill(NIGHT_COLOR, darkness);
+    const light = (x: number, y: number, radius: number): void => {
+      night.stamp(LIGHT_TEXTURE, undefined, Math.round(x - x0), Math.round(y - y0), {
+        scale: radius / LIGHT_RADIUS,
+        blendMode: Phaser.BlendModes.ERASE,
+      });
+    };
+    const player = this.player;
+    if (player) light(player.x, player.y - 10, BALANCE.playerLightPx);
+    const flicker = Math.sin(this.time.now / 90) * 0.04 + Math.sin(this.time.now / 37) * 0.02;
+    for (const record of simulation.building.structures()) {
+      const def = content.structures[record[1]];
+      if (!def?.light) continue;
+      const feet = structureFeet(def, record[2], record[3], simulation.building.tileSize);
+      light(feet.x, feet.y - 8, def.light * (1 + flicker));
+    }
+    night.render();
   }
 
   /** Contentores já vazios ficam mais escuros (voltam a encher com o tempo). */

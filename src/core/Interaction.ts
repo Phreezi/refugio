@@ -31,6 +31,8 @@ export interface ZoneContext {
   lootTables: LootTables;
   /** Dias de jogo até os contentores voltarem a encher (zones.json; omisso = 1). */
   respawnDays?: number;
+  /** Multiplicador de inimigos à noite (zones.json; omisso = 1). */
+  nightEnemyMultiplier?: number;
 }
 
 /**
@@ -109,6 +111,7 @@ export class Interaction {
         rollLoot(table, zone.items, world),
       ];
       this.state.markDirty();
+      this.bus.emit('loot:rolled', { table: placement.id });
     }
     this.bus.emit('container:open', { container: `loot:${zone.zoneId}:${key}` });
   }
@@ -324,6 +327,7 @@ export class Interaction {
     this.bus.emit('resource:hit', {
       zoneId: zone.zoneId,
       objectId: placement.objectId,
+      resource: placement.id,
       hp: left,
       maxHp: def.hp,
     });

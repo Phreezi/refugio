@@ -2,6 +2,7 @@
   "dayLengthSec": 1200,
   "dayStartHour": 6,
   "nightFraction": 0.25,
+  "nightDarkness": 0.72,
   "statMax": 100,
   "hungerDecaySec": 18,
   "thirstDecaySec": 12,
@@ -41,5 +42,12 @@
   "xpCurve": {
     "base": 50,
     "growth": 1.25
-  }
+  },
+  "maxLevel": 30,
+  "xpGather": 2,
+  "xpCraftMin": 1,
+  "xpBuild": 1,
+  "xpLoot": 3,
+  "xpFish": 4,
+  "playerLightPx": 44
 }

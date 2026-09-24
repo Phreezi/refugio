@@ -178,6 +178,7 @@ const SORT_ORDER: readonly string[] = [
   'consumable',
   'resource',
   'key',
+  'note',
 ];
 
 /**

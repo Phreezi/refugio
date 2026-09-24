@@ -258,15 +258,17 @@ export class CraftingUI {
         const lbl = this.label(ix, ry + 12, text, { size: 7, color: have >= need ? 'lime' : 'red' });
         ix += lbl.text.width + 8;
       }
-      const ok = missingInputs(containers, recipe).length === 0;
+      const unlocked = this.sim.progression.isRecipeUnlocked(recipe);
+      const ok = unlocked && missingInputs(containers, recipe).length === 0;
       this.button(
         x + w - PAD - 22,
         ry + 9,
-        t('craft.make'),
+        unlocked ? t('craft.make') : t('craft.locked', { level: recipe.unlockLevel }),
         44,
         () => {
           const result = this.sim.crafting.craft(recipe.id, this.station);
-          if (result === 'missing') this.message(t('craft.missing'));
+          if (result === 'locked') this.message(t('craft.locked_msg', { level: recipe.unlockLevel }));
+          else if (result === 'missing') this.message(t('craft.missing'));
           else if (result === 'no_space') this.message(t('msg.inventory_full'));
           else if (result === 'queue_full') {
             const max = content.stations[recipe.station]?.queue ?? 1;

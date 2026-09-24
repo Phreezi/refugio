@@ -121,7 +121,12 @@ export class PreloadScene extends Phaser.Scene {
     const props = parseProps(propsJson, Object.keys(manifest.assets));
     content.setProps(props);
     const stations = parseStations(stationsJson, Object.keys(manifest.assets));
-    content.setCrafting(stations, parseRecipes(recipesJson, Object.keys(items), Object.keys(stations)));
+    const recipes = parseRecipes(recipesJson, Object.keys(items), Object.keys(stations));
+    content.setCrafting(stations, recipes);
+    for (const [id, item] of Object.entries(items)) {
+      if (item.teaches !== undefined && !recipes.some((r) => r.id === item.teaches))
+        throw new Error(`items.json: "${id}" ensina uma receita que não existe (${item.teaches}).`);
+    }
     content.setStructures(
       parseStructures(
         structuresJson,

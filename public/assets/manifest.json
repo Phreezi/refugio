@@ -769,6 +769,28 @@
         "border": "ink",
         "letter": "C"
       }
+    },
+    "torch": {
+      "type": "image",
+      "file": "sprites/torch.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "orange",
+        "border": "bark",
+        "letter": "T"
+      }
+    },
+    "icon_note": {
+      "type": "image",
+      "file": "sprites/icons/note.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "parchment",
+        "border": "ink",
+        "letter": "N"
+      }
     }
   }
 }

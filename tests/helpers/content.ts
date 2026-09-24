@@ -10,6 +10,7 @@ import recipes from '../../src/data/recipes.json';
 import resources from '../../src/data/resources.json';
 import stations from '../../src/data/stations.json';
 import structures from '../../src/data/structures.json';
+import zones from '../../src/data/zones.json';
 import {
   parseEnemies,
   parseEnemyGroups,
@@ -20,6 +21,7 @@ import {
   parseResources,
   parseStations,
   parseStructures,
+  parseZones,
 } from '../../src/data/types';
 
 /** Conteúdo real do jogo (JSON validados), para testes de integração da lógica. */
@@ -38,6 +40,7 @@ export function loadContent() {
     recipes: parseRecipes(recipes, Object.keys(itemDefs), Object.keys(stationDefs)),
     structures: parseStructures(structures, keys, Object.keys(itemDefs), Object.keys(stationDefs)),
     enemies: enemyDefs,
+    zones: parseZones(zones),
     lootTables: parseLootTables(lootTables, keys, Object.keys(itemDefs)),
     enemyGroups: parseEnemyGroups(enemyGroups, Object.keys(enemyDefs)),
   };

@@ -15,7 +15,8 @@
       "hunger": 0,
       "thirst": 0
     },
-    "respawnDays": 1
+    "respawnDays": 1,
+    "nightEnemyMultiplier": 1.5
   },
   "zone_farm": {
     "name": "zone.farm",
@@ -27,7 +28,8 @@
       "thirst": 3
     },
     "respawnDays": 1,
-    "unlockLevel": 2
+    "unlockLevel": 2,
+    "nightEnemyMultiplier": 1.5
   },
   "zone_lake": {
     "name": "zone.lake",
@@ -39,6 +41,7 @@
       "thirst": 2
     },
     "respawnDays": 1,
-    "unlockLevel": 3
+    "unlockLevel": 3,
+    "nightEnemyMultiplier": 1.5
   }
 }

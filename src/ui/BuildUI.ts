@@ -21,6 +21,8 @@ interface Cell {
   id: string;
   border: Phaser.GameObjects.Rectangle;
   sprite: Phaser.GameObjects.Image;
+  /** "Nv X" por cima das peças ainda bloqueadas. */
+  lock: Label;
 }
 
 /**
@@ -125,7 +127,11 @@ export class BuildUI {
     for (const cell of this.cells) {
       const def = content.structures[cell.id];
       const affordable = def?.cost.every(({ item, qty }) => countItem(containers, item) >= qty) ?? false;
-      cell.sprite.setAlpha(affordable ? 1 : 0.4);
+      const unlocked = this.simulation.progression.isStructureUnlocked(cell.id);
+      cell.sprite.setAlpha(affordable && unlocked ? 1 : 0.4);
+      if (unlocked) cell.sprite.clearTint();
+      else cell.sprite.setTint(0x555555);
+      cell.lock.setVisible(!unlocked);
       const selected = !buildMode.demolish && cell.id === buildMode.selected;
       cell.border.setFillStyle(paletteNumber(selected ? 'gold' : 'bark_dark'));
     }
@@ -212,7 +218,17 @@ export class BuildUI {
       back.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
         this.select(id);
       });
-      this.cells.push({ id, border, sprite });
+      const lock = add(
+        new Label(
+          scene,
+          x + CELL_W / 2,
+          y + CELL_H / 2,
+          t('level.short', { level: def?.unlockLevel ?? 1 }),
+          { size: 7, bold: true, color: 'cream', stroke: true },
+          [0.5, 0.5],
+        ),
+      ).setDepth(DEPTH + 1);
+      this.cells.push({ id, border, sprite, lock });
     });
 
     // Botões por cima da paleta.

@@ -56,6 +56,7 @@ function setup(seed = 7) {
     () => content.items,
     () => content,
     () => content,
+    () => content,
   );
   const enter = (zoneId: string, map = realMap(zoneId)) => {
     sim.setZone({
@@ -159,10 +160,16 @@ describe('Mapa-mundo e viagens', () => {
     const player = state.data.player;
     player.hotbar.fill(null);
     player.inventory[0] = ['wood', 10];
+    player.level = 3; // ao fim dos primeiros minutos de jogo
     const craftable = () =>
       new Set(
         content.recipes
-          .filter((r) => r.station === HANDS && missingInputs(sim.actions.pickupContainers(), r).length === 0)
+          .filter(
+            (r) =>
+              r.station === HANDS &&
+              sim.progression.isRecipeUnlocked(r) &&
+              missingInputs(sim.actions.pickupContainers(), r).length === 0,
+          )
           .map((r) => r.id),
       );
     const before = craftable();

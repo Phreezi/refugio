@@ -57,6 +57,12 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     }
     return { ...s, zones };
   },
+  // v6 → v7 (Fase 8): nível, XP e receitas aprendidas. Quem já jogava começa no nível 3 (a
+  // Quinta e o Lago, que já podia visitar, continuam abertos).
+  6: (s) => {
+    const player = s.player as Record<string, unknown>;
+    return { ...s, player: { ...player, level: 3, xp: 0 }, unlocks: { recipes: [] } };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

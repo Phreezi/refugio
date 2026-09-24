@@ -48,6 +48,7 @@ function setup(zone: ZoneMap, player = { x: 240, y: 240 }) {
     () => content.items,
     () => content,
     () => content,
+    () => content,
   );
   sim.setZone({
     zoneId: ZONE,

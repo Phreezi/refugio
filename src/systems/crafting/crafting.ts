@@ -39,7 +39,7 @@ function restore(containers: readonly Container[], saved: (Slot | null)[][]): vo
   });
 }
 
-export type CraftResult = 'ok' | 'missing' | 'no_space' | 'queue_full';
+export type CraftResult = 'ok' | 'missing' | 'no_space' | 'queue_full' | 'locked';
 
 /** Craft nas mãos: consome os ingredientes e dá o resultado já (tudo ou nada). */
 export function craftInstant(containers: readonly Container[], recipe: Recipe, items: ItemDefs): CraftResult {
