@@ -233,5 +233,17 @@
   "item.pistol_ammo": "Pistol rounds",
   "item.gunpowder": "Gunpowder",
   "station.workbench": "Workbench",
-  "structure.workbench": "Workbench"
+  "structure.workbench": "Workbench",
+  "enemy.boss_warden": "Bunker Warden",
+  "item.bunker_key": "Bunker key",
+  "item.military_keycard": "Military keycard",
+  "zone.bunker": "Bunker",
+  "zone.bunker_2": "Bunker — floor 2",
+  "zone.bunker_3": "Bunker — floor 3",
+  "zone.bunker_4": "Bunker — floor 4",
+  "map.needs_item": "Needs: {item}",
+  "map.checkpoint": "You'll enter floor {floor} (checkpoint).",
+  "msg.checkpoint": "Floor {floor}: checkpoint saved.",
+  "msg.boss_defeated": "Boss defeated! It returns in a week.",
+  "map.bunker_hint": "They say the key is in a safe in the Industrial Zone."
 }

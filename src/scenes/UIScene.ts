@@ -44,6 +44,8 @@ const BAR_X = 34;
 const BAR_WIDTH = 60;
 const BAR_HEIGHT = 6;
 const BAR_SPACING = 11;
+/** Largura da barra do chefe (px de jogo). */
+const BOSS_BAR = 120;
 /** Piscar das barras abaixo de BALANCE.lowStatPct (CLAUDE.md §2: aviso aos 30%). */
 const BLINK_MS = 400;
 const NOTICE_MS = 2500;
@@ -83,6 +85,12 @@ export class UIScene extends Phaser.Scene {
   private fishing: FishingUI | null = null;
   private levelUp: LevelUpUI | null = null;
   private levelLabel: Label | null = null;
+  /** Barra do chefe (em cima, ao centro), só com um chefe na zona. */
+  private bossBar: {
+    label: Label;
+    back: Phaser.GameObjects.Rectangle;
+    fill: Phaser.GameObjects.Rectangle;
+  } | null = null;
   /** "A sangrar" (por baixo da barra de XP), a piscar. */
   private bleedLabel: Label | null = null;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
@@ -114,6 +122,23 @@ export class UIScene extends Phaser.Scene {
       { size: 8, color: 'cream', bold: true },
       [1, 0],
     );
+    const bossX = Math.round(width / 2);
+    this.bossBar = {
+      label: new Label(
+        this,
+        bossX,
+        HUD_MARGIN,
+        '',
+        { size: 8, bold: true, color: 'red', stroke: true },
+        [0.5, 0],
+      ),
+      back: this.add
+        .rectangle(bossX - BOSS_BAR / 2 - 1, HUD_MARGIN + 12, BOSS_BAR + 2, 6, paletteNumber('ink'))
+        .setOrigin(0),
+      fill: this.add
+        .rectangle(bossX - BOSS_BAR / 2, HUD_MARGIN + 13, BOSS_BAR, 4, paletteNumber('red'))
+        .setOrigin(0),
+    };
     this.hordeLabel = new Label(
       this,
       width - HUD_MARGIN,
@@ -173,6 +198,7 @@ export class UIScene extends Phaser.Scene {
       this.levelLabel = null;
       this.hordeLabel = null;
       this.bleedLabel = null;
+      this.bossBar = null;
       this.xpFill = null;
       this.actionButton = [];
       this.buildButton = null;
@@ -211,6 +237,22 @@ export class UIScene extends Phaser.Scene {
     this.clock?.setText(t('hud.clock', { day: clock.day, time: `${pad(clock.hour)}:${pad(clock.minute)}` }));
     this.hordeLabel?.setText(this.hordeStatus());
     this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
+    this.renderBossBar();
+  }
+
+  /** Barra de vida do chefe da zona (escondida sem chefe). */
+  private renderBossBar(): void {
+    const bar = this.bossBar;
+    if (!bar) return;
+    const boss = simulation.combat.list.find((e) => content.enemies[e.id]?.boss === true);
+    const def = boss ? content.enemies[boss.id] : undefined;
+    const visible = boss !== undefined && def !== undefined;
+    bar.label.setVisible(visible);
+    bar.back.setVisible(visible);
+    bar.fill.setVisible(visible);
+    if (!boss || !def) return;
+    bar.label.setText(tKey(`enemy.${boss.id}`));
+    bar.fill.width = Math.max(0, Math.round((BOSS_BAR * boss.hp) / def.hp));
   }
 
   /** Texto do aviso da horda (vazio se as hordas estiverem desligadas ou ainda longe). */
@@ -252,6 +294,12 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'needs_item')
           this.showNotice(t('msg.needs_item', { item: itemName(item ?? '') }));
         else this.showNotice(t(tool === 'pickaxe' ? 'msg.needs_pickaxe' : 'msg.needs_axe'));
+      }),
+      eventBus.on('dungeon:checkpoint', ({ floor }) => {
+        this.showNotice(t('msg.checkpoint', { floor }));
+      }),
+      eventBus.on('boss:defeated', () => {
+        this.showNotice(t('msg.boss_defeated'));
       }),
       eventBus.on('player:bleeding', () => {
         this.showNotice(t('msg.bleeding'));

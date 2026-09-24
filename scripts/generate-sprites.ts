@@ -1983,6 +1983,106 @@ const PHASE10B_ICONS: Sprite[] = [
   },
 ];
 
+/** Fase 10 (parte C): guarda do bunker, cofre, caixa militar e chaves. */
+const PHASE10C: Sprite[] = [
+  {
+    file: 'boss_warden',
+    width: 32,
+    height: 40,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 16, 38, 12, 2);
+      // Botas e pernas com calças militares.
+      img.fill(9, 28, 6, 9, c('forest'));
+      img.fill(17, 28, 6, 9, c('forest_dark'));
+      img.fill(8, 36, 7, 2, c('ink'));
+      img.fill(17, 36, 7, 2, c('ink'));
+      // Colete à prova de bala sobre o tronco largo.
+      img.fill(6, 13, 20, 16, c('forest'));
+      img.fill(8, 14, 16, 12, c('forest_dark'));
+      img.fill(10, 16, 4, 3, c('stone'));
+      img.fill(18, 16, 4, 3, c('stone'));
+      img.fill(8, 24, 16, 2, c('bark_dark')); // cinto
+      img.set(15, 24, c('gold'));
+      // Braços enormes, pele cinzenta, com ligaduras.
+      img.fill(1, 14, 5, 12, c('stone_light'));
+      img.fill(26, 14, 5, 12, c('stone'));
+      img.fill(1, 18, 5, 2, c('cream'));
+      img.fill(0, 24, 6, 4, c('stone'));
+      img.fill(26, 24, 6, 4, c('stone_dark'));
+      // Capacete e cara.
+      img.fill(10, 4, 12, 10, c('stone_light'));
+      img.fill(9, 2, 14, 4, c('forest_dark'));
+      img.fill(8, 5, 16, 1, c('forest'));
+      img.fill(12, 8, 3, 2, c('ink'));
+      img.fill(18, 8, 3, 2, c('ink'));
+      img.set(13, 8, c('red'));
+      img.set(19, 8, c('red'));
+      img.fill(13, 12, 6, 1, c('blood'));
+    },
+  },
+  {
+    file: 'safe',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 14.5, 7, 1.5);
+      img.fill(2, 2, 12, 12, c('stone_dark'));
+      img.fill(2, 2, 12, 1, c('stone'));
+      img.fill(3, 4, 10, 8, c('shadow'));
+      img.ellipse(8, 8, 2.5, 2.5, c('stone_light'));
+      img.set(8, 8, c('ink'));
+      img.fill(11, 6, 1, 4, c('gold'));
+    },
+  },
+  {
+    file: 'military_crate',
+    width: 24,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 12, 14.5, 11, 1.5);
+      img.fill(1, 3, 22, 11, c('forest'));
+      img.fill(1, 3, 22, 2, c('grass'));
+      img.fill(1, 8, 22, 1, c('forest_dark'));
+      for (const x of [3, 19]) img.fill(x, 3, 2, 11, c('forest_dark'));
+      img.fill(9, 5, 6, 2, c('wheat'));
+      img.set(12, 10, c('stone_light'));
+    },
+  },
+];
+
+const PHASE10C_ICONS: Sprite[] = [
+  {
+    file: 'bunker_key',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(5, 8, 3.5, 3.5, c('gold'));
+      img.ellipse(5, 8, 1.5, 1.5, c('ink'));
+      img.fill(8, 7, 7, 2, c('gold'));
+      img.fill(12, 9, 1, 3, c('amber'));
+      img.fill(14, 9, 1, 2, c('amber'));
+    },
+  },
+  {
+    file: 'military_keycard',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 4, 12, 9, c('forest'));
+      img.fill(2, 4, 12, 1, c('grass'));
+      img.fill(3, 6, 4, 4, c('cream'));
+      img.fill(8, 6, 5, 1, c('lime'));
+      img.fill(8, 8, 4, 1, c('stone_light'));
+      img.fill(2, 11, 12, 1, c('gold'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -1997,6 +2097,7 @@ for (const [dir, list] of [
   [outDir, PHASE9],
   [outDir, PHASE10A],
   [outDir, PHASE10B],
+  [outDir, PHASE10C],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
   [iconDir, FOOD_ICONS],
@@ -2005,6 +2106,7 @@ for (const [dir, list] of [
   [iconDir, PHASE9_ICONS],
   [iconDir, PHASE10A_ICONS],
   [iconDir, PHASE10B_ICONS],
+  [iconDir, PHASE10C_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -2015,7 +2117,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

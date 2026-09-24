@@ -233,5 +233,17 @@
   "item.pistol_ammo": "Balas de pistola",
   "item.gunpowder": "Pólvora",
   "station.workbench": "Bancada de trabalho",
-  "structure.workbench": "Bancada de trabalho"
+  "structure.workbench": "Bancada de trabalho",
+  "enemy.boss_warden": "Guarda do Bunker",
+  "item.bunker_key": "Chave do bunker",
+  "item.military_keycard": "Cartão de acesso militar",
+  "zone.bunker": "Bunker",
+  "zone.bunker_2": "Bunker — piso 2",
+  "zone.bunker_3": "Bunker — piso 3",
+  "zone.bunker_4": "Bunker — piso 4",
+  "map.needs_item": "Precisa de: {item}",
+  "map.checkpoint": "Entras no piso {floor} (checkpoint).",
+  "msg.checkpoint": "Piso {floor}: checkpoint guardado.",
+  "msg.boss_defeated": "Chefe derrotado! Volta daqui a uma semana.",
+  "map.bunker_hint": "Dizem que a chave está num cofre da Zona Industrial."
 }

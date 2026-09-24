@@ -202,6 +202,17 @@ describe('save: migrações', () => {
     expect(parseSave(text).state.player.bleed).toBe(0);
   });
 
+  it('v10 → v11 (Fase 10): bunker e chefes vazios', () => {
+    const v10 = structuredClone(STATE) as unknown as Record<string, unknown>;
+    delete v10.dungeons;
+    delete v10.bosses;
+    const stateJson = JSON.stringify(v10);
+    const text = `{"version":10,"timestamp":6,"checksum":"${checksum(`10|6|${stateJson}`)}","state":${stateJson}}`;
+    const { state } = parseSave(text);
+    expect(state.dungeons).toEqual({});
+    expect(state.bosses).toEqual({});
+  });
+
   it('valida a horta', () => {
     const ok = structuredClone(STATE);
     ok.base.crops['3'] = ['carrot_seeds', null];

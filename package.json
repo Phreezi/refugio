@@ -26,7 +26,8 @@
     "map:farm": "node scripts/generate-farm.ts",
     "map:lake": "node scripts/generate-lake.ts",
     "map:t2": "node scripts/generate-t2.ts",
-    "map:t3": "node scripts/generate-t3.ts"
+    "map:t3": "node scripts/generate-t3.ts",
+    "map:bunker": "node scripts/generate-bunker.ts"
   },
   "dependencies": {
     "phaser": "^4.2.1"

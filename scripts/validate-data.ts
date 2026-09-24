@@ -317,6 +317,15 @@ function checkZones(): string[] {
     if (!isStringRecord(dict)) continue;
     for (const [id, zone] of Object.entries(zones)) {
       if (!(zone.name in dict)) problems.push(`zones.json: "${id}" sem nome em i18n/${lang}.json`);
+      if (zone.hint && !(zone.hint in dict))
+        problems.push(`zones.json: "${id}" com pista sem texto em i18n/${lang}.json`);
+    }
+  }
+  const items = loadItems();
+  if (!Array.isArray(items)) {
+    for (const [id, zone] of Object.entries(zones)) {
+      if (zone.requiresItem && !(zone.requiresItem in items))
+        problems.push(`zones.json: "${id}" pede o item desconhecido "${zone.requiresItem}"`);
     }
   }
   return problems;

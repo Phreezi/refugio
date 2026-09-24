@@ -180,5 +180,37 @@
       ["canned_food", 2, 1, 1],
       ["cloth", 3, 2, 3]
     ]
+  },
+  "safe": {
+    "sprite": "safe",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "rolls": [1, 1],
+    "slots": 2,
+    "entries": [["bunker_key", 1, 1, 1]]
+  },
+  "bunker_crate": {
+    "sprite": "military_crate",
+    "footprint": {
+      "width": 20,
+      "height": 6
+    },
+    "rolls": [2, 4],
+    "slots": 8,
+    "guaranteeUncommon": true,
+    "entries": [
+      ["pistol_ammo", 3, 4, 10],
+      ["bolt", 3, 5, 10],
+      ["medkit", 2, 1, 1],
+      ["gunpowder", 3, 1, 3],
+      ["electronics", 3, 1, 2],
+      ["iron_ingot", 3, 2, 3],
+      ["canned_food", 3, 1, 2],
+      ["water_clean", 2, 1, 2],
+      ["crossbow", 1, 1, 1],
+      ["leather_jacket", 1, 1, 1]
+    ]
   }
 }

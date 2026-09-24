@@ -83,6 +83,8 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     const player = s.player as Record<string, unknown>;
     return { ...s, player: { ...player, bleed: 0 } };
   },
+  // v10 → v11 (Fase 10): bunker (checkpoint por piso) e chefes derrotados.
+  10: (s) => ({ ...s, dungeons: {}, bosses: {} }),
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

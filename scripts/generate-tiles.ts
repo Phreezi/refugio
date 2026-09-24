@@ -166,6 +166,38 @@ const painters: Record<BaseTile, Painter> = {
     img.fill(ox + 4, 5, 4, 2, color('stone_light'));
     img.fill(ox + 3, 13, 10, 2, color('stone_dark'));
   },
+  floor_dark: (img, ox) => {
+    speckled(
+      'stone_dark',
+      [
+        ['shadow', 12],
+        ['stone', 5],
+      ],
+      6,
+    )(img, ox);
+    // Placas de metal de 8 × 8.
+    img.fill(ox, 7, SIZE, 1, color('shadow'));
+    img.fill(ox + 7, 0, 1, SIZE, color('shadow'));
+  },
+  // Escadas: degraus a escurecer para onde se desce (ou a clarear para onde se sobe).
+  stairs_down: (img, ox) => {
+    const steps = ['stone_light', 'stone', 'stone_dark', 'shadow'] as const;
+    for (const [i, c] of steps.entries()) {
+      img.fill(ox, i * 4, SIZE, 4, color(c));
+      img.fill(ox, i * 4, SIZE, 1, color('stone_light'));
+    }
+    img.fill(ox, 0, 1, SIZE, color('ink'));
+    img.fill(ox + SIZE - 1, 0, 1, SIZE, color('ink'));
+  },
+  stairs_up: (img, ox) => {
+    const steps = ['shadow', 'stone_dark', 'stone', 'stone_light'] as const;
+    for (const [i, c] of steps.entries()) {
+      img.fill(ox, i * 4, SIZE, 4, color(c));
+      img.fill(ox, i * 4 + 3, SIZE, 1, color('ink'));
+    }
+    img.fill(ox, 0, 1, SIZE, color('ink'));
+    img.fill(ox + SIZE - 1, 0, 1, SIZE, color('ink'));
+  },
 };
 
 const image = new Bitmap(SIZE * BASE_TILES.length, SIZE);

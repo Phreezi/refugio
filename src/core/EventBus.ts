@@ -76,6 +76,10 @@ export interface GameEvents {
   /** A peça foi destruída (vida a 0) ou a armadilha gastou-se toda. */
   'structure:destroyed': { uid: number; x: number; y: number };
   'structure:repaired': { uid: number };
+  /** Chegou a um piso novo de uma masmorra (fica como checkpoint). */
+  'dungeon:checkpoint': { floor: number };
+  /** Um chefe foi derrotado (só volta daqui a uns dias). */
+  'boss:defeated': { enemy: string };
   /** Hordas (§7.13). */
   'horde:started': { size: number };
   'horde:ended': { won: boolean };

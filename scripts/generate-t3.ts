@@ -50,6 +50,8 @@ function industrial(): void {
   m.point('player_spawn', 3, 31);
   m.point('exit', 0, 31);
   m.point('exit', 47, 63);
+  // O cofre do escritório guarda a chave do bunker (Fase 10).
+  m.put('container:safe', 66, 10);
   for (const [x, y] of [
     [40, 26],
     [52, 26],

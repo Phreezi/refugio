@@ -25,6 +25,7 @@ export function advanceRespawns(data: GameStateData, ticks: number): void {
   for (const crop of Object.values(data.base.crops)) {
     if (crop[1] !== null) crop[1] = Math.max(0, crop[1] - ticks);
   }
+  for (const key of Object.keys(data.bosses)) data.bosses[key] = Math.max(0, (data.bosses[key] ?? 0) - ticks);
   const produce = data.base.produce;
   for (const key of Object.keys(produce)) produce[key] = (produce[key] ?? 0) - ticks;
 }

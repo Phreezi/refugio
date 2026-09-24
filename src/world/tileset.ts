@@ -23,6 +23,10 @@ export const BASE_TILES = [
   'wall',
   'fence',
   'boulder',
+  // Fase 10: bunker (chão escuro e escadas; as escadas marcam as saídas entre pisos).
+  'floor_dark',
+  'stairs_down',
+  'stairs_up',
 ] as const;
 
 export type BaseTile = (typeof BASE_TILES)[number];
