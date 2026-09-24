@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { EQUIP_SLOTS } from '../data/types';
 import type { StructureRecord } from '../systems/building/building';
+import type { GameStatsCounters } from './Stats';
 import { createStationState, type StationState } from '../systems/crafting/crafting';
 import { createContainer, type Container } from '../systems/inventory/inventory';
 import type { Facing } from '../systems/movement/movement';
@@ -102,6 +103,8 @@ export interface GameStateData {
   dungeons: Record<string, number>;
   /** Chefes derrotados: zona → tick em que o chefe volta (respawn semanal). */
   bosses: Record<string, number>;
+  /** Estatísticas do jogador (menu de pausa). */
+  stats: GameStatsCounters & { playTicks: number };
 }
 
 /** Baú da base num jogo novo: mantimentos para os primeiros minutos (e testar a fogueira). */
@@ -148,6 +151,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
     horde: { at: 0, count: 0, active: false },
     dungeons: {},
     bosses: {},
+    stats: { kills: 0, deaths: 0, crafted: 0, gathered: 0, looted: 0, playTicks: 0 },
   };
 }
 

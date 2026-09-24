@@ -213,6 +213,21 @@ describe('save: migrações', () => {
     expect(state.bosses).toEqual({});
   });
 
+  it('v11 → v12 (Fase 11): estatísticas a zero', () => {
+    const v11 = structuredClone(STATE) as unknown as Record<string, unknown>;
+    delete v11.stats;
+    const stateJson = JSON.stringify(v11);
+    const text = `{"version":11,"timestamp":6,"checksum":"${checksum(`11|6|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.stats).toEqual({
+      kills: 0,
+      deaths: 0,
+      crafted: 0,
+      gathered: 0,
+      looted: 0,
+      playTicks: 0,
+    });
+  });
+
   it('valida a horta', () => {
     const ok = structuredClone(STATE);
     ok.base.crops['3'] = ['carrot_seeds', null];

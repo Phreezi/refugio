@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DISPLAY } from '../config';
 import { computePixelScale, type PixelScale, type PixelScaleOptions } from './pixelScale';
 import { setView } from './view';
+import { preferences, UI_SIZE_TARGET } from '../ui/preferences';
 
 // Resolução adaptável + escala inteira em píxeis do dispositivo (CLAUDE.md §3.1). O Phaser 4 não
 // tem um modo de escala inteira nem considera o devicePixelRatio, por isso usamos Scale.NONE:
@@ -18,8 +19,11 @@ export interface PixelScaling {
 
 function displayOptions(): PixelScaleOptions {
   const touch = window.matchMedia('(pointer: coarse)').matches;
+  const base = touch ? DISPLAY.touchTargetHeight : DISPLAY.targetHeight;
+  // Tamanho da interface (definições): menos píxeis de jogo no lado curto = tudo maior.
+  const size = UI_SIZE_TARGET[preferences().uiSize] / UI_SIZE_TARGET.normal;
   return {
-    targetHeight: touch ? DISPLAY.touchTargetHeight : DISPLAY.targetHeight,
+    targetHeight: Math.round(base * size),
     minHeight: DISPLAY.minHeight,
     minAspect: DISPLAY.minAspect,
     maxAspect: DISPLAY.maxAspect,

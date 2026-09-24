@@ -85,6 +85,11 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   },
   // v10 → v11 (Fase 10): bunker (checkpoint por piso) e chefes derrotados.
   10: (s) => ({ ...s, dungeons: {}, bosses: {} }),
+  // v11 → v12 (Fase 11): estatísticas do jogador (começam a contar agora).
+  11: (s) => ({
+    ...s,
+    stats: { kills: 0, deaths: 0, crafted: 0, gathered: 0, looted: 0, playTicks: 0 },
+  }),
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

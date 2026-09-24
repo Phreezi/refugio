@@ -344,6 +344,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Andar agachado (metade da velocidade) | Shift ou Ctrl | Joystick pouco empurrado (até 55% do raio) |
 | Zoom (até metade) | Ctrl + roda do rato, +/− | Pinça com 2 dedos |
 | Velocidade do jogo x1/x2/x3 | Botão por baixo do relógio | Idem |
+| Pausa (definições, estatísticas, sair) | Esc (sem painéis abertos) / botão "II" | Botão "II" |
 | Ação contextual (bater, recolher, abrir, atacar) | Espaço / clique (manter premido repete golpes ao ritmo da arma) | Botão grande (lado direito) |
 | Inventário | I / Tab | Botão mochila |
 | Equipar arma/roupa | Na mochila: selecionar → "Equipar", ou arrastar para a coluna Arma/Cabeça/Corpo | Idem |
@@ -859,9 +860,9 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 - [ ] Revisão completa dos controlos touch (tamanho de botões, zonas mortas do joystick).
 - [ ] Tutorial curto e contextual (primeira árvore, primeiro craft, primeira zona).
-- [ ] Definições: volume, idioma, tamanho da UI, vibração, hordas, mostrar números de dano.
-- [ ] Modo daltónico para raridades (ícone além da cor).
-- [ ] Menu de pausa, estatísticas do jogador.
+- [x] Definições (menu de pausa): idioma, tamanho da UI, vibração, hordas, mostrar números de dano. *(Volume quando houver som, Fase 12.)* Preferências do dispositivo no localStorage (`refugio.prefs`, `src/ui/preferences.ts`); as hordas no save.
+- [x] Raridade nos slots (contorno verde/azul/rosa) e modo daltónico (1–3 marcas no canto, além da cor).
+- [x] Menu de pausa (Esc / botão "II"; o tempo de jogo pára), estatísticas do jogador (save v12 `stats`), "Gravar e sair".
 - [ ] Testes em 3+ telemóveis Android de gamas diferentes.
 - [ ] Otimização: object pooling de inimigos/partículas, culling, atlas de texturas.
 
@@ -1060,3 +1061,6 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Zonas-evento calculadas a partir do dia de jogo (sem save) | Determinístico e sem estado a migrar; o loot das caixas volta com o `respawnDays` da zona |
 | 2026-09-24 | Comerciante = estação com receitas de troca instantâneas | Reaproveita o painel de fabrico (ingredientes a vermelho, "Posso fazer"); sem moeda (§8.3) |
 | 2026-09-24 | Moto como peça construída na base que dá desconto nas viagens | Sem gestão de combustível; o custo é pagar as peças |
+| 2026-09-24 | Preferências do dispositivo (língua, tamanho da UI, números de dano, vibração, daltónico) no localStorage; hordas no save | As primeiras valem já no menu inicial e são de quem joga naquele aparelho; as hordas mudam o mundo |
+| 2026-09-24 | Tamanho da UI = alvo do lado curto (320/270/230 px de jogo) | Mantém a escala inteira (pixel art exata); menos píxeis de jogo = tudo maior |
+| 2026-09-24 | Save v12: `stats` | Estatísticas no menu de pausa; contam a partir da migração |

@@ -399,3 +399,20 @@ describe('Armas à distância (Fase 10)', () => {
     expect(walker.hp).toBe(40);
   });
 });
+
+describe('Estatísticas (Fase 11)', () => {
+  it('contam inimigos derrotados, mortes e o tempo de jogo', () => {
+    const { state, sim, run } = setup(map([{ id: 'walker', x: 250, y: 240 }]));
+    const walker = sim.combat.list[0];
+    if (!walker) throw new Error('sem arrastado');
+    walker.hp = 1;
+    sim.combat.attack(walker.uid);
+    run(1);
+    state.data.player.hp = 0;
+    run(0.1);
+    const stats = state.data.stats;
+    expect(stats.kills).toBe(1);
+    expect(stats.deaths).toBe(1);
+    expect(stats.playTicks).toBeGreaterThanOrEqual(20);
+  });
+});

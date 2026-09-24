@@ -4,7 +4,7 @@ import { MIGRATIONS, migrate, type Migration } from './migrations';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -217,6 +217,9 @@ export function validateState(input: unknown): GameStateData {
     problems.push('dungeons inválido');
   const bosses = isObject(input) ? input.bosses : undefined;
   if (!isObject(bosses) || !Object.values(bosses).every(stat)) problems.push('bosses inválido');
+  const stats = isObject(input) ? input.stats : undefined;
+  const STAT_KEYS = ['kills', 'deaths', 'crafted', 'gathered', 'looted', 'playTicks'] as const;
+  if (!isObject(stats) || !STAT_KEYS.every((k) => stat(stats[k]))) problems.push('stats inválido');
   if (problems.length > 0) throw new SaveError('state', problems.join('; '));
   return input as GameStateData;
 }

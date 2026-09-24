@@ -19,6 +19,9 @@ import { gameSpeed, nextGameSpeed } from '../ui/gameSpeed';
 import { CraftingUI } from '../ui/CraftingUI';
 import { FishingUI } from '../ui/FishingUI';
 import { LevelUpUI } from '../ui/LevelUpUI';
+import { PauseUI } from '../ui/PauseUI';
+import { preferences } from '../ui/preferences';
+import { autosave } from '../save';
 import { InventoryUI } from '../ui/InventoryUI';
 import { Label } from '../ui/text';
 import { uiState } from '../ui/uiState';
@@ -91,6 +94,7 @@ export class UIScene extends Phaser.Scene {
     back: Phaser.GameObjects.Rectangle;
     fill: Phaser.GameObjects.Rectangle;
   } | null = null;
+  private pause: PauseUI | null = null;
   /** "A sangrar" (por baixo da barra de XP), a piscar. */
   private bleedLabel: Label | null = null;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
@@ -161,6 +165,10 @@ export class UIScene extends Phaser.Scene {
     this.build = new BuildUI(this, simulation, this.inventory.hotbarRect().y);
     this.fishing = new FishingUI(this, simulation);
     this.levelUp = new LevelUpUI(this);
+    this.pause = new PauseUI(this);
+    this.pause.onQuit = () => {
+      this.quitToMenu();
+    };
     this.build.onToggle = (open) => {
       for (const obj of this.actionButton) obj.setVisible(!open);
       this.buildButton?.setVisible(!open);
@@ -174,6 +182,14 @@ export class UIScene extends Phaser.Scene {
       this.showNotice(uiState.pendingNotice);
       uiState.pendingNotice = null;
     }
+    if (uiState.reopenPause) {
+      this.pause.open(uiState.reopenPause);
+      uiState.reopenPause = null;
+    }
+    const onLanguage = (): void => {
+      this.scene.restart({});
+    };
+    this.events.on('ui:language-changed', onLanguage);
 
     // Mudou a resolução ou o zoom: refazer o HUD com a vista nova.
     const onResize = (): void => {
@@ -182,6 +198,9 @@ export class UIScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       offEvents();
+      this.events.off('ui:language-changed', onLanguage);
+      this.pause?.destroy();
+      this.pause = null;
       this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
       moveInput.joystick = { x: 0, y: 0 };
       uiState.actionHeld = false;
@@ -301,6 +320,10 @@ export class UIScene extends Phaser.Scene {
       eventBus.on('boss:defeated', () => {
         this.showNotice(t('msg.boss_defeated'));
       }),
+      eventBus.on('player:damaged', () => {
+        // Vibrar ao levar dano (telemóvel), se o jogador não o desligou.
+        if (preferences().vibration && 'vibrate' in navigator) navigator.vibrate(40);
+      }),
       eventBus.on('player:bleeding', () => {
         this.showNotice(t('msg.bleeding'));
       }),
@@ -383,6 +406,25 @@ export class UIScene extends Phaser.Scene {
       },
     ).setDepth(70);
     if (gameSpeed() !== 1) button.setStyle('primary');
+    // Pausa ("II"), à esquerda da velocidade.
+    new Button(
+      this,
+      width - HUD_MARGIN - 12 - 28,
+      HUD_MARGIN + 20,
+      'II',
+      { width: 24, height: 12, fontSize: 8, style: 'secondary' },
+      () => {
+        this.pause?.toggle();
+      },
+    ).setDepth(70);
+  }
+
+  /** Grava e volta ao menu inicial (a cena de jogo, ao parar, também pára o HUD). */
+  private quitToMenu(): void {
+    void autosave.flush().then(() => {
+      this.game.scene.stop(SceneKey.Zone);
+      this.game.scene.start(SceneKey.MainMenu, {});
+    });
   }
 
   /** Botão da mochila (junto à hotbar) e, com toque, o botão grande de ação (CLAUDE.md §7.2). */
@@ -469,9 +511,12 @@ export class UIScene extends Phaser.Scene {
       this.toggleCrafting();
     });
     keyboard.on('keydown-ESC', () => {
-      if (this.inventory?.isOpen) this.inventory.close();
-      if (this.crafting?.isOpen) this.crafting.close();
-      this.build?.close();
+      // Esc fecha o que estiver aberto; sem nada aberto, abre (ou fecha) o menu de pausa.
+      if (this.pause?.isOpen) this.pause.close();
+      else if (this.inventory?.isOpen) this.inventory.close();
+      else if (this.crafting?.isOpen) this.crafting.close();
+      else if (this.build?.isOpen) this.build.close();
+      else this.pause?.open();
     });
     // Modo construção (CLAUDE.md §7.2): B entra/sai; Espaço coloca; R roda; Z desfaz; X demolir.
     keyboard.on('keydown-B', () => {
@@ -570,6 +615,7 @@ export class UIScene extends Phaser.Scene {
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       const p = this.toGame(pointer);
+      if (this.pause?.isOpen) return; // o menu de pausa tapa tudo
       // 1) Interface: painéis, hotbar, botões.
       if (this.crafting?.pointerDown(p.x, p.y)) return;
       if (this.inventory?.pointerDown(p.x, p.y, pointer.id)) return;

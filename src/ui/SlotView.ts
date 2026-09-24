@@ -1,7 +1,8 @@
 import type Phaser from 'phaser';
-import { paletteNumber } from '../assets/palette';
+import { paletteNumber, type PaletteColor } from '../assets/palette';
 import type { SlotRef } from '../core/PlayerActions';
-import type { ItemDefs } from '../data/types';
+import type { ItemDefs, Rarity } from '../data/types';
+import { preferences } from './preferences';
 import type { Slot } from '../systems/inventory/inventory';
 import { Label } from './text';
 
@@ -16,6 +17,16 @@ export const SLOT_GAP = 2;
 export function slotSize(scale: number): number {
   return scale === 1 ? SLOT_SIZE : 16 * scale + 4;
 }
+
+/** Cor do contorno por raridade (comum: a madeira de sempre). */
+const RARITY_FRAME: Readonly<Record<Rarity, PaletteColor>> = {
+  common: 'bark_dark',
+  uncommon: 'grass',
+  rare: 'sky',
+  epic: 'rose',
+};
+/** Modo daltónico: número de marcas por raridade (além da cor). */
+const RARITY_PIPS: Readonly<Record<Rarity, number>> = { common: 0, uncommon: 1, rare: 2, epic: 3 };
 
 /**
  * Um slot desenhado: fundo, ícone, quantidade e barra de durabilidade. Posições inteiras e
@@ -34,6 +45,8 @@ export class SlotView {
   private readonly wearBg: Phaser.GameObjects.Rectangle;
   private readonly wear: Phaser.GameObjects.Rectangle;
   private readonly key: Label | null;
+  /** Marcas de raridade no canto (modo daltónico). */
+  private readonly pips: Phaser.GameObjects.Rectangle[];
 
   /**
    * @param keyHint número da tecla (hotbar no PC), ou null.
@@ -78,14 +91,23 @@ export class SlotView {
       { size: 7 + 3 * (scale - 1), bold: true, stroke: true },
       [1, 1],
     );
+    this.pips = [0, 1, 2].map((i) =>
+      scene.add
+        .rectangle(x + size - 4 - i * 3, y + 2, 2, 2, paletteNumber('cream'))
+        .setOrigin(0)
+        .setVisible(false),
+    );
     this.key = keyHint
       ? new Label(scene, x + 2, y + 1, keyHint, { size: 6, color: 'stone_light', stroke: true })
       : null;
   }
 
   update(slot: Slot | null, items: ItemDefs, selected: boolean): void {
-    this.frame.setFillStyle(paletteNumber(selected ? 'gold' : 'bark_dark'));
     const def = slot ? items[slot[0]] : undefined;
+    const rarity = def?.rarity ?? 'common';
+    this.frame.setFillStyle(paletteNumber(selected ? 'gold' : RARITY_FRAME[rarity]));
+    const pips = preferences().colorblind ? RARITY_PIPS[rarity] : 0;
+    this.pips.forEach((pip, i) => pip.setVisible(i < pips));
     // Os slots de equipamento dizem o que levam só quando estão vazios.
     if (this.ref.container === 'equipment') this.key?.setVisible(!slot);
     if (!slot || !def) {
@@ -115,13 +137,14 @@ export class SlotView {
 
   setDepth(depth: number): this {
     for (const obj of [this.frame, this.bg, this.icon, this.wearBg, this.wear]) obj.setDepth(depth);
+    for (const pip of this.pips) pip.setDepth(depth + 1);
     this.qty.setDepth(depth + 1);
     this.key?.setDepth(depth + 1);
     return this;
   }
 
   destroy(): void {
-    for (const obj of [this.frame, this.bg, this.icon, this.wearBg, this.wear]) obj.destroy();
+    for (const obj of [this.frame, this.bg, this.icon, this.wearBg, this.wear, ...this.pips]) obj.destroy();
     this.qty.destroy();
     this.key?.destroy();
   }
