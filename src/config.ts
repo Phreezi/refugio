@@ -40,6 +40,15 @@ export const BASE_MAP_KEY = 'map_base';
 /** Caminho do manifest de assets, relativo ao index.html. */
 export const ASSET_MANIFEST_URL = 'assets/manifest.json';
 
+/**
+ * Acrescenta a versão do build ao URL de um ficheiro de dados/arte. O código (JS) tem hash no
+ * nome, mas os ficheiros em public/ não: sem isto, o browser podia juntar código novo com um
+ * manifest/mapa antigo em cache (o GitHub Pages guarda-os 10 min) e o arranque falhava.
+ */
+export function versioned(url: string): string {
+  return `${url}?v=${__BUILD_ID__}`;
+}
+
 /** Parâmetro de URL que mostra o overlay de debug ao arrancar (ex.: `?debug`), útil no telemóvel. */
 export const DEBUG_QUERY_PARAM = 'debug';
 

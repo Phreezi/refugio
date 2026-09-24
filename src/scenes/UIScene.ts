@@ -24,9 +24,6 @@ const KNOB_RADIUS = 10;
 const JOYSTICK_DEAD_ZONE = 0.25;
 /** Até esta fração do raio anda-se agachado (devagar); acima, a correr normal. */
 const JOYSTICK_SNEAK_ZONE = 0.55;
-/** Margem entre o joystick em repouso e os cantos do ecrã. */
-const JOYSTICK_MARGIN = 12;
-const IDLE_ALPHA = 0.35;
 const ACTIVE_ALPHA = 0.7;
 /** Ponteiros em simultâneo: rato + 2 dedos (joystick + botão de ação, ou pinça). */
 const TOUCH_POINTERS = 2;
@@ -276,16 +273,15 @@ export class UIScene extends Phaser.Scene {
   }
 
   /**
-   * Joystick flutuante: aparece onde o dedo toca na metade esquerda do ecrã.
-   * Em dispositivos com toque fica visível (esbatido) no canto, para se saber que existe.
+   * Joystick flutuante: aparece onde o dedo toca, em qualquer ponto do ecrã que não seja um
+   * botão/hotbar, e desaparece ao levantar o dedo.
    */
   private createJoystick(): void {
     if (this.input.manager.pointersTotal < TOUCH_POINTERS + 1) this.input.addPointer(TOUCH_POINTERS);
 
     this.joystickBase = this.add.circle(0, 0, JOYSTICK_RADIUS, paletteNumber('ink'));
     this.joystickKnob = this.add.circle(0, 0, KNOB_RADIUS, paletteNumber('cream'));
-    this.placeJoystick(this.restPosition());
-    this.setJoystickVisible(this.sys.game.device.input.touch, IDLE_ALPHA);
+    this.setJoystickVisible(false, ACTIVE_ALPHA);
 
     // Dedos no ecrã (px do dispositivo), para a pinça: com 2 dedos o joystick larga e faz-se zoom.
     const touches = new Map<number, { x: number; y: number }>();
@@ -310,7 +306,7 @@ export class UIScene extends Phaser.Scene {
         }
         return;
       }
-      // 3) Toque: pinça com 2 dedos, ou joystick na metade esquerda.
+      // 3) Toque: pinça com 2 dedos, ou joystick onde o dedo tocar.
       touches.set(pointer.id, { x: pointer.x, y: pointer.y });
       if (touches.size >= 2) {
         pinching = true;
@@ -319,7 +315,6 @@ export class UIScene extends Phaser.Scene {
         return;
       }
       if (pinching || this.joystickPointer !== null) return;
-      if (p.x >= getView().width / 2) return; // metade direita: botão de ação
       this.joystickPointer = pointer.id;
       this.placeJoystick(this.clampToScreen(p.x, p.y));
       this.setJoystickVisible(true, ACTIVE_ALPHA);
@@ -367,19 +362,13 @@ export class UIScene extends Phaser.Scene {
     this.joystickPointer = null;
     moveInput.joystick = { x: 0, y: 0 };
     moveInput.joystickSneak = false;
-    this.placeJoystick(this.restPosition());
-    this.setJoystickVisible(true, IDLE_ALPHA);
+    this.setJoystickVisible(false, ACTIVE_ALPHA);
   }
 
   /** Coordenadas do ponteiro em píxeis de jogo (o canvas está em píxeis do dispositivo). */
   private toGame(pointer: Phaser.Input.Pointer): { x: number; y: number } {
     const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     return { x: point.x, y: point.y };
-  }
-
-  private restPosition(): { x: number; y: number } {
-    const offset = JOYSTICK_MARGIN + JOYSTICK_RADIUS;
-    return { x: offset, y: getView().height - offset };
   }
 
   /** O joystick nunca fica cortado pelos bordos do ecrã. */
