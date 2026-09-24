@@ -75,6 +75,30 @@ describe('save: migrações', () => {
     expect(() => migrate({}, 1, 3, { 1: (s) => s })).toThrow(/2 → 3/);
   });
 
+  it('v1 → v2 (Fase 3): um save antigo ganha inventário, hotbar, baús, zonas e rng', () => {
+    const v1State = {
+      player: { x: 10, y: 20, facing: 'up', zoneId: 'zone_base', hp: 70, hunger: 60, thirst: 50 },
+      world: { tick: 999 },
+    };
+    const stateJson = JSON.stringify(v1State);
+    const sum = checksum(`1|5|${stateJson}`);
+    const text = `{"version":1,"timestamp":5,"checksum":"${sum}","state":${stateJson}}`;
+    const parsed = parseSave(text);
+    expect(parsed.version).toBe(1);
+    expect(parsed.state.player).toMatchObject({ x: 10, y: 20, hp: 70 });
+    expect(parsed.state.player.inventory).toHaveLength(20);
+    expect(parsed.state.player.hotbar).toEqual([null, null, null, null]);
+    expect(parsed.state.world).toEqual({ tick: 999, rng: 1 });
+    expect(parsed.state.base).toEqual({ chests: {} });
+    expect(parsed.state.zones).toEqual({});
+  });
+
+  it('valida os slots do inventário', () => {
+    const bad = structuredClone(STATE);
+    (bad.player.inventory as unknown[])[0] = ['wood', 0];
+    expect(problemOf(serializeSave(bad, 1))).toBe('state');
+  });
+
   it('um save antigo sem migração disponível é recusado como formato inválido', () => {
     const v0 = serializeSave(STATE, 1).replace(`"version":${String(SAVE_VERSION)}`, '"version":0');
     const json = JSON.parse(v0) as { state: unknown };

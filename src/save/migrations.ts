@@ -3,9 +3,21 @@
 
 export type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
+const emptySlots = (n: number): null[] => new Array<null>(n).fill(null);
+
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
-  // Exemplo para a primeira mudança de formato:
-  // 1: (s) => ({ ...s, stats: { kills: 0, deaths: 0 } }),
+  // v1 → v2 (Fase 3): inventário, hotbar, baús, recursos apanhados por zona, estado do RNG.
+  1: (s) => {
+    const player = s.player as Record<string, unknown>;
+    const world = s.world as Record<string, unknown>;
+    return {
+      ...s,
+      player: { ...player, inventory: emptySlots(20), hotbar: emptySlots(4) },
+      world: { ...world, rng: 1 },
+      base: { chests: {} },
+      zones: {},
+    };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

@@ -65,9 +65,9 @@ describe('parseZoneMap', () => {
     expect(map.solid).toEqual([false, false, true, false, false, false]);
     expect(map.playerSpawn).toEqual({ x: 8, y: 8 });
     expect(map.exits).toHaveLength(2);
-    expect(map.resources).toEqual([{ id: 'rock', x: 24, y: 30 }]);
+    expect(map.resources).toEqual([{ id: 'rock', x: 24, y: 30, objectId: 4 }]);
     expect(map.containers).toEqual([{ id: 'crate_common', x: 40, y: 30 }]);
-    expect(map.props).toEqual([{ id: 'log', x: 20.5, y: 12.25 }]);
+    expect(map.props).toEqual([{ id: 'log', x: 20.5, y: 12.25, objectId: 6 }]);
   });
 
   it('ignora os bits de rotação/espelho do Tiled nos gids', () => {

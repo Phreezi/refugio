@@ -1,4 +1,4 @@
-import type { PropDefs, ResourceDefs } from '../data/types';
+import type { ItemDefs, PropDefs, ResourceDefs } from '../data/types';
 import type { ZoneMap } from './zoneMap';
 
 /**
@@ -6,9 +6,19 @@ import type { ZoneMap } from './zoneMap';
  * Não é estado do jogo: é igual para todos os jogos e não se grava.
  */
 class Content {
+  private itemDefs: ItemDefs | null = null;
   private resourceDefs: ResourceDefs | null = null;
   private propDefs: PropDefs | null = null;
   private readonly zoneMaps = new Map<string, ZoneMap>();
+
+  setItems(defs: ItemDefs): void {
+    this.itemDefs = defs;
+  }
+
+  get items(): ItemDefs {
+    if (this.itemDefs === null) throw new Error('Content: itens ainda não carregados.');
+    return this.itemDefs;
+  }
 
   setResources(defs: ResourceDefs): void {
     this.resourceDefs = defs;

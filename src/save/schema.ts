@@ -4,7 +4,7 @@ import { MIGRATIONS, migrate, type Migration } from './migrations';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -70,6 +70,25 @@ function stat(value: unknown): value is number {
 
 const FACINGS = new Set(['down', 'left', 'right', 'up']);
 
+/** Slot compacto: null ou [itemId, qtd ≥ 1] / [itemId, qtd, durabilidade ≥ 0]. */
+function validSlot(slot: unknown): boolean {
+  if (slot === null) return true;
+  if (!Array.isArray(slot) || slot.length < 2 || slot.length > 3) return false;
+  const [id, qty, durability] = slot as unknown[];
+  return (
+    typeof id === 'string' &&
+    id !== '' &&
+    typeof qty === 'number' &&
+    Number.isInteger(qty) &&
+    qty >= 1 &&
+    (durability === undefined || stat(durability))
+  );
+}
+
+function validContainer(value: unknown): boolean {
+  return Array.isArray(value) && value.every(validSlot);
+}
+
 /** Valida o estado (já migrado para a versão atual) e devolve-o tipado. */
 export function validateState(input: unknown): GameStateData {
   const problems: string[] = [];
@@ -84,9 +103,27 @@ export function validateState(input: unknown): GameStateData {
     for (const key of ['hp', 'hunger', 'thirst'] as const) {
       if (!stat(player[key])) problems.push(`player.${key} inválido`);
     }
+    if (!validContainer(player.inventory)) problems.push('player.inventory inválido');
+    if (!validContainer(player.hotbar)) problems.push('player.hotbar inválido');
   }
   if (!isObject(world)) problems.push('falta world');
-  else if (!stat(world.tick)) problems.push('world.tick inválido');
+  else {
+    if (!stat(world.tick)) problems.push('world.tick inválido');
+    if (!stat(world.rng)) problems.push('world.rng inválido');
+  }
+  const base = isObject(input) ? input.base : undefined;
+  if (!isObject(base) || !isObject(base.chests) || !Object.values(base.chests).every(validContainer)) {
+    problems.push('base.chests inválido');
+  }
+  const zones = isObject(input) ? input.zones : undefined;
+  if (
+    !isObject(zones) ||
+    !Object.values(zones).every(
+      (z) => isObject(z) && isObject(z.depleted) && Object.values(z.depleted).every(stat),
+    )
+  ) {
+    problems.push('zones inválido');
+  }
   if (problems.length > 0) throw new SaveError('state', problems.join('; '));
   return input as GameStateData;
 }

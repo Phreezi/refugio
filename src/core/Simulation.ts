@@ -1,5 +1,6 @@
 import { FIXED_STEP_MS, MAX_STEPS_PER_FRAME, PLAYER_FOOTPRINT } from '../config';
 import { BALANCE } from '../data/balance';
+import type { ItemDefs } from '../data/types';
 import type { CollisionWorld } from '../systems/movement/CollisionWorld';
 import { isZero, ZERO, type Vec2 } from '../systems/movement/geometry';
 import { facingFromIntent, moveWithCollision, normalize } from '../systems/movement/movement';
@@ -7,6 +8,10 @@ import { respawnVitals, survivalRules, tickSurvival } from '../systems/survival/
 import { eventBus, type EventBus, type GameEvents } from './EventBus';
 import { FixedStep } from './FixedStep';
 import { gameState, type GameState } from './GameState';
+import { Interaction, type ZoneContext } from './Interaction';
+import { PlayerActions } from './PlayerActions';
+import { secondsToTicks } from './Clock';
+import { content } from '../world/content';
 
 /**
  * Corre a lógica do jogo em passo fixo. As cenas de jogo (Base, Zona) chamam
@@ -17,15 +22,39 @@ export class Simulation {
   private readonly state: GameState;
   private readonly bus: EventBus<GameEvents>;
   private readonly survival = survivalRules(BALANCE);
+  private readonly actionCooldownTicks = secondsToTicks(BALANCE.actionCooldownSec);
+  readonly actions: PlayerActions;
+  readonly interaction: Interaction;
+  private actionHeld = false;
+  private actionQueued = false;
+  private nextActionTick = 0;
   private world: CollisionWorld | null = null;
   private respawnPoint: Vec2 | null = null;
   private intent: Vec2 = ZERO;
   private previous: Vec2 = ZERO;
   private moved = false;
 
-  constructor(state: GameState, bus: EventBus<GameEvents>) {
+  /** @param items definições dos itens (lidas quando são precisas: carregam depois do arranque). */
+  constructor(state: GameState, bus: EventBus<GameEvents>, items: () => ItemDefs = () => content.items) {
     this.state = state;
     this.bus = bus;
+    this.actions = new PlayerActions(state, bus, items);
+    this.interaction = new Interaction(state, bus, this.actions);
+  }
+
+  /** Zona onde o jogador está: colisões, recursos, baús… (null = fora de uma cena de jogo). */
+  setZone(zone: ZoneContext | null): void {
+    this.world = zone?.collision ?? null;
+    this.interaction.setZone(zone);
+  }
+
+  /**
+   * Ação contextual (Espaço/clique/botão). `held` = tecla/botão premido: repete golpes em
+   * recursos ao ritmo de `actionCooldownSec`. Um toque rápido também conta (fica em fila).
+   */
+  setActionHeld(held: boolean): void {
+    if (held && !this.actionHeld) this.actionQueued = true;
+    this.actionHeld = held;
   }
 
   /** Geometria da zona onde o jogador está (null = sem movimento, ex.: fora de uma cena de jogo). */
@@ -70,6 +99,9 @@ export class Simulation {
     this.clock.reset();
     this.intent = ZERO;
     this.moved = false;
+    this.actionHeld = false;
+    this.actionQueued = false;
+    this.nextActionTick = 0;
     if (this.state.hasGame) {
       const { x, y } = this.state.data.player;
       this.previous = { x, y };
@@ -81,8 +113,20 @@ export class Simulation {
     world.tick += 1;
     this.state.markDirty(); // o tempo de jogo avançou
     this.movePlayer();
+    this.runAction(world.tick);
+    this.interaction.tick(world.tick);
     if (tickSurvival(this.state.data.player, world.tick, this.survival)) this.respawn();
     this.bus.emit('world:tick', { tick: world.tick });
+  }
+
+  private runAction(tick: number): void {
+    if (!(this.actionQueued || this.actionHeld) || tick < this.nextActionTick) return;
+    this.actionQueued = false;
+    const done = this.interaction.act(PLAYER_FOOTPRINT);
+    if (done === null) return;
+    this.nextActionTick = tick + this.actionCooldownTicks;
+    // Abrir um baú ou beber não se repete com a tecla presa (só golpes em recursos).
+    if (done === 'chest' || done === 'drink') this.actionHeld = false;
   }
 
   private respawn(): void {

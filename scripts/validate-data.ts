@@ -6,8 +6,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { ManifestError, parseManifest } from '../src/assets/manifest.ts';
 import {
   DataError,
+  parseItems,
   parseProps,
   parseResources,
+  type ItemDefs,
   type PropDefs,
   type ResourceDefs,
 } from '../src/data/types.ts';
@@ -117,9 +119,36 @@ function checkBalance(): string[] {
   return problems;
 }
 
-function loadResources(): ResourceDefs | string[] {
+function loadItems(): ItemDefs | string[] {
   try {
-    return parseResources(readJson('src/data/resources.json'), manifestKeys());
+    return parseItems(readJson('src/data/items.json'), manifestKeys());
+  } catch (error) {
+    if (error instanceof DataError) return error.problems.map((p) => `items.json: ${p}`);
+    throw error;
+  }
+}
+
+/** Itens válidos e com nome traduzido em todas as línguas. */
+function checkItems(): string[] {
+  const items = loadItems();
+  if (Array.isArray(items)) return items;
+  const problems: string[] = [];
+  for (const lang of ['pt-PT', 'en']) {
+    const dict = readJson(`src/i18n/${lang}.json`);
+    if (!isStringRecord(dict)) continue;
+    for (const [id, item] of Object.entries(items)) {
+      if (!(item.name in dict))
+        problems.push(`items.json: "${id}" sem nome em i18n/${lang}.json (${item.name})`);
+    }
+  }
+  return problems;
+}
+
+function loadResources(): ResourceDefs | string[] {
+  const items = loadItems();
+  if (Array.isArray(items)) return ['items.json inválido (ver acima)'];
+  try {
+    return parseResources(readJson('src/data/resources.json'), manifestKeys(), Object.keys(items));
   } catch (error) {
     if (error instanceof DataError) return error.problems.map((p) => `resources.json: ${p}`);
     throw error;
@@ -214,6 +243,7 @@ const checks: [string, () => string[]][] = [
   ['paleta', checkPalette],
   ['manifest de assets', checkManifest],
   ['balance', checkBalance],
+  ['itens', checkItems],
   ['recursos', checkResources],
   ['obstáculos', checkProps],
   ['mapas', checkMaps],

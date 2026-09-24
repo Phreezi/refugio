@@ -23,7 +23,7 @@ Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
 | `npm run validate-data` | Valida paleta, manifest de assets e i18n (e, no futuro, os JSON de conteúdo) |
 | `npm run palette`       | Regenera `public/assets/palette.png` a partir de `src/assets/palette.json`   |
 | `npm run tiles`         | Regenera o tileset placeholder `public/assets/tiles/base_tiles.png`          |
-| `npm run sprites`       | Regenera os sprites de recursos e obstáculos em `public/assets/sprites/`     |
+| `npm run sprites`       | Regenera sprites (recursos, obstáculos, baú) e ícones de itens               |
 | `npm run map:base`      | Gera o mapa inicial da base (não substitui um existente sem `-- --force`)    |
 
 ## Debug
@@ -37,7 +37,12 @@ Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
 - **PC:** WASD ou setas para andar (8 direções).
 - **Telemóvel:** joystick virtual — tocar e arrastar na metade esquerda do ecrã. Funciona na
   horizontal e na vertical.
-- **Zoom:** roda do rato ou teclas +/− no PC; pinça com dois dedos no telemóvel (até metade).
+- **Zoom:** Ctrl + roda do rato ou teclas +/− no PC; pinça com dois dedos no telemóvel (até metade).
+- **Ação** (cortar, apanhar, abrir o baú, beber no poço): Espaço ou clique no PC; botão "Ação" no
+  telemóvel. A seta indica o alvo. Manter premido repete golpes.
+- **Mochila:** I ou Tab (ou o botão "Mochila"); arrastar para mover, tocar para selecionar.
+  Hotbar: teclas 1–4 ou tocar para comer/beber.
+- **Velocidade do jogo:** botão x1/x2/x3 por baixo do relógio.
 
 ## Gravação
 

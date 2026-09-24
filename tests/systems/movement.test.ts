@@ -99,10 +99,11 @@ describe('CollisionWorld', () => {
       playerSpawn: { x: 8, y: 8 },
       exits: [],
       resources: [
-        { id: 'tree', x: 8, y: 14 },
-        { id: 'grass', x: 4, y: 14 },
+        { id: 'tree', x: 8, y: 14, objectId: 1 },
+        { id: 'grass', x: 4, y: 14, objectId: 2 },
       ],
-      props: [{ id: 'crate', x: 24, y: 10 }],
+      props: [{ id: 'crate', x: 24, y: 10, objectId: 3 }],
+      chests: [],
       containers: [],
       enemySpawns: [],
     };
@@ -119,6 +120,11 @@ describe('CollisionWorld', () => {
     expect(cw.blocks({ x: 1, y: 12, w: 1, h: 1 })).toBe(false); // erva: atravessável
     expect(cw.blocks({ x: 20, y: 4, w: 1, h: 1 })).toBe(true); // tile sólido
     expect(cw.blocks({ x: 23, y: 7, w: 1, h: 1 })).toBe(true); // caixote (obstáculo livre)
+    // Um recurso apanhado deixa de bloquear (e volta a bloquear quando reaparece).
+    cw.setEnabled(1, false);
+    expect(cw.blocks({ x: 7, y: 12, w: 1, h: 1 })).toBe(false);
+    cw.setEnabled(1, true);
+    expect(cw.blocks({ x: 7, y: 12, w: 1, h: 1 })).toBe(true);
   });
 
   it('rejeita um mapa de colisões com tamanho errado', () => {

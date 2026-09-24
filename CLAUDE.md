@@ -96,7 +96,8 @@ Base (casa) → escolher zona no mapa-mundo → viajar (custa um pouco de comida
   - Implementação (`src/display/`): `Scale.NONE` + `scale.resize(canvas)` + `scale.setZoom(1 / dpr)`, com a posição do canvas alinhada a píxeis físicos (também com DPR 1,25 ou 2,625).
   - Com zoom na câmara o Phaser **não arredonda** posições: tudo o que se desenha tem de estar em coordenadas **inteiras** de jogo (o jogador interpolado é arredondado em `BaseScene`).
   - **Nenhuma cena pode assumir um tamanho fixo**: usar `getView()` (não `this.scale.width`, que está em píxeis do dispositivo) e reagir a `Phaser.Scale.Events.RESIZE` (removendo o listener no SHUTDOWN). Ponteiros: converter com `camera.getWorldPoint`.
-- **Zoom do jogador** (`src/display/worldZoom.ts`): o zoom da vista é o máximo; pode afastar-se até metade, em níveis inteiros (×4 → ×3 → ×2; ×3 → ×2) para a pixel art continuar exata. Roda do rato ou +/− no PC, pinça com 2 dedos no telemóvel (UIScene). Guardado no localStorage (`refugio.zoomOut`). Só a câmara do mundo muda; o HUD mantém o tamanho. Se se vê mais do que o mapa, este fica centrado.
+- **Zoom do jogador** (`src/display/worldZoom.ts`): o zoom da vista é o máximo; pode afastar-se até metade, em níveis inteiros (×4 → ×3 → ×2; ×3 → ×2) para a pixel art continuar exata. **Ctrl + roda** (ou pinça no touchpad) ou +/− no PC — a roda sozinha não faz zoom; pinça com 2 dedos no telemóvel (UIScene).
+- **Velocidade do jogo** (`src/ui/gameSpeed.ts`, botão x1/x2/x3 no HUD): multiplica o tempo real que entra na `Simulation`, por isso acelera tudo o que corre no passo fixo (relógio, fome/sede, movimento, golpes, respawn) e as animações do jogador. Guardada no localStorage (`refugio.speed`). Guardado no localStorage (`refugio.zoomOut`). Só a câmara do mundo muda; o HUD mantém o tamanho. Se se vê mais do que o mapa, este fica centrado.
 - 60 FPS alvo; lógica de jogo com passo fixo (ver 5.2).
 
 ---
@@ -149,10 +150,14 @@ refugio/
 │   │   ├── EventBus.ts
 │   │   ├── FixedStep.ts      # acumulador de passo fixo (50 ms)
 │   │   ├── Simulation.ts     # corre os ticks de lógica (sistemas entram aqui)
+│   │   ├── Interaction.ts    # ação contextual, recolha, respawn de recursos (ZoneContext)
+│   │   ├── PlayerActions.ts  # usar/mover/dividir/guardar semelhantes/beber
 │   │   ├── Clock.ts          # tempo de jogo, dia/noite
 │   │   └── Rng.ts            # RNG com seed
 │   ├── systems/              # lógica pura, SEM dependências do Phaser sempre que possível
 │   │   ├── movement/         # CollisionWorld, movimento com deslize, direção do sprite
+│   │   ├── gathering/        # ferramenta automática, força do golpe, drops, desgaste
+│   │   ├── interaction/      # escolha do alvo em frente (prioridade zombie > contentor > recurso)
 │   │   ├── survival/         # fome, sede, vida
 │   │   ├── inventory/
 │   │   ├── crafting/
@@ -163,7 +168,7 @@ refugio/
 │   │   ├── progression/
 │   │   └── travel/
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
-│   ├── ui/                   # Label (texto nítido), Button, fileTransfer (exportar/importar), fatalError
+│   ├── ui/                   # Label, Button, SlotView, InventoryUI, gameSpeed, uiState, fileTransfer, fatalError
 │   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
 │   ├── save/
 │   │   ├── index.ts          # instâncias (saves, autosave) + gravar ao esconder a página
@@ -316,6 +321,8 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Ação | Teclado/rato | Touch |
 |---|---|---|
 | Mover | WASD / setas | Joystick virtual (lado esquerdo) |
+| Zoom (até metade) | Ctrl + roda do rato, +/− | Pinça com 2 dedos |
+| Velocidade do jogo x1/x2/x3 | Botão por baixo do relógio | Idem |
 | Ação contextual (bater, recolher, abrir, atacar) | Espaço / clique | Botão grande (lado direito) |
 | Inventário | I / Tab | Botão mochila |
 | Craft | C | Botão martelo |
@@ -459,7 +466,8 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 ### 8.4 Regras de desenho de mapas (Tiled)
 
 - Camadas: `ground`, `decor_low`, `collision`, `decor_high` (por cima do jogador), `objects`.
-- Camada `objects` contém pontos de spawn: `player_spawn`, `exit`, `resource:<id>`, `prop:<id>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
+- Camada `objects` contém pontos de spawn: `player_spawn`, `exit`, `resource:<id>`, `prop:<id>`, `chest:<id>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
+- O **id do objeto no Tiled** identifica cada recurso no save (`zones.<zona>.depleted`): não reutilizar ids (o Tiled nunca o faz).
 - **Obstáculos livres** (`prop:<id>`, definidos em `props.json`): troncos, cepos, caixotes, barris, vedação partida, carros abandonados, poço, pedrinhas… Colocam-se em **qualquer posição** (fora da grelha) e bloqueiam com o seu `footprint` (ou são decoração atravessável sem ele). É assim que se dá realismo ao mapa sem mudar a escala.
 - Cada zona tem **pelo menos 2 saídas** para o mapa-mundo e uma área segura perto da entrada.
 - Nomes dos objetos (campo *Name* no Tiled) com esse formato; o ponto de um `resource:<id>`/`prop:<id>` são os **pés** do objeto (meio da base do sprite). Posições fracionárias são arredondadas ao desenhar.
@@ -668,13 +676,13 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** apanhar coisas do mundo.
 
-- [ ] `items.json` com ~25 itens iniciais e validação no arranque.
-- [ ] Sistema de inventário puro (adicionar, remover, stack, dividir, mover) com testes.
-- [ ] UI de inventário (arrastar e largar; toque longo em mobile) e hotbar de 4 slots.
-- [ ] Nós de recurso (árvore, pedra, arbusto, erva) com vida, feedback de golpe e drops.
-- [ ] Ação contextual automática sobre o alvo mais próximo.
-- [ ] Consumir itens (comer bagas, beber água).
-- [ ] Baú na base (colocado manualmente no mapa por agora).
+- [x] `items.json` com 25 itens iniciais e validação no arranque (ícones em pixel art para os que já se apanham).
+- [x] Sistema de inventário puro (adicionar, remover, stack, dividir, mover, guardar semelhantes) com testes.
+- [x] UI de inventário e hotbar de 4 slots: tocar seleciona (Usar/Dividir), arrastar move (rato e toque) entre mochila, hotbar e baú. *(Sem "largar no chão" ainda: não há itens no chão.)*
+- [x] Nós de recurso (árvore, pedra, arbusto, erva) com vida, feedback de golpe (abanão/clarão, "+2 Madeira") e drops; reaparecem após `respawnSec` de jogo.
+- [x] Ação contextual automática sobre o alvo mais próximo em frente (seta por cima do alvo; Espaço/clique/botão "Ação"; manter premido repete golpes).
+- [x] Consumir itens (comer bagas, beber água; garrafa vazia volta) e beber no **poço** da base.
+- [x] Baú na base (`chest:base_1` no mapa, dentro da casa).
 
 **Aceitação:** o jogador corta árvores, apanha bagas, come, e guarda coisas num baú; tudo sobrevive a um reload.
 
@@ -927,5 +935,11 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Sprites de recursos/obstáculos em pixel art gerada por script (`npm run sprites`) | Os retângulos com letra não davam para avaliar o aspeto; continuam a ser placeholders (Fase 12), mas já com sombra, luz e contorno |
 | 2026-09-24 | Zoom do jogador até metade, em níveis inteiros | Pedido do jogador (roda/pinça). Zoom fracionário deixaria píxeis irregulares; num ecrã ×3 o mínimo é ×2 |
 | 2026-09-24 | Jogo também na vertical (alvo no lado curto) em vez do aviso "roda o ecrã" | Pedido do jogador: prefere jogar ao alto, mesmo vendo uma área diferente |
+| 2026-09-24 | Ferramenta de recolha escolhida automaticamente (a melhor do tipo certo na mochila/hotbar) | Menos gestão de equipamento, mais simpático; o equipamento (arma/armadura) chega na Fase 6 |
+| 2026-09-24 | Recursos só se partem se os drops couberem na mochila | "Nada se perde": com a mochila cheia aparece o aviso e o último golpe não acontece |
+| 2026-09-24 | Poço da base dá de beber diretamente (`props.json` → `action: "drink"`) | Sem água potável até à Fase 7 (ferver), a sede seria uma armadilha logo no início |
+| 2026-09-24 | Save v2: inventário, hotbar, baús, recursos apanhados por zona (id do objeto → tick de respawn), `world.rng` | Formato compacto (§10.5); migração v1 → v2 com teste |
+| 2026-09-24 | Zoom no PC só com Ctrl + roda (preventDefault para o browser não ampliar a página) | Pedido do jogador; a roda sozinha fica livre |
+| 2026-09-24 | Botão de velocidade x1/x2/x3 | Pedido do jogador: acelera todo o tempo de jogo (útil para testar e para esperas) |
 | 2026-09-24 | Cópia de emergência síncrona (localStorage) ao esconder/fechar a página | Testado: ao recarregar, o Chrome corta a escrita assíncrona no IndexedDB e perdiam-se os últimos segundos |
 | 2026-09-24 | Joystick virtual flutuante na metade esquerda (só toque), 8 direções, zona morta 25% | Metade direita fica livre para o botão de ação (Fase 3). O teclado tem prioridade sobre o joystick |

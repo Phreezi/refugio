@@ -1,11 +1,63 @@
 {
-  "$comment": "Obstáculos e decoração colocados livremente nos mapas (objetos prop:<id>, fora da grelha). 'footprint' = caixa sólida na base do sprite, centrada nos pés (px); omisso = atravessável.",
-  "log": { "sprite": "log", "footprint": { "width": 40, "height": 6 } },
-  "stump": { "sprite": "stump", "footprint": { "width": 10, "height": 5 } },
-  "pebbles": { "sprite": "pebbles" },
-  "crate": { "sprite": "crate", "footprint": { "width": 12, "height": 6 } },
-  "barrel": { "sprite": "barrel", "footprint": { "width": 10, "height": 5 } },
-  "fence_broken": { "sprite": "fence_broken", "footprint": { "width": 28, "height": 4 } },
-  "car_wreck": { "sprite": "car_wreck", "footprint": { "width": 42, "height": 12 } },
-  "well": { "sprite": "well", "footprint": { "width": 26, "height": 12 } }
+  "$comment": "Obstáculos e decoração colocados livremente nos mapas (objetos prop:<id>, fora da grelha). 'footprint' = caixa sólida na base do sprite, centrada nos pés (px); omisso = atravessável. 'action' = ação contextual (drink: beber água). 'chest' é o aspeto dos baús (objetos chest:<id>).",
+  "log": {
+    "sprite": "log",
+    "footprint": {
+      "width": 40,
+      "height": 6
+    }
+  },
+  "stump": {
+    "sprite": "stump",
+    "footprint": {
+      "width": 10,
+      "height": 5
+    }
+  },
+  "pebbles": {
+    "sprite": "pebbles"
+  },
+  "crate": {
+    "sprite": "crate",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    }
+  },
+  "barrel": {
+    "sprite": "barrel",
+    "footprint": {
+      "width": 10,
+      "height": 5
+    }
+  },
+  "fence_broken": {
+    "sprite": "fence_broken",
+    "footprint": {
+      "width": 28,
+      "height": 4
+    }
+  },
+  "car_wreck": {
+    "sprite": "car_wreck",
+    "footprint": {
+      "width": 42,
+      "height": 12
+    }
+  },
+  "well": {
+    "sprite": "well",
+    "footprint": {
+      "width": 26,
+      "height": 12
+    },
+    "action": "drink"
+  },
+  "chest": {
+    "sprite": "chest",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    }
+  }
 }

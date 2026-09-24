@@ -12,6 +12,9 @@ export class CollisionWorld {
   readonly tileSize: number;
   private readonly solid: readonly boolean[];
   private readonly obstacles: readonly Rect[];
+  /** Obstáculos com chave (ex.: id do objeto de um recurso), que se podem desligar. */
+  private readonly keyed = new Map<number, Rect>();
+  private readonly disabled = new Set<number>();
 
   constructor(
     widthTiles: number,
@@ -36,15 +39,29 @@ export class CollisionWorld {
     props: Readonly<Record<string, WorldObjectDef>> = {},
   ): CollisionWorld {
     const obstacles: Rect[] = [];
-    const add = (placements: ZoneMap['resources'], defs: Readonly<Record<string, WorldObjectDef>>): void => {
-      for (const placement of placements) {
-        const footprint = defs[placement.id]?.footprint;
-        if (footprint) obstacles.push(footprintRect(placement, footprint));
-      }
-    };
-    add(map.resources, resources);
-    add(map.props, props);
-    return new CollisionWorld(map.width, map.height, map.tileSize, map.solid, obstacles);
+    const keyed: [number, Rect][] = [];
+    for (const placement of map.resources) {
+      const footprint = resources[placement.id]?.footprint;
+      // Recursos têm chave: quando são apanhados deixam de bloquear.
+      if (footprint) keyed.push([placement.objectId, footprintRect(placement, footprint)]);
+    }
+    for (const placement of [...map.props, ...map.chests]) {
+      const def = map.chests.includes(placement) ? props.chest : props[placement.id];
+      if (def?.footprint) obstacles.push(footprintRect(placement, def.footprint));
+    }
+    const world = new CollisionWorld(map.width, map.height, map.tileSize, map.solid, obstacles);
+    for (const [key, rect] of keyed) world.addKeyed(key, rect);
+    return world;
+  }
+
+  /** Obstáculo que se pode ligar/desligar (ex.: um recurso apanhado deixa de bloquear). */
+  addKeyed(key: number, rect: Rect): void {
+    this.keyed.set(key, rect);
+  }
+
+  setEnabled(key: number, enabled: boolean): void {
+    if (enabled) this.disabled.delete(key);
+    else this.disabled.add(key);
   }
 
   get pixelWidth(): number {
@@ -76,6 +93,9 @@ export class CollisionWorld {
     }
     for (const obstacle of this.obstacles) {
       if (overlaps(obstacle, area)) found.push(obstacle);
+    }
+    for (const [key, obstacle] of this.keyed) {
+      if (!this.disabled.has(key) && overlaps(obstacle, area)) found.push(obstacle);
     }
     return found;
   }

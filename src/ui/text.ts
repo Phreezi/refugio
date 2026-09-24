@@ -13,6 +13,8 @@ export interface LabelStyle {
   /** Largura máxima (px de jogo) antes de mudar de linha. */
   wrap?: number;
   align?: 'left' | 'center' | 'right';
+  /** Contorno escuro (legível por cima do mundo, ex.: quantidades nos slots). */
+  stroke?: boolean;
 }
 
 /**
@@ -46,6 +48,7 @@ export class Label {
         color: PALETTE[this.color],
         align: style.align ?? 'left',
         resolution: textResolution(),
+        ...(style.stroke ? { stroke: PALETTE.ink, strokeThickness: Math.max(1, style.size / 4) } : {}),
         ...(style.wrap === undefined ? {} : { wordWrap: { width: style.wrap } }),
       })
       .setOrigin(0, 0);

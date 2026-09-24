@@ -1,0 +1,202 @@
+import { BALANCE } from '../data/balance';
+import type { ItemDefs, PropDefs, ResourceDefs } from '../data/types';
+import { bestTool, hitPower, maxDrops, rollDrops, wearTool } from '../systems/gathering/gathering';
+import { addItem, spaceFor } from '../systems/inventory/inventory';
+import { pickTarget, type Target } from '../systems/interaction/targeting';
+import type { CollisionWorld } from '../systems/movement/CollisionWorld';
+import { footprintRect, type Rect } from '../systems/movement/geometry';
+import type { ResourcePlacement, ZoneMap } from '../world/zoneMap';
+import { secondsToTicks } from './Clock';
+import type { EventBus, GameEvents } from './EventBus';
+import { zoneState, type GameState } from './GameState';
+import type { PlayerActions } from './PlayerActions';
+
+/** Tudo o que a lógica precisa de saber da zona onde o jogador está. */
+export interface ZoneContext {
+  zoneId: string;
+  map: ZoneMap;
+  collision: CollisionWorld;
+  items: ItemDefs;
+  resources: ResourceDefs;
+  props: PropDefs;
+}
+
+export type TargetData =
+  | { type: 'resource'; placement: ResourcePlacement }
+  | { type: 'chest'; placement: ResourcePlacement }
+  | { type: 'drink'; placement: ResourcePlacement };
+
+/** Área de interação de objetos sem caixa sólida (ex.: erva): um pouco à volta dos pés. */
+const LOOSE_AREA = { width: 10, height: 6 } as const;
+/** Os recursos que reaparecem verificam-se uma vez por segundo de jogo. */
+const RESPAWN_CHECK_TICKS = 20;
+
+/**
+ * Ação contextual e recolha (CLAUDE.md §7.2, §7.4): escolhe o alvo em frente, aplica golpes,
+ * dá os drops, desgasta a ferramenta e faz os recursos reaparecerem com o tempo de jogo.
+ * Corre dentro do passo fixo (Simulation); não usa o Phaser.
+ */
+export class Interaction {
+  private readonly state: GameState;
+  private readonly bus: EventBus<GameEvents>;
+  private readonly actions: PlayerActions;
+  private zone: ZoneContext | null = null;
+  /** Vida dos recursos já golpeados (não se grava: ao recarregar voltam a estar inteiros). */
+  private readonly nodeHp = new Map<number, number>();
+
+  constructor(state: GameState, bus: EventBus<GameEvents>, actions: PlayerActions) {
+    this.state = state;
+    this.bus = bus;
+    this.actions = actions;
+  }
+
+  setZone(zone: ZoneContext | null): void {
+    this.zone = zone;
+    this.nodeHp.clear();
+    if (!zone) return;
+    // Recursos já apanhados (do save) não bloqueiam.
+    const depleted = zoneState(this.state.data, zone.zoneId).depleted;
+    for (const placement of zone.map.resources) {
+      zone.collision.setEnabled(placement.objectId, depleted[String(placement.objectId)] === undefined);
+    }
+  }
+
+  /** O recurso está apanhado (à espera de reaparecer)? */
+  isDepleted(objectId: number): boolean {
+    if (!this.zone) return false;
+    return zoneState(this.state.data, this.zone.zoneId).depleted[String(objectId)] !== undefined;
+  }
+
+  /** Alvos possíveis na zona (recursos disponíveis, baús, poço). */
+  targets(): Target<TargetData>[] {
+    const zone = this.zone;
+    if (!zone) return [];
+    const list: Target<TargetData>[] = [];
+    const areaOf = (
+      placement: ResourcePlacement,
+      footprint: { width: number; height: number } | undefined,
+    ): Rect => footprintRect(placement, footprint ?? LOOSE_AREA);
+    for (const placement of zone.map.resources) {
+      if (this.isDepleted(placement.objectId)) continue;
+      const def = zone.resources[placement.id];
+      if (def)
+        list.push({
+          kind: 'resource',
+          area: areaOf(placement, def.footprint),
+          data: { type: 'resource', placement },
+        });
+    }
+    for (const placement of zone.map.chests) {
+      list.push({
+        kind: 'container',
+        area: areaOf(placement, zone.props.chest?.footprint),
+        data: { type: 'chest', placement },
+      });
+    }
+    for (const placement of zone.map.props) {
+      const def = zone.props[placement.id];
+      if (def?.action === 'drink') {
+        list.push({
+          kind: 'container',
+          area: areaOf(placement, def.footprint),
+          data: { type: 'drink', placement },
+        });
+      }
+    }
+    return list;
+  }
+
+  /** Alvo atual da ação contextual (também para a UI o destacar). */
+  currentTarget(footprint: { width: number; height: number }): Target<TargetData> | null {
+    if (!this.zone) return null;
+    const player = this.state.data.player;
+    const from = { x: player.x, y: player.y - footprint.height / 2 };
+    return pickTarget(from, player.facing, this.targets(), BALANCE.actionReachPx);
+  }
+
+  /**
+   * Faz a ação contextual.
+   * @returns o tipo de ação feita (para a animação), ou null se não houver zona.
+   */
+  act(footprint: { width: number; height: number }): TargetData['type'] | 'swing' | null {
+    if (!this.zone) return null;
+    const target = this.currentTarget(footprint);
+    if (!target) {
+      this.bus.emit('player:action', { kind: 'swing' });
+      return 'swing';
+    }
+    const data = target.data;
+    if (data.type === 'resource') this.gather(data.placement);
+    else if (data.type === 'chest') {
+      this.bus.emit('player:action', { kind: 'open' });
+      this.bus.emit('container:open', { chestId: data.placement.id });
+    } else {
+      this.bus.emit('player:action', { kind: 'use' });
+      this.actions.drink();
+    }
+    return data.type;
+  }
+
+  /** Recursos que já devem ter reaparecido (chamar a cada tick). */
+  tick(tick: number): void {
+    const zone = this.zone;
+    if (!zone || tick % RESPAWN_CHECK_TICKS !== 0) return;
+    const depleted = zoneState(this.state.data, zone.zoneId).depleted;
+    for (const [key, respawnAt] of Object.entries(depleted)) {
+      if (tick < respawnAt) continue;
+      Reflect.deleteProperty(depleted, key);
+      const objectId = Number(key);
+      zone.collision.setEnabled(objectId, true);
+      this.bus.emit('resource:respawned', { zoneId: zone.zoneId, objectId });
+    }
+  }
+
+  private gather(placement: ResourcePlacement): void {
+    const zone = this.zone;
+    const def = zone?.resources[placement.id];
+    if (!zone || !def) return;
+    const containers = this.actions.pickupContainers();
+    const tool = def.tool ? bestTool(containers, def.tool, zone.items) : null;
+    const power = hitPower(def, tool);
+    if (power === 0) {
+      this.bus.emit('action:blocked', { reason: 'needs_tool', ...(def.tool ? { tool: def.tool } : {}) });
+      return;
+    }
+    const hp = this.nodeHp.get(placement.objectId) ?? def.hp;
+    const finalHit = hp - power <= 0;
+    // Antes do último golpe, confirmar que os drops cabem (nada se perde).
+    if (finalHit && !maxDrops(def).every((drop) => spaceFor(containers, drop.item, zone.items) >= drop.qty)) {
+      this.bus.emit('action:blocked', { reason: 'inventory_full' });
+      return;
+    }
+
+    this.bus.emit('player:action', { kind: 'gather' });
+    if (tool) {
+      const toolItem = tool.container[tool.index]?.[0];
+      if (wearTool(tool) && toolItem) this.bus.emit('item:broken', { item: toolItem });
+    }
+    const left = Math.max(0, hp - power);
+    this.bus.emit('resource:hit', {
+      zoneId: zone.zoneId,
+      objectId: placement.objectId,
+      hp: left,
+      maxHp: def.hp,
+    });
+    this.state.markDirty();
+    if (!finalHit) {
+      this.nodeHp.set(placement.objectId, left);
+      return;
+    }
+
+    this.nodeHp.delete(placement.objectId);
+    const world = this.state.data.world;
+    for (const drop of rollDrops(def, world)) {
+      addItem(containers, drop.item, drop.qty, zone.items);
+      this.bus.emit('item:gained', { item: drop.item, qty: drop.qty, x: placement.x, y: placement.y });
+    }
+    zoneState(this.state.data, zone.zoneId).depleted[String(placement.objectId)] =
+      world.tick + secondsToTicks(def.respawnSec);
+    zone.collision.setEnabled(placement.objectId, false);
+    this.bus.emit('inventory:changed', {});
+  }
+}

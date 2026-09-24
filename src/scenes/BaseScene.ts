@@ -1,5 +1,11 @@
 import Phaser from 'phaser';
 import { PALETTE } from '../assets/palette';
+import { PLAYER_FOOTPRINT } from '../config';
+import { eventBus } from '../core/EventBus';
+import { itemName, t } from '../i18n';
+import { Label } from '../ui/text';
+import { gameSpeed } from '../ui/gameSpeed';
+import { uiState } from '../ui/uiState';
 import { CHARACTER_COLUMNS, CHARACTER_ROWS, characterFrame } from '../assets/characterSheet';
 import { BASE_MAP_KEY } from '../config';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
@@ -17,6 +23,12 @@ import { TILE_LAYERS, type TileLayerName } from '../world/zoneMap';
 import { SceneKey } from './keys';
 
 const PLAYER_TEXTURE = 'player';
+/** Seta por cima do alvo da ação contextual (textura gerada por código). */
+const MARKER_TEXTURE = 'target_marker';
+/** Duração da animação de golpe (2 frames). */
+const ATTACK_MS = 240;
+const FLOAT_TEXT_MS = 900;
+const FLOAT_TEXT_RISE = 14;
 const TILESET_TEXTURE = 'tileset_base';
 const WALK_FRAME_RATE = 8;
 /** Intervalo mínimo entre passos de zoom com a roda do rato. */
@@ -35,12 +47,16 @@ const LAYER_DEPTH: Readonly<Record<TileLayerName, number>> = {
 
 const walkAnimationKey = (facing: Facing): string => `${PLAYER_TEXTURE}_walk_${facing}`;
 
-type MoveKeys = Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key[]>;
+type MoveKeys = Record<'up' | 'down' | 'left' | 'right' | 'action', Phaser.Input.Keyboard.Key[]>;
 
-/** A base do jogador: mapa Tiled, recursos (decorativos até à Fase 3) e o jogador a andar. */
+/** A base do jogador: mapa Tiled, recursos, obstáculos, baú e o jogador (andar e recolher). */
 export class BaseScene extends Phaser.Scene {
   private player: Phaser.GameObjects.Sprite | null = null;
   private keys: MoveKeys | null = null;
+  /** Sprites dos recursos, pelo id do objeto no Tiled (para golpes, esconder e reaparecer). */
+  private resourceSprites = new Map<number, Phaser.GameObjects.Image>();
+  private marker: Phaser.GameObjects.Image | null = null;
+  private attackUntil = 0;
 
   constructor() {
     super(SceneKey.Base);
@@ -50,17 +66,23 @@ export class BaseScene extends Phaser.Scene {
     const zone = content.zoneMap(BASE_ZONE_ID);
     this.createMap();
 
-    // Recursos e obstáculos: pés no ponto do mapa (arredondado: posições inteiras), Y-sort.
-    const objects = [
-      ...zone.resources.map((p) => ({ p, def: content.resources[p.id] })),
-      ...zone.props.map((p) => ({ p, def: content.props[p.id] })),
-    ];
-    for (const { p, def } of objects) {
-      if (!def) continue; // impossível: o mapa foi validado contra resources.json/props.json
+    // Recursos, obstáculos e baús: pés no ponto do mapa (arredondado: posições inteiras), Y-sort.
+    const place = (p: { x: number; y: number }, sprite: string): Phaser.GameObjects.Image => {
       const x = Math.round(p.x);
       const y = Math.round(p.y);
-      this.add.image(x, y, def.sprite).setOrigin(0.5, 1).setDepth(y);
+      return this.add.image(x, y, sprite).setOrigin(0.5, 1).setDepth(y);
+    };
+    this.resourceSprites = new Map();
+    for (const p of zone.resources) {
+      const def = content.resources[p.id];
+      if (def) this.resourceSprites.set(p.objectId, place(p, def.sprite));
     }
+    for (const p of zone.props) {
+      const def = content.props[p.id];
+      if (def) place(p, def.sprite);
+    }
+    const chestSprite = content.props.chest?.sprite;
+    if (chestSprite) for (const p of zone.chests) place(p, chestSprite);
 
     this.createPlayerAnimations();
     const { x, y, facing } = gameState.data.player;
@@ -80,23 +102,39 @@ export class BaseScene extends Phaser.Scene {
     applyZoom();
     this.scale.on(Phaser.Scale.Events.RESIZE, applyZoom);
     const offZoom = onWorldZoomChange(applyZoom);
-    this.listenForZoomInput();
+    const offZoomInput = this.listenForZoomInput();
 
     this.keys = this.createMoveKeys();
-    simulation.setWorld(CollisionWorld.fromZone(zone, content.resources, content.props));
+    simulation.setZone({
+      zoneId: BASE_ZONE_ID,
+      map: zone,
+      collision: CollisionWorld.fromZone(zone, content.resources, content.props),
+      items: content.items,
+      resources: content.resources,
+      props: content.props,
+    });
     simulation.setRespawnPoint(zone.playerSpawn);
     simulation.reset();
+    for (const [objectId, sprite] of this.resourceSprites) {
+      sprite.setVisible(!simulation.interaction.isDepleted(objectId));
+    }
+    this.marker = this.add.image(0, 0, this.markerTexture()).setOrigin(0.5, 1).setVisible(false);
+    const offFeedback = this.listenForFeedback();
     autosave.start();
     this.scene.launch(SceneKey.UI, {});
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE, applyZoom);
       offZoom();
+      offZoomInput();
       this.scene.stop(SceneKey.UI);
       autosave.stop();
       void autosave.flush();
-      simulation.setWorld(null);
+      offFeedback();
+      simulation.setZone(null);
       simulation.setRespawnPoint(null);
+      this.resourceSprites.clear();
+      this.marker = null;
       moveInput.reset();
       this.player = null;
       this.keys = null;
@@ -105,11 +143,121 @@ export class BaseScene extends Phaser.Scene {
 
   override update(): void {
     moveInput.keyboard = this.readKeyboard();
-    simulation.setMoveIntent(moveInput.direction);
+    // Com a mochila/baú aberto o jogador fica parado.
+    const blocked = uiState.modalOpen;
+    simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction);
+    const actionKey = this.keys?.action.some((key) => key.isDown) ?? false;
+    simulation.setActionHeld(!blocked && (actionKey || uiState.actionHeld));
     // rawDelta = tempo real entre frames; o delta "suavizado" do Phaser fica limitado a
     // 16,7 ms com a janela sem foco, o que atrasaria o relógio do jogo.
-    simulation.update(this.game.loop.rawDelta);
+    // Velocidade do jogo (x1/x2/x3): mais tempo de jogo por frame (no máx. 5 ticks por frame).
+    const speed = gameSpeed();
+    simulation.update(this.game.loop.rawDelta * speed);
+    if (this.player) this.player.anims.timeScale = speed;
     this.renderPlayer();
+    this.renderMarker();
+  }
+
+  /** Seta por cima do alvo atual da ação contextual (para se saber o que o Espaço faz). */
+  private renderMarker(): void {
+    const marker = this.marker;
+    if (!marker) return;
+    const target = uiState.modalOpen ? null : simulation.interaction.currentTarget(PLAYER_FOOTPRINT);
+    if (!target) {
+      marker.setVisible(false);
+      return;
+    }
+    const placement = target.data.placement;
+    const sprite = this.resourceSprites.get(placement.objectId);
+    const top = sprite ? sprite.y - sprite.height : Math.round(placement.y) - 16;
+    const bob = Math.floor(this.time.now / 300) % 2;
+    marker
+      .setPosition(Math.round(placement.x), top - 1 - bob)
+      .setDepth(LAYER_DEPTH.decor_high + 1)
+      .setVisible(true);
+  }
+
+  private markerTexture(): string {
+    if (this.textures.exists(MARKER_TEXTURE)) return MARKER_TEXTURE;
+    // Triângulo de 7×4 px a apontar para baixo, com contorno escuro.
+    const canvas = this.textures.createCanvas(MARKER_TEXTURE, 7, 4);
+    const ctx = canvas?.getContext();
+    if (!canvas || !ctx) return '__DEFAULT';
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(0, 0, 7, 1);
+    ctx.fillRect(1, 1, 5, 1);
+    ctx.fillRect(2, 2, 3, 1);
+    ctx.fillRect(3, 3, 1, 1);
+    ctx.fillStyle = PALETTE.cream;
+    ctx.fillRect(1, 0, 5, 1);
+    ctx.fillRect(2, 1, 3, 1);
+    ctx.fillRect(3, 2, 1, 1);
+    canvas.refresh();
+    return MARKER_TEXTURE;
+  }
+
+  /** Reações visuais aos eventos da lógica: golpes, recursos apanhados, itens ganhos. */
+  private listenForFeedback(): () => void {
+    const offs = [
+      eventBus.on('player:action', ({ kind }) => {
+        if (kind !== 'open') this.attackUntil = this.time.now + ATTACK_MS;
+      }),
+      eventBus.on('resource:hit', ({ objectId, hp }) => {
+        const sprite = this.resourceSprites.get(objectId);
+        if (!sprite) return;
+        if (hp <= 0) {
+          sprite.setVisible(false);
+          return;
+        }
+        // Abanão de 1 px e clarão branco: posições inteiras (o Phaser não arredonda com zoom).
+        const x = sprite.x;
+        sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+        this.time.delayedCall(60, () => sprite.clearTint());
+        [1, -1, 1, 0].forEach((dx, i) => {
+          this.time.delayedCall(40 * i, () => sprite.setX(x + dx));
+        });
+      }),
+      eventBus.on('resource:respawned', ({ objectId }) => {
+        const sprite = this.resourceSprites.get(objectId);
+        if (!sprite) return;
+        sprite.setVisible(true).setAlpha(0);
+        this.tweens.add({ targets: sprite, alpha: 1, duration: 600 });
+      }),
+      eventBus.on('item:gained', ({ item, qty, x, y }) => {
+        this.floatText(t('msg.gained', { qty, item: itemName(item) }), Math.round(x), Math.round(y) - 20);
+      }),
+    ];
+    return () => {
+      for (const off of offs) off();
+    };
+  }
+
+  /** Texto que sobe e desaparece (ex.: "+2 Madeira"). */
+  private floatText(text: string, x: number, y: number): void {
+    const label = new Label(
+      this,
+      x,
+      y,
+      text,
+      { size: 7, bold: true, color: 'cream', stroke: true },
+      [0.5, 1],
+    );
+    label.setDepth(LAYER_DEPTH.decor_high + 2);
+    const start = this.time.now;
+    const timer = this.time.addEvent({
+      delay: 30,
+      loop: true,
+      callback: () => {
+        const progress = (this.time.now - start) / FLOAT_TEXT_MS;
+        if (progress >= 1) {
+          timer.remove();
+          label.destroy();
+          return;
+        }
+        label.setPosition(x, y - Math.round(progress * FLOAT_TEXT_RISE));
+        label.text.setAlpha(1 - progress * progress);
+      },
+    });
   }
 
   /**
@@ -130,18 +278,24 @@ export class BaseScene extends Phaser.Scene {
     camera.setBounds(bx, by, Math.max(mapWidth, visibleWidth), Math.max(mapHeight, visibleHeight));
   }
 
-  /** Roda do rato e teclas +/− (a pinça com 2 dedos está na UIScene, que recebe os toques). */
-  private listenForZoomInput(): void {
+  /**
+   * Ctrl + roda do rato (e a pinça dos touchpads, que o browser envia como Ctrl + roda) e
+   * teclas +/−. A pinça com 2 dedos no ecrã tátil está na UIScene, que recebe os toques.
+   * Devolve a função que remove os listeners.
+   */
+  private listenForZoomInput(): () => void {
     let lastWheel = 0;
-    this.input.on(
-      Phaser.Input.Events.POINTER_WHEEL,
-      (_pointer: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number) => {
-        // Um "clique" da roda gera vários eventos (sobretudo em touchpads): um passo por 150 ms.
-        if (dy === 0 || this.time.now - lastWheel < WHEEL_COOLDOWN_MS) return;
-        lastWheel = this.time.now;
-        stepWorldZoom(dy < 0 ? 1 : -1, getView().zoom);
-      },
-    );
+    const canvas = this.game.canvas;
+    const onWheel = (event: WheelEvent): void => {
+      if (!event.ctrlKey) return; // a roda sozinha fica livre (ex.: listas, no futuro)
+      event.preventDefault(); // senão o browser amplia a página inteira
+      // Um "clique" da roda gera vários eventos (sobretudo em touchpads): um passo por 150 ms.
+      if (event.deltaY === 0 || this.time.now - lastWheel < WHEEL_COOLDOWN_MS) return;
+      lastWheel = this.time.now;
+      stepWorldZoom(event.deltaY < 0 ? 1 : -1, getView().zoom);
+    };
+    // passive: false — só assim o preventDefault impede o zoom da página.
+    canvas.addEventListener('wheel', onWheel, { passive: false });
     const zoomIn = (): void => {
       stepWorldZoom(1, getView().zoom);
     };
@@ -150,6 +304,9 @@ export class BaseScene extends Phaser.Scene {
     };
     for (const key of ['PLUS', 'NUMPAD_ADD']) this.input.keyboard?.on(`keydown-${key}`, zoomIn);
     for (const key of ['MINUS', 'NUMPAD_SUBTRACT']) this.input.keyboard?.on(`keydown-${key}`, zoomOut);
+    return () => {
+      canvas.removeEventListener('wheel', onWheel);
+    };
   }
 
   private createMap(): void {
@@ -191,6 +348,7 @@ export class BaseScene extends Phaser.Scene {
       down: add(KeyCodes.S, KeyCodes.DOWN),
       left: add(KeyCodes.A, KeyCodes.LEFT),
       right: add(KeyCodes.D, KeyCodes.RIGHT),
+      action: add(KeyCodes.SPACE),
     };
   }
 
@@ -218,7 +376,13 @@ export class BaseScene extends Phaser.Scene {
     const y = Math.round(previous.y + (state.y - previous.y) * alpha);
     player.setPosition(x, y).setDepth(y);
 
-    if (simulation.playerMoved) {
+    if (this.time.now < this.attackUntil) {
+      // Golpe: frame "levantado" e depois "estendido".
+      const [raised, extended] = CHARACTER_COLUMNS.attack;
+      const column = this.attackUntil - this.time.now > ATTACK_MS / 2 ? raised : extended;
+      player.stop();
+      player.setFrame(characterFrame(state.facing, column));
+    } else if (simulation.playerMoved) {
       player.play(walkAnimationKey(state.facing), true);
     } else {
       player.stop();

@@ -116,3 +116,15 @@ describe('Simulation: sobrevivência e morte', () => {
     expect(sim.previousPlayerPosition).toEqual({ x: 100, y: 120 });
   });
 });
+
+describe('Simulation: velocidade do jogo', () => {
+  it('x3 = três vezes mais tempo de jogo pelo mesmo tempo real', () => {
+    const normal = setup();
+    const fast = setup();
+    for (let i = 0; i < 60; i++) {
+      normal.sim.update(1000 / 60);
+      fast.sim.update((1000 / 60) * 3);
+    }
+    expect(fast.state.data.world.tick).toBe(normal.state.data.world.tick * 3);
+  });
+});
