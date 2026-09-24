@@ -179,5 +179,15 @@
   "map.locked": "Locked: you need level {level}.",
   "msg.learned": "You learned to make: {item}.",
   "msg.note_known": "You already know this.",
-  "craft.locked_msg": "You can't make this yet (level {level})."
+  "craft.locked_msg": "You can't make this yet (level {level}).",
+  "item.iron_ingot": "Iron ingot",
+  "item.iron_axe": "Iron axe",
+  "item.iron_pickaxe": "Iron pickaxe",
+  "structure.furnace": "Furnace",
+  "station.furnace": "Furnace",
+  "enemy.zombie_bloated": "Bloater",
+  "enemy.boar": "Boar",
+  "zone.road": "Road and Gas Station",
+  "zone.village": "Deserted Village",
+  "zone.deep_forest": "Deep Forest"
 }

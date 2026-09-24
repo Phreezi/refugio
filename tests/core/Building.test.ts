@@ -3,6 +3,7 @@ import { FIXED_STEP_MS, PLAYER_FOOTPRINT } from '../../src/config';
 import { EventBus, type GameEvents } from '../../src/core/EventBus';
 import { BASE_ZONE_ID, GameState, type GameStateData } from '../../src/core/GameState';
 import { Simulation } from '../../src/core/Simulation';
+import { secondsToTicks } from '../../src/core/Clock';
 import { BALANCE } from '../../src/data/balance';
 import { parseSave, serializeSave } from '../../src/save/schema';
 import { countItem } from '../../src/systems/inventory/inventory';
@@ -261,5 +262,33 @@ describe('Building (construção da base)', () => {
     const campfire = again.sim.building.structures().find(([, id]) => id === 'campfire');
     expect(campfire).toBeDefined();
     expect(again.sim.crafting.craft('r_cooked_meat', `campfire_s${String(campfire?.[0])}`)).toBe('ok');
+  });
+
+  it('Fase 8: fornalha → lingotes de ferro → machado de ferro (mais forte que o de pedra)', () => {
+    const { state, sim, give } = setup();
+    give([
+      ['stone', 30],
+      ['clay', 10],
+      ['iron_ore', 6],
+      ['wood', 30],
+    ]);
+    sim.building.place('foundation_wood', 2, 2, 0);
+    sim.building.place('foundation_wood', 4, 2, 0);
+    sim.building.place('foundation_wood', 5, 2, 0);
+    expect(sim.building.place('furnace', 2, 2, 0)).toBeNull();
+    expect(sim.building.place('wood_bench', 4, 2, 0)).toBeNull();
+    const furnace = sim.building.structures().find(([, id]) => id === 'furnace');
+    const bench = sim.building.structures().find(([, id]) => id === 'wood_bench');
+    if (!furnace || !bench) throw new Error('faltam estações');
+    const furnaceKey = `furnace_s${String(furnace[0])}`;
+    for (let i = 0; i < 3; i++) expect(sim.crafting.craft('r_iron_ingot', furnaceKey)).toBe('ok');
+    sim.crafting.advance(secondsToTicks(20) * 3);
+    expect(sim.crafting.collect(furnaceKey)).toBe(3);
+    expect(sim.crafting.craft('r_iron_axe', `wood_bench_s${String(bench[0])}`)).toBe('ok');
+    sim.crafting.advance(secondsToTicks(25));
+    sim.crafting.collect(`wood_bench_s${String(bench[0])}`);
+    const axe = state.data.player.inventory.find((slot) => slot?.[0] === 'iron_axe');
+    expect(axe).toEqual(['iron_axe', 1, 220]);
+    expect(content.items.iron_axe?.gatherPower).toBeGreaterThan(content.items.stone_axe?.gatherPower ?? 0);
   });
 });

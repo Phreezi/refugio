@@ -257,3 +257,46 @@ describe('Equipamento', () => {
     expect(sim.combat.weapon().damage).toBe(BALANCE.fistDamage);
   });
 });
+
+describe('Inimigos T2 (Fase 8)', () => {
+  it('o inchado, derrotado, incha e rebenta ao fim do aviso: dano em área (fugir evita)', () => {
+    const { state, sim, events, run } = setup(map([{ id: 'bloated', x: 250, y: 240 }]));
+    const bloated = sim.combat.list[0];
+    if (!bloated) throw new Error('sem inchado');
+    bloated.hp = 1;
+    expect(sim.combat.attack(bloated.uid)).toBe(true);
+    expect(bloated.dying).toBeGreaterThan(0);
+    expect(events).not.toContain('killed:zombie_bloated');
+    // Não se pode bater num inchado a rebentar.
+    expect(sim.combat.attack(bloated.uid)).toBe(false);
+    const hp = state.data.player.hp;
+    run(1);
+    expect(events).toContain('killed:zombie_bloated');
+    expect(state.data.player.hp).toBe(hp - 12);
+
+    // Longe da explosão: sem dano.
+    const far = setup(map([{ id: 'bloated', x: 250, y: 240 }]));
+    const other = far.sim.combat.list[0];
+    if (!other) throw new Error('sem inchado');
+    other.hp = 1;
+    far.sim.combat.attack(other.uid);
+    far.state.data.player.x = 150;
+    const farHp = far.state.data.player.hp;
+    far.run(1);
+    expect(far.state.data.player.hp).toBe(farHp);
+  });
+
+  it('o javali avisa e carrega em linha reta; sair da frente evita o golpe', () => {
+    const { state, sim, events, run } = setup(map([{ id: 'boars', x: 300, y: 240 }]));
+    const boar = sim.combat.list[0];
+    if (!boar) throw new Error('sem javali');
+    for (let i = 0; i < 200 && boar.state !== 'windup'; i++) sim.update(FIXED_STEP_MS);
+    expect(boar.state).toBe('windup');
+    expect(boar.charging).toBe(true);
+    run(BALANCE.enemyWindupSec * 2 + 0.05);
+    expect(boar.state).toBe('charge');
+    run(1);
+    expect(events.some((e) => e.startsWith('hurt:'))).toBe(true);
+    expect(state.data.player.hp).toBeLessThan(100);
+  });
+});

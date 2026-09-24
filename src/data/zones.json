@@ -43,5 +43,44 @@
     "respawnDays": 1,
     "unlockLevel": 3,
     "nightEnemyMultiplier": 1.5
+  },
+  "zone_road": {
+    "name": "zone.road",
+    "map": "maps/road.json",
+    "danger": 2,
+    "worldMapPos": [85, 70],
+    "travelCost": {
+      "hunger": 5,
+      "thirst": 5
+    },
+    "respawnDays": 2,
+    "unlockLevel": 6,
+    "nightEnemyMultiplier": 1.5
+  },
+  "zone_village": {
+    "name": "zone.village",
+    "map": "maps/village.json",
+    "danger": 2,
+    "worldMapPos": [62, 88],
+    "travelCost": {
+      "hunger": 6,
+      "thirst": 6
+    },
+    "respawnDays": 2,
+    "unlockLevel": 8,
+    "nightEnemyMultiplier": 1.5
+  },
+  "zone_deep_forest": {
+    "name": "zone.deep_forest",
+    "map": "maps/deep_forest.json",
+    "danger": 2,
+    "worldMapPos": [12, 48],
+    "travelCost": {
+      "hunger": 6,
+      "thirst": 7
+    },
+    "respawnDays": 2,
+    "unlockLevel": 10,
+    "nightEnemyMultiplier": 1.5
   }
 }

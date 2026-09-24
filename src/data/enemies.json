@@ -79,5 +79,55 @@
       ["leather", 1, 2]
     ],
     "xp": 15
+  },
+  "zombie_bloated": {
+    "sprite": "zombie_bloated",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 60,
+    "damage": 8,
+    "speed": 30,
+    "detectRadius": 64,
+    "leashRadius": 160,
+    "attackRange": 10,
+    "attackSec": 1.8,
+    "xp": 14,
+    "explode": {
+      "radius": 30,
+      "damage": 12,
+      "delaySec": 0.9
+    },
+    "drops": [
+      ["cloth", 1, 2],
+      ["scrap_metal", 0, 2]
+    ]
+  },
+  "boar": {
+    "sprite": "boar",
+    "footprint": {
+      "width": 14,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 70,
+    "damage": 10,
+    "speed": 55,
+    "detectRadius": 72,
+    "leashRadius": 180,
+    "attackRange": 12,
+    "attackSec": 1.6,
+    "xp": 16,
+    "charge": {
+      "range": 70,
+      "speed": 150,
+      "sec": 0.7
+    },
+    "drops": [
+      ["raw_meat", 2, 4],
+      ["leather", 1, 2]
+    ]
   }
 }

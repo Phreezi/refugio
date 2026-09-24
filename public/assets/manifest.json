@@ -791,6 +791,72 @@
         "border": "ink",
         "letter": "N"
       }
+    },
+    "zombie_bloated": {
+      "type": "image",
+      "file": "sprites/zombie_bloated.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "leaf",
+        "border": "ink",
+        "letter": "Z"
+      }
+    },
+    "boar": {
+      "type": "image",
+      "file": "sprites/boar.png",
+      "placeholder": {
+        "width": 24,
+        "height": 20,
+        "color": "bark",
+        "border": "ink",
+        "letter": "J"
+      }
+    },
+    "furnace": {
+      "type": "image",
+      "file": "sprites/furnace.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "stone",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
+    "icon_iron_ingot": {
+      "type": "image",
+      "file": "sprites/icons/iron_ingot.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_light",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
+    "icon_iron_axe": {
+      "type": "image",
+      "file": "sprites/icons/iron_axe.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_light",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
+    "icon_iron_pickaxe": {
+      "type": "image",
+      "file": "sprites/icons/iron_pickaxe.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_light",
+        "border": "ink",
+        "letter": "F"
+      }
     }
   }
 }

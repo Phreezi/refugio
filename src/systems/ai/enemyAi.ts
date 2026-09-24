@@ -8,7 +8,7 @@ import { moveWithCollision, normalize } from '../movement/movement';
 // idle → wander → chase → windup (aviso) → recover → … → return (leash).
 // As presas (`flee`) fogem do jogador em vez de o perseguir.
 
-export type EnemyState = 'idle' | 'wander' | 'chase' | 'windup' | 'recover' | 'return' | 'flee';
+export type EnemyState = 'idle' | 'wander' | 'chase' | 'windup' | 'recover' | 'return' | 'flee' | 'charge';
 
 export interface Enemy {
   uid: number;
@@ -32,6 +32,12 @@ export interface Enemy {
   stun: number;
   /** Empurrão por tick enquanto está atordoado. */
   knock: Vec2;
+  /** O aviso em curso é para uma carga (javali) e não para um golpe. */
+  charging: boolean;
+  /** Direção da carga. */
+  dir: Vec2;
+  /** Derrotado, a rebentar (inchado): ticks até explodir (0 = vivo). */
+  dying: number;
 }
 
 export interface AiContext {
@@ -67,6 +73,9 @@ export function createEnemy(uid: number, id: string, def: EnemyDef, at: Vec2): E
     flip: false,
     stun: 0,
     knock: { x: 0, y: 0 },
+    charging: false,
+    dir: { x: 0, y: 0 },
+    dying: 0,
   };
 }
 
@@ -99,6 +108,7 @@ function startIdle(enemy: Enemy, ctx: AiContext): void {
 export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack' | null {
   enemy.px = enemy.x;
   enemy.py = enemy.y;
+  if (enemy.dying > 0) return null; // a rebentar: quem trata é o Combat
   if (enemy.stun > 0) {
     enemy.stun -= 1;
     const next = moveWithCollision(enemy, def.footprint, enemy.knock, ctx.world);
@@ -129,9 +139,38 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
       enemy.flip = ctx.player.x < enemy.x;
       enemy.timer -= 1;
       if (enemy.timer > 0) return null;
+      if (enemy.charging && def.charge) {
+        // Carga: corre em linha reta para onde o jogador estava no fim do aviso.
+        enemy.state = 'charge';
+        enemy.dir = normalize({ x: ctx.player.x - enemy.x, y: ctx.player.y - enemy.y });
+        enemy.timer = Math.round(def.charge.sec * ctx.ticksPerSec);
+        return null;
+      }
       enemy.state = 'recover';
       enemy.timer = Math.round(def.attackSec * ctx.ticksPerSec);
       return toPlayer <= def.attackRange + ATTACK_SLACK_PX ? 'attack' : null;
+    case 'charge': {
+      const speed = (def.charge?.speed ?? def.speed) / ctx.ticksPerSec;
+      const next = moveWithCollision(
+        enemy,
+        def.footprint,
+        { x: enemy.dir.x * speed, y: enemy.dir.y * speed },
+        ctx.world,
+      );
+      const stuck = next.x === enemy.x && next.y === enemy.y;
+      enemy.x = next.x;
+      enemy.y = next.y;
+      if (enemy.dir.x !== 0) enemy.flip = enemy.dir.x < 0;
+      enemy.timer -= 1;
+      const hit = distance(enemy, ctx.player) <= def.attackRange + ATTACK_SLACK_PX;
+      if (hit || stuck || enemy.timer <= 0) {
+        enemy.state = 'recover';
+        enemy.charging = false;
+        enemy.timer = Math.round(def.attackSec * ctx.ticksPerSec);
+        return hit ? 'attack' : null;
+      }
+      return null;
+    }
     case 'recover':
       enemy.timer -= 1;
       if (enemy.timer <= 0) enemy.state = 'chase';
@@ -153,7 +192,15 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
       }
       if (toPlayer <= def.attackRange && def.damage > 0) {
         enemy.state = 'windup';
+        enemy.charging = false;
         enemy.timer = ctx.windupTicks;
+        return null;
+      }
+      // Javali: de longe, avisa e carrega (um aviso mais longo, para dar tempo de sair da frente).
+      if (def.charge && toPlayer <= def.charge.range) {
+        enemy.state = 'windup';
+        enemy.charging = true;
+        enemy.timer = ctx.windupTicks * 2;
         return null;
       }
       walk(enemy, def, ctx.player, def.speed, ctx, def.attackRange - 2);

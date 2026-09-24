@@ -703,6 +703,10 @@ export interface EnemyDef {
   drops: readonly Drop[];
   /** XP ao derrotar. */
   xp: number;
+  /** Explode ao morrer (inchado): aviso de `delaySec`, depois dano em área. */
+  explode?: { radius: number; damage: number; delaySec: number };
+  /** Carrega (javali): a esta distância, aviso e depois corre em linha reta a `speed` px/s. */
+  charge?: { range: number; speed: number; sec: number };
 }
 
 export type EnemyDefs = Readonly<Record<string, EnemyDef>>;
@@ -720,6 +724,8 @@ const ENEMY_KEYS = new Set([
   'attackSec',
   'drops',
   'xp',
+  'explode',
+  'charge',
 ]);
 
 function isNonNegativeInt(value: unknown): value is number {
@@ -788,6 +794,25 @@ export function parseEnemies(
       drops,
       xp: raw.xp === undefined ? 0 : num('xp', isNonNegativeInt, 'um inteiro ≥ 0'),
     };
+    const nums = (key: string, fields: readonly string[]): Record<string, number> | undefined => {
+      const value = raw[key];
+      if (value === undefined) return undefined;
+      if (isObject(value) && fields.every((f) => positive(value[f]))) {
+        return Object.fromEntries(fields.map((f) => [f, value[f] as number]));
+      }
+      problems.push(`"${id}": ${key} tem de ser { ${fields.join(', ')} } com números > 0`);
+      return undefined;
+    };
+    const explode = nums('explode', ['radius', 'damage', 'delaySec']);
+    if (explode)
+      defs[id].explode = {
+        radius: explode.radius ?? 1,
+        damage: explode.damage ?? 1,
+        delaySec: explode.delaySec ?? 1,
+      };
+    const charge = nums('charge', ['range', 'speed', 'sec']);
+    if (charge)
+      defs[id].charge = { range: charge.range ?? 1, speed: charge.speed ?? 1, sec: charge.sec ?? 1 };
     const def = defs[id];
     if (def.leashRadius < def.detectRadius) problems.push(`"${id}": leashRadius tem de ser ≥ detectRadius`);
   }
