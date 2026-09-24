@@ -325,7 +325,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Ação | Teclado/rato | Touch |
 |---|---|---|
 | Mover | WASD / setas | Joystick virtual flutuante (aparece onde o dedo tocar, fora dos botões) |
-| Andar agachado (metade da velocidade) | Shift | Joystick pouco empurrado (até 55% do raio) |
+| Andar agachado (metade da velocidade) | Shift ou Ctrl | Joystick pouco empurrado (até 55% do raio) |
 | Zoom (até metade) | Ctrl + roda do rato, +/− | Pinça com 2 dedos |
 | Velocidade do jogo x1/x2/x3 | Botão por baixo do relógio | Idem |
 | Ação contextual (bater, recolher, abrir, atacar) | Espaço / clique | Botão grande (lado direito) |
@@ -333,6 +333,8 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Craft | C | Botão "Fabricar" (à esquerda da hotbar) |
 | Modo construção | B (dentro: clique/Espaço coloca, R roda, Z desfaz, X demolir, B/Esc sai) | Botão "Construir" (por cima do "Fabricar"); toque curto no mundo escolhe o tile, botões Colocar/Rodar/Desfazer/Demolir/Sair |
 | Comer/beber rápido | 1–4 (hotbar) | Hotbar de 4 slots |
+
+Com Ctrl/Cmd premido, os atalhos do browser nas teclas do jogo (Ctrl+S, Ctrl+D, Ctrl+A, Ctrl+F…) são anulados (`src/input/browserShortcuts.ts`); Ctrl+W/T/N não se podem anular, por isso fechar a página com o Ctrl premido pede confirmação.
 
 A **ação contextual** escolhe automaticamente o alvo mais próximo em frente (como no original): zombie > contentor > recurso.
 
@@ -964,3 +966,4 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Save v4: `base.structures` + `nextStructureId`; a fogueira e a bancada do mapa passam a peças por migração (com as filas) | Os jogadores antigos mantêm as estações; os jogos novos constroem-nas |
 | 2026-09-24 | Pode-se construir onde um recurso foi apanhado (só reaparece com o sítio livre) | A base tem muitas árvores: sem isto não havia espaço para uma casa 6×6 |
 | 2026-09-24 | Desfazer guardado só em memória (não no save) | A janela é de 10 s; perder o Desfazer ao recarregar não custa nada (continua a dar para demolir a 50%) |
+| 2026-09-24 | Ctrl também agacha; atalhos do browser com Ctrl anulados no jogo; fechar com Ctrl premido pede confirmação | Pedido do jogador: Ctrl+WASD disparava atalhos do browser (guardar página, marcador, fechar separador) |
