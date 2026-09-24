@@ -858,13 +858,13 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** ser agradável em telemóvel.
 
-- [ ] Revisão completa dos controlos touch (tamanho de botões, zonas mortas do joystick).
-- [ ] Tutorial curto e contextual (primeira árvore, primeiro craft, primeira zona).
+- [ ] Revisão completa dos controlos touch (tamanho de botões, zonas mortas do joystick). *(Precisa de testes em telemóveis reais; o tamanho da interface já é ajustável nas definições.)*
+- [x] Tutorial curto e contextual (andar, primeira árvore, primeiro craft, primeira peça, comer, primeira zona): dica no topo com texto de teclado ou de toque e × para desligar (`core/Tutorial.ts`, save v13 `tutorial`).
 - [x] Definições (menu de pausa): idioma, tamanho da UI, vibração, hordas, mostrar números de dano. *(Volume quando houver som, Fase 12.)* Preferências do dispositivo no localStorage (`refugio.prefs`, `src/ui/preferences.ts`); as hordas no save.
 - [x] Raridade nos slots (contorno verde/azul/rosa) e modo daltónico (1–3 marcas no canto, além da cor).
 - [x] Menu de pausa (Esc / botão "II"; o tempo de jogo pára), estatísticas do jogador (save v12 `stats`), "Gravar e sair".
 - [ ] Testes em 3+ telemóveis Android de gamas diferentes.
-- [ ] Otimização: object pooling de inimigos/partículas, culling, atlas de texturas.
+- [ ] Otimização: object pooling de inimigos/partículas, culling, atlas de texturas. *(Por fazer depois de medir num Android de gama média.)*
 
 **Aceitação:** 60 FPS num Android de gama média; tutorial concluído por quem nunca jogou sem ajuda.
 
@@ -1064,3 +1064,4 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Preferências do dispositivo (língua, tamanho da UI, números de dano, vibração, daltónico) no localStorage; hordas no save | As primeiras valem já no menu inicial e são de quem joga naquele aparelho; as hordas mudam o mundo |
 | 2026-09-24 | Tamanho da UI = alvo do lado curto (320/270/230 px de jogo) | Mantém a escala inteira (pixel art exata); menos píxeis de jogo = tudo maior |
 | 2026-09-24 | Save v12: `stats` | Estatísticas no menu de pausa; contam a partir da migração |
+| 2026-09-24 | Save v13: `tutorial`; saves antigos ficam com as dicas desligadas | Quem já jogava não precisa do tutorial; jogos novos veem-no |

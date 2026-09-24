@@ -105,6 +105,8 @@ export interface GameStateData {
   bosses: Record<string, number>;
   /** Estatísticas do jogador (menu de pausa). */
   stats: GameStatsCounters & { playTicks: number };
+  /** Tutorial (Fase 11): passos já feitos e se as dicas estão desligadas. */
+  tutorial: { done: string[]; off: boolean };
 }
 
 /** Baú da base num jogo novo: mantimentos para os primeiros minutos (e testar a fogueira). */
@@ -152,6 +154,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
     dungeons: {},
     bosses: {},
     stats: { kills: 0, deaths: 0, crafted: 0, gathered: 0, looted: 0, playTicks: 0 },
+    tutorial: { done: [], off: false },
   };
 }
 

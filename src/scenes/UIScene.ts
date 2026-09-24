@@ -12,7 +12,7 @@ import { itemName, t, tKey, type MessageKey } from '../i18n';
 import { content } from '../world/content';
 import { readJoystick } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
-import { Button } from '../ui/Button';
+import { Button, CLOSE_ICON } from '../ui/Button';
 import { BuildUI } from '../ui/BuildUI';
 import { buildMode, pickTile, type Tile } from '../ui/buildMode';
 import { gameSpeed, nextGameSpeed } from '../ui/gameSpeed';
@@ -95,6 +95,8 @@ export class UIScene extends Phaser.Scene {
     fill: Phaser.GameObjects.Rectangle;
   } | null = null;
   private pause: PauseUI | null = null;
+  /** Dica do tutorial (em cima, ao centro) e o × que a desliga. */
+  private hint: { label: Label; close: Button | null; step: string | null; x: number } | null = null;
   /** "A sangrar" (por baixo da barra de XP), a piscar. */
   private bleedLabel: Label | null = null;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
@@ -127,6 +129,27 @@ export class UIScene extends Phaser.Scene {
       [1, 0],
     );
     const bossX = Math.round(width / 2);
+    const cx = Math.round(width / 2);
+    this.hint = {
+      label: new Label(
+        this,
+        cx,
+        HUD_MARGIN + 24,
+        '',
+        {
+          size: 8,
+          bold: true,
+          color: 'wheat',
+          stroke: true,
+          align: 'center',
+          wrap: Math.min(260, width - 60),
+        },
+        [0.5, 0],
+      ).setDepth(40),
+      close: null,
+      step: null,
+      x: cx,
+    };
     this.bossBar = {
       label: new Label(
         this,
@@ -218,6 +241,7 @@ export class UIScene extends Phaser.Scene {
       this.hordeLabel = null;
       this.bleedLabel = null;
       this.bossBar = null;
+      this.hint = null;
       this.xpFill = null;
       this.actionButton = [];
       this.buildButton = null;
@@ -257,6 +281,33 @@ export class UIScene extends Phaser.Scene {
     this.hordeLabel?.setText(this.hordeStatus());
     this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
     this.renderBossBar();
+    this.renderHint();
+  }
+
+  /** Dica do tutorial do passo atual (texto de teclado ou de toque); escondida sem passo. */
+  private renderHint(): void {
+    const hint = this.hint;
+    if (!hint) return;
+    const step = simulation.tutorial.current();
+    if (step === hint.step) return;
+    hint.step = step;
+    hint.label.setVisible(step !== null);
+    hint.close?.destroy();
+    hint.close = null;
+    if (!step) return;
+    const touch = window.matchMedia('(pointer: coarse)').matches;
+    hint.label.setText(tKey(`tut.${step}.${touch ? 'touch' : 'keys'}`));
+    // O × (desligar as dicas) fica à direita do texto.
+    hint.close = new Button(
+      this,
+      Math.round(hint.x + hint.label.text.width / 2 + 10),
+      HUD_MARGIN + 30,
+      CLOSE_ICON,
+      { width: 12, height: 12, fontSize: 8, style: 'secondary' },
+      () => {
+        simulation.tutorial.dismiss();
+      },
+    ).setDepth(40);
   }
 
   /** Barra de vida do chefe da zona (escondida sem chefe). */

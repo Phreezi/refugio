@@ -290,5 +290,17 @@
   "stats.deaths": "Mortes",
   "stats.crafted": "Coisas fabricadas",
   "stats.gathered": "Recursos apanhados",
-  "stats.looted": "Contentores abertos"
+  "stats.looted": "Contentores abertos",
+  "tut.move.keys": "Anda com WASD ou as setas.",
+  "tut.move.touch": "Toca e arrasta em qualquer lado para andar.",
+  "tut.gather.keys": "Vai até uma árvore e carrega Espaço para cortar.",
+  "tut.gather.touch": "Vai até uma árvore e toca em Ação para cortar.",
+  "tut.craft.keys": "Carrega C para fabricar: faz um machado de pedra (3 madeira + 3 pedra).",
+  "tut.craft.touch": "Toca em Fabricar: faz um machado de pedra (3 madeira + 3 pedra).",
+  "tut.build.keys": "Carrega B para construir: põe uma fogueira no chão da casa.",
+  "tut.build.touch": "Toca em Construir: põe uma fogueira no chão da casa.",
+  "tut.eat.keys": "Tens fome: carrega 1 para comer as bagas.",
+  "tut.eat.touch": "Tens fome: toca nas bagas, na barra de baixo.",
+  "tut.travel.keys": "Sai pela estrada, na borda do mapa, para abrir o mapa-mundo e ir ao Pinhal.",
+  "tut.travel.touch": "Sai pela estrada, na borda do mapa, para abrir o mapa-mundo e ir ao Pinhal."
 }
