@@ -228,6 +228,14 @@ describe('save: migrações', () => {
     });
   });
 
+  it('v12 → v13 (Fase 11): quem já jogava fica sem dicas do tutorial', () => {
+    const v12 = structuredClone(STATE) as unknown as Record<string, unknown>;
+    delete v12.tutorial;
+    const stateJson = JSON.stringify(v12);
+    const text = `{"version":12,"timestamp":6,"checksum":"${checksum(`12|6|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.tutorial).toEqual({ done: [], off: true });
+  });
+
   it('valida a horta', () => {
     const ok = structuredClone(STATE);
     ok.base.crops['3'] = ['carrot_seeds', null];

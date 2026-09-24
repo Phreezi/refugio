@@ -290,5 +290,17 @@
   "stats.deaths": "Deaths",
   "stats.crafted": "Things crafted",
   "stats.gathered": "Resources gathered",
-  "stats.looted": "Containers opened"
+  "stats.looted": "Containers opened",
+  "tut.move.keys": "Walk with WASD or the arrow keys.",
+  "tut.move.touch": "Touch and drag anywhere to walk.",
+  "tut.gather.keys": "Go to a tree and press Space to chop it.",
+  "tut.gather.touch": "Go to a tree and tap Action to chop it.",
+  "tut.craft.keys": "Press C to craft: make a stone axe (3 wood + 3 stone).",
+  "tut.craft.touch": "Tap Craft: make a stone axe (3 wood + 3 stone).",
+  "tut.build.keys": "Press B to build: place a campfire on the house floor.",
+  "tut.build.touch": "Tap Build: place a campfire on the house floor.",
+  "tut.eat.keys": "You're hungry: press 1 to eat the berries.",
+  "tut.eat.touch": "You're hungry: tap the berries in the bottom bar.",
+  "tut.travel.keys": "Leave by the road at the edge of the map to open the world map and visit the Pine Woods.",
+  "tut.travel.touch": "Leave by the road at the edge of the map to open the world map and visit the Pine Woods."
 }

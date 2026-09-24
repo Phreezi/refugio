@@ -90,6 +90,8 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     ...s,
     stats: { kills: 0, deaths: 0, crafted: 0, gathered: 0, looted: 0, playTicks: 0 },
   }),
+  // v12 → v13 (Fase 11): tutorial. Quem já jogava não precisa das dicas (ficam desligadas).
+  12: (s) => ({ ...s, tutorial: { done: [], off: true } }),
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

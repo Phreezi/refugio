@@ -416,3 +416,22 @@ describe('Estatísticas (Fase 11)', () => {
     expect(stats.playTicks).toBeGreaterThanOrEqual(20);
   });
 });
+
+describe('Tutorial (Fase 11)', () => {
+  it('mostra um passo de cada vez e avança quando o jogador faz a coisa', () => {
+    const { state, sim, run } = setup(map([]));
+    const tutorial = sim.tutorial;
+    expect(tutorial.current()).toBe('move');
+    sim.setMoveIntent({ x: 1, y: 0 });
+    run(0.2);
+    sim.setMoveIntent({ x: 0, y: 0 });
+    expect(tutorial.current()).toBe('gather');
+    state.data.tutorial.done.push('gather', 'craft', 'build');
+    // "Comer" só aparece com fome.
+    expect(tutorial.current()).toBe('travel');
+    state.data.player.hunger = 40;
+    expect(tutorial.current()).toBe('eat');
+    tutorial.dismiss();
+    expect(tutorial.current()).toBeNull();
+  });
+});
