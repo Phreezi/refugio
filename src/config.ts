@@ -31,6 +31,9 @@ export const MAX_STEPS_PER_FRAME = 5;
 /** Caixa de colisão do jogador (px), centrada nos pés: só a base do corpo bate nas coisas. */
 export const PLAYER_FOOTPRINT = { width: 10, height: 6 } as const;
 
+/** Área de objetos sem caixa sólida (ex.: erva): um pouco à volta dos pés (interação, construção). */
+export const LOOSE_OBJECT_AREA = { width: 10, height: 6 } as const;
+
 /** Mapa Tiled da base, relativo a `public/assets/`. */
 export const BASE_MAP_FILE = 'maps/base.json';
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import props from '../../src/data/props.json';
 import resources from '../../src/data/resources.json';
 import stations from '../../src/data/stations.json';
-import { BASE_TILES, BASE_TILESET_NAME } from '../../src/world/tileset';
+import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../../src/world/tileset';
 import { parseZoneMap, ZoneMapError, type ZoneMapRules } from '../../src/world/zoneMap';
 
 const RULES: ZoneMapRules = {
@@ -12,6 +12,7 @@ const RULES: ZoneMapRules = {
   resourceIds: Object.keys(resources).filter((id) => id !== '$comment'),
   propIds: Object.keys(props).filter((id) => id !== '$comment'),
   stationIds: Object.keys(stations).filter((id) => id !== '$comment'),
+  floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
 };
 
 /** Mapa 3×2 mínimo válido; `patch` altera partes para testar erros. */
@@ -92,6 +93,15 @@ describe('parseZoneMap', () => {
     expect(map.height).toBe(48);
     expect(map.resources.length).toBeGreaterThan(0);
     expect(map.props.length).toBeGreaterThan(0);
+  });
+
+  it('o chão da casa em ruínas conta como fundação; a relva não', () => {
+    const url = new URL('../../public/assets/maps/base.json', import.meta.url);
+    const map = parseZoneMap(JSON.parse(readFileSync(url, 'utf8')), RULES, 'base.json');
+    expect(map.floor[16 * map.width + 21]).toBe(true); // quarto de madeira
+    expect(map.floor[16 * map.width + 27]).toBe(true); // betão
+    expect(map.floor[40 * map.width + 10]).toBe(false);
+    expect(map.stations).toEqual([]); // a fogueira e a bancada passaram a ser construídas
   });
 
   it('reporta camadas em falta, spawn duplicado, recursos desconhecidos e nomes inválidos', () => {

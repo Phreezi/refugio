@@ -1,5 +1,7 @@
+import { LOOSE_OBJECT_AREA } from '../config';
 import { BALANCE } from '../data/balance';
-import type { ItemDefs, PropDefs, ResourceDefs, StationDefs } from '../data/types';
+import type { ItemDefs, PropDefs, ResourceDefs, StationDefs, StructureDefs } from '../data/types';
+import { structureArea, structureFeet } from '../systems/building/building';
 import { bestTool, hitPower, maxDrops, rollDrops, wearTool } from '../systems/gathering/gathering';
 import { addItem, spaceFor } from '../systems/inventory/inventory';
 import { pickTarget, type Target } from '../systems/interaction/targeting';
@@ -9,6 +11,7 @@ import type { ResourcePlacement, ZoneMap } from '../world/zoneMap';
 import { secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
 import { zoneState, type GameState } from './GameState';
+import { structureChestId, structureStationKey, type Building } from './Building';
 import { stationKey } from './Crafting';
 import type { PlayerActions } from './PlayerActions';
 
@@ -21,16 +24,19 @@ export interface ZoneContext {
   resources: ResourceDefs;
   props: PropDefs;
   stations: StationDefs;
+  structures: StructureDefs;
 }
 
+/**
+ * Alvo da ação contextual. `placement` = onde está (pés), para a seta da UI; nas peças
+ * construídas, `objectId` é o uid negativo.
+ */
 export type TargetData =
   | { type: 'resource'; placement: ResourcePlacement }
-  | { type: 'chest'; placement: ResourcePlacement }
+  | { type: 'chest'; placement: ResourcePlacement; chestId: string }
   | { type: 'drink'; placement: ResourcePlacement }
-  | { type: 'station'; placement: ResourcePlacement };
-
-/** Área de interação de objetos sem caixa sólida (ex.: erva): um pouco à volta dos pés. */
-const LOOSE_AREA = { width: 10, height: 6 } as const;
+  | { type: 'station'; placement: ResourcePlacement; key: string }
+  | { type: 'door'; placement: ResourcePlacement; uid: number };
 /** Os recursos que reaparecem verificam-se uma vez por segundo de jogo. */
 const RESPAWN_CHECK_TICKS = 20;
 
@@ -43,14 +49,16 @@ export class Interaction {
   private readonly state: GameState;
   private readonly bus: EventBus<GameEvents>;
   private readonly actions: PlayerActions;
+  private readonly building: Building;
   private zone: ZoneContext | null = null;
   /** Vida dos recursos já golpeados (não se grava: ao recarregar voltam a estar inteiros). */
   private readonly nodeHp = new Map<number, number>();
 
-  constructor(state: GameState, bus: EventBus<GameEvents>, actions: PlayerActions) {
+  constructor(state: GameState, bus: EventBus<GameEvents>, actions: PlayerActions, building: Building) {
     this.state = state;
     this.bus = bus;
     this.actions = actions;
+    this.building = building;
   }
 
   setZone(zone: ZoneContext | null): void {
@@ -78,7 +86,7 @@ export class Interaction {
     const areaOf = (
       placement: ResourcePlacement,
       footprint: { width: number; height: number } | undefined,
-    ): Rect => footprintRect(placement, footprint ?? LOOSE_AREA);
+    ): Rect => footprintRect(placement, footprint ?? LOOSE_OBJECT_AREA);
     for (const placement of zone.map.resources) {
       if (this.isDepleted(placement.objectId)) continue;
       const def = zone.resources[placement.id];
@@ -93,14 +101,14 @@ export class Interaction {
       list.push({
         kind: 'container',
         area: areaOf(placement, zone.props.chest?.footprint),
-        data: { type: 'chest', placement },
+        data: { type: 'chest', placement, chestId: placement.id },
       });
     }
     for (const placement of zone.map.stations) {
       list.push({
         kind: 'container',
         area: areaOf(placement, zone.stations[placement.id]?.footprint),
-        data: { type: 'station', placement },
+        data: { type: 'station', placement, key: stationKey(placement.id, placement.objectId) },
       });
     }
     for (const placement of zone.map.props) {
@@ -112,6 +120,26 @@ export class Interaction {
           data: { type: 'drink', placement },
         });
       }
+    }
+    list.push(...this.structureTargets());
+    return list;
+  }
+
+  /** Portas, estações e baús construídos. */
+  private structureTargets(): Target<TargetData>[] {
+    const list: Target<TargetData>[] = [];
+    const tileSize = this.building.tileSize;
+    for (const [uid, id, tx, ty] of this.building.structures()) {
+      const def = this.building.def(id);
+      if (!def || !(def.door || def.station || def.chest)) continue;
+      const feet = structureFeet(def, tx, ty, tileSize);
+      const placement = { id, objectId: -uid, ...feet };
+      const area = def.footprint ? footprintRect(feet, def.footprint) : structureArea(def, tx, ty, tileSize);
+      let data: TargetData;
+      if (def.station) data = { type: 'station', placement, key: structureStationKey(def.station, uid) };
+      else if (def.chest) data = { type: 'chest', placement, chestId: structureChestId(uid) };
+      else data = { type: 'door', placement, uid };
+      list.push({ kind: 'container', area, data });
     }
     return list;
   }
@@ -139,10 +167,14 @@ export class Interaction {
     if (data.type === 'resource') this.gather(data.placement);
     else if (data.type === 'chest') {
       this.bus.emit('player:action', { kind: 'open' });
-      this.bus.emit('container:open', { chestId: data.placement.id });
+      this.bus.emit('container:open', { chestId: data.chestId });
     } else if (data.type === 'station') {
       this.bus.emit('player:action', { kind: 'open' });
-      this.bus.emit('station:open', { stationKey: stationKey(data.placement.id, data.placement.objectId) });
+      this.bus.emit('station:open', { stationKey: data.key });
+    } else if (data.type === 'door') {
+      this.bus.emit('player:action', { kind: 'open' });
+      if (this.building.toggleDoor(data.uid) === 'door_blocked')
+        this.bus.emit('action:blocked', { reason: 'door_blocked' });
     } else {
       this.bus.emit('player:action', { kind: 'use' });
       this.actions.drink();
@@ -157,8 +189,13 @@ export class Interaction {
     const depleted = zoneState(this.state.data, zone.zoneId).depleted;
     for (const [key, respawnAt] of Object.entries(depleted)) {
       if (tick < respawnAt) continue;
-      Reflect.deleteProperty(depleted, key);
       const objectId = Number(key);
+      // Com uma peça construída por cima, espera até o sítio ficar livre.
+      const placement = zone.map.resources.find((p) => p.objectId === objectId);
+      const footprint = placement ? zone.resources[placement.id]?.footprint : undefined;
+      if (placement && this.building.covers(footprintRect(placement, footprint ?? LOOSE_OBJECT_AREA)))
+        continue;
+      Reflect.deleteProperty(depleted, key);
       zone.collision.setEnabled(objectId, true);
       this.bus.emit('resource:respawned', { zoneId: zone.zoneId, objectId });
     }

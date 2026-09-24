@@ -450,3 +450,159 @@ export function parseRecipes(
   if (problems.length > 0) throw new DataError('recipes.json', problems);
   return recipes;
 }
+
+/** Camada de uma peça: `floor` (fundações, por baixo) ou `top` (paredes, portas, estações…). */
+export type StructureLayer = 'floor' | 'top';
+const STRUCTURE_LAYERS: readonly StructureLayer[] = ['floor', 'top'];
+
+/** Peça de construção da base (CLAUDE.md §7.7). Ocupa `size` tiles da grelha. */
+export interface StructureDef {
+  /**
+   * Chave de textura. Variantes derivadas do nome: `<sprite>_v` (rodada, se `rotatable`),
+   * `<sprite>_open` / `<sprite>_v_open` (porta aberta).
+   */
+  sprite: string;
+  layer: StructureLayer;
+  /** Largura × altura em tiles (omisso = 1×1). */
+  size: { width: number; height: number };
+  cost: readonly { item: string; qty: number }[];
+  /** Bloqueia os tiles inteiros (paredes, janelas, vedações, portas fechadas). */
+  solid: boolean;
+  /** Caixa sólida nos pés (estações, baús), em vez do tile inteiro. */
+  footprint?: Footprint;
+  /** Duas orientações (horizontal/vertical). */
+  rotatable: boolean;
+  /** Abre e fecha com a ação contextual (fechada é sólida). */
+  door: boolean;
+  /** Estação de crafting (id de `stations.json`). */
+  station?: string;
+  /** Baú (guarda itens). */
+  chest: boolean;
+  /** Só pode ser colocada sobre fundação (estações e baús, §7.7). */
+  needsFoundation: boolean;
+}
+
+export type StructureDefs = Readonly<Record<string, StructureDef>>;
+
+/** Texturas de que uma peça precisa (a base e as variantes rodada/aberta). */
+export function structureSpriteKeys(def: StructureDef): string[] {
+  const keys = [def.sprite];
+  if (def.rotatable) keys.push(`${def.sprite}_v`);
+  if (def.door) keys.push(...keys.map((key) => `${key}_open`));
+  return keys;
+}
+
+/** Textura de uma peça com a orientação e o estado (porta aberta) dados. */
+export function structureSprite(def: StructureDef, rot: number, open: boolean): string {
+  const rotated = def.rotatable && rot === 1 ? `${def.sprite}_v` : def.sprite;
+  return def.door && open ? `${rotated}_open` : rotated;
+}
+
+const STRUCTURE_KEYS = new Set([
+  'sprite',
+  'layer',
+  'size',
+  'cost',
+  'solid',
+  'footprint',
+  'rotatable',
+  'door',
+  'station',
+  'chest',
+  'needsFoundation',
+]);
+const MAX_STRUCTURE_TILES = 4;
+
+/**
+ * Valida `structures.json`: sprites (e variantes) no manifest, custos com itens existentes,
+ * estações existentes, e combinações coerentes (ex.: estações e baús na camada de cima).
+ */
+export function parseStructures(
+  input: unknown,
+  spriteKeys: Iterable<string>,
+  itemIds: Iterable<string>,
+  stationIds: Iterable<string>,
+): StructureDefs {
+  if (!isObject(input)) throw new DataError('structures.json', ['tem de ser um objeto id → peça']);
+  const sprites = new Set(spriteKeys);
+  const items = new Set(itemIds);
+  const stations = new Set(stationIds);
+  const problems: string[] = [];
+  const defs: Record<string, StructureDef> = {};
+  const flag = (id: string, raw: Record<string, unknown>, key: string): boolean => {
+    const value = raw[key];
+    if (value !== undefined && typeof value !== 'boolean')
+      problems.push(`"${id}": ${key} tem de ser true/false`);
+    return value === true;
+  };
+  for (const [id, raw] of Object.entries(input)) {
+    if (id === '$comment') continue;
+    if (!ID_PATTERN.test(id)) problems.push(`"${id}": o id tem de estar em snake_case`);
+    if (!isObject(raw)) {
+      problems.push(`"${id}": tem de ser um objeto`);
+      continue;
+    }
+    for (const key of Object.keys(raw)) {
+      if (!STRUCTURE_KEYS.has(key)) problems.push(`"${id}": campo desconhecido "${key}"`);
+    }
+    const layer = STRUCTURE_LAYERS.find((l) => l === raw.layer);
+    if (!layer) problems.push(`"${id}": layer tem de ser "floor" ou "top"`);
+    const size = { width: 1, height: 1 };
+    if (raw.size !== undefined) {
+      const [w, h] = Array.isArray(raw.size) ? (raw.size as unknown[]) : [];
+      if (isPositiveInt(w) && isPositiveInt(h) && w <= MAX_STRUCTURE_TILES && h <= MAX_STRUCTURE_TILES) {
+        size.width = w;
+        size.height = h;
+      } else
+        problems.push(
+          `"${id}": size tem de ser [largura, altura] em tiles (1–${String(MAX_STRUCTURE_TILES)})`,
+        );
+    }
+    const cost: { item: string; qty: number }[] = [];
+    if (!Array.isArray(raw.cost) || raw.cost.length === 0) {
+      problems.push(`"${id}": cost tem de ser [[item, qtd], …]`);
+    } else {
+      for (const entry of raw.cost as unknown[]) {
+        const [item, qty] = Array.isArray(entry) ? (entry as unknown[]) : [];
+        if (typeof item !== 'string' || !items.has(item))
+          problems.push(`"${id}": custo com item desconhecido ${describe(item)}`);
+        else if (!isPositiveInt(qty)) problems.push(`"${id}": quantidade de ${item} inválida`);
+        else cost.push({ item, qty });
+      }
+    }
+    const def: StructureDef = {
+      sprite: typeof raw.sprite === 'string' ? raw.sprite : '',
+      layer: layer ?? 'top',
+      size,
+      cost,
+      solid: flag(id, raw, 'solid'),
+      rotatable: flag(id, raw, 'rotatable'),
+      door: flag(id, raw, 'door'),
+      chest: flag(id, raw, 'chest'),
+      needsFoundation: flag(id, raw, 'needsFoundation'),
+    };
+    if (raw.footprint !== undefined) {
+      const fp = raw.footprint;
+      if (isObject(fp) && isSize(fp.width) && isSize(fp.height))
+        def.footprint = { width: fp.width, height: fp.height };
+      else problems.push(`"${id}": footprint tem de ser { width, height } inteiros`);
+    }
+    if (raw.station !== undefined) {
+      if (typeof raw.station === 'string' && stations.has(raw.station)) def.station = raw.station;
+      else problems.push(`"${id}": estação desconhecida ${describe(raw.station)}`);
+    }
+    for (const key of structureSpriteKeys(def)) {
+      if (!sprites.has(key)) problems.push(`"${id}": sprite "${key}" não existe no manifest`);
+    }
+    if (def.layer === 'floor' && (def.solid || def.door || def.chest || def.station || def.footprint))
+      problems.push(`"${id}": peças de chão não podem ser sólidas, portas, baús nem estações`);
+    if (def.solid && def.footprint) problems.push(`"${id}": solid e footprint são alternativos`);
+    if (def.door && !def.solid) problems.push(`"${id}": uma porta tem de ser solid (quando fechada)`);
+    if (def.chest && def.station) problems.push(`"${id}": não pode ser baú e estação`);
+    if ((def.rotatable || def.door) && (size.width !== 1 || size.height !== 1))
+      problems.push(`"${id}": peças rodáveis e portas têm 1×1 tiles`);
+    defs[id] = def;
+  }
+  if (problems.length > 0) throw new DataError('structures.json', problems);
+  return defs;
+}

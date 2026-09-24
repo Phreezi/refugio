@@ -8,13 +8,21 @@ import itemsJson from '../data/items.json';
 import propsJson from '../data/props.json';
 import recipesJson from '../data/recipes.json';
 import stationsJson from '../data/stations.json';
+import structuresJson from '../data/structures.json';
 import resourcesJson from '../data/resources.json';
-import { parseItems, parseProps, parseRecipes, parseResources, parseStations } from '../data/types';
+import {
+  parseItems,
+  parseProps,
+  parseRecipes,
+  parseResources,
+  parseStations,
+  parseStructures,
+} from '../data/types';
 import { getView, setupFixedCamera } from '../display/view';
 import { t } from '../i18n';
 import { Label } from '../ui/text';
 import { content } from '../world/content';
-import { BASE_TILES, BASE_TILESET_NAME } from '../world/tileset';
+import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../world/tileset';
 import { parseZoneMap } from '../world/zoneMap';
 import { showFatalError } from '../ui/fatalError';
 import { SceneKey } from './keys';
@@ -101,6 +109,14 @@ export class PreloadScene extends Phaser.Scene {
     content.setProps(props);
     const stations = parseStations(stationsJson, Object.keys(manifest.assets));
     content.setCrafting(stations, parseRecipes(recipesJson, Object.keys(items), Object.keys(stations)));
+    content.setStructures(
+      parseStructures(
+        structuresJson,
+        Object.keys(manifest.assets),
+        Object.keys(items),
+        Object.keys(stations),
+      ),
+    );
 
     const cached: unknown = this.cache.tilemap.get(BASE_MAP_KEY);
     const data = typeof cached === 'object' && cached !== null && 'data' in cached ? cached.data : undefined;
@@ -113,6 +129,7 @@ export class PreloadScene extends Phaser.Scene {
         resourceIds: Object.keys(resources),
         propIds: Object.keys(props),
         stationIds: Object.keys(stations),
+        floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
       },
       BASE_MAP_FILE,
     );

@@ -89,7 +89,14 @@ describe('save: migrações', () => {
     expect(parsed.state.player.inventory).toHaveLength(20);
     expect(parsed.state.player.hotbar).toEqual([null, null, null, null]);
     expect(parsed.state.world).toEqual({ tick: 999, rng: 1 });
-    expect(parsed.state.base).toEqual({ chests: {} });
+    expect(parsed.state.base).toEqual({
+      chests: {},
+      structures: [
+        [1, 'campfire', 28, 24, 0, 0],
+        [2, 'wood_bench', 20, 15, 0, 0],
+      ],
+      nextStructureId: 3,
+    });
     expect(parsed.state.zones).toEqual({});
     expect(parsed.state.stations).toEqual({});
   });
@@ -100,6 +107,34 @@ describe('save: migrações', () => {
     const stateJson = JSON.stringify(v2);
     const text = `{"version":2,"timestamp":7,"checksum":"${checksum(`2|7|${stateJson}`)}","state":${stateJson}}`;
     expect(parseSave(text).state.stations).toEqual({});
+  });
+
+  it('v3 → v4 (Fase 5): a fogueira e a bancada do mapa passam a peças, com as suas filas', () => {
+    const v3 = structuredClone(STATE) as unknown as { base: Record<string, unknown>; stations: unknown };
+    delete v3.base.structures;
+    delete v3.base.nextStructureId;
+    v3.stations = {
+      campfire_90: { queue: [['r_cooked_meat', 40]], output: [null] },
+      wood_bench_91: { queue: [], output: [['wood_plank', 2]] },
+    };
+    const stateJson = JSON.stringify(v3);
+    const text = `{"version":3,"timestamp":8,"checksum":"${checksum(`3|8|${stateJson}`)}","state":${stateJson}}`;
+    const { state } = parseSave(text);
+    expect(state.base.structures).toEqual([
+      [1, 'campfire', 28, 24, 0, 0],
+      [2, 'wood_bench', 20, 15, 0, 0],
+    ]);
+    expect(state.base.nextStructureId).toBe(3);
+    expect(state.stations).toEqual({
+      campfire_s1: { queue: [['r_cooked_meat', 40]], output: [null] },
+      wood_bench_s2: { queue: [], output: [['wood_plank', 2]] },
+    });
+  });
+
+  it('valida as peças construídas', () => {
+    const bad = structuredClone(STATE);
+    bad.base.structures.push([1, 'wall_wood', 3, 4, 2, 0]);
+    expect(problemOf(serializeSave(bad, 1))).toBe('state');
   });
 
   it('valida os slots do inventário', () => {

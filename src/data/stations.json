@@ -1,5 +1,5 @@
 {
-  "$comment": "Estações de crafting (CLAUDE.md §7.5). Na Fase 4 estão colocadas no mapa (objetos station:<id>); na Fase 5 passam a ser construídas. 'hands' (craft no inventário) não é uma estação física.",
+  "$comment": "Estações de crafting (CLAUDE.md §7.5). Na base são construídas (structures.json, com o mesmo id); noutros mapas podem estar colocadas como objetos station:<id>. 'hands' (craft no inventário) não é uma estação física.",
   "campfire": { "sprite": "campfire", "footprint": { "width": 12, "height": 6 }, "queue": 3 },
   "wood_bench": {
     "sprite": "wood_bench",

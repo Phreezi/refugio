@@ -455,6 +455,291 @@ const SPRITES: Sprite[] = [
   },
 ];
 
+/**
+ * Peças de construção (CLAUDE.md §7.7). As de cima têm 16×24: o tile (16×16) visto de cima fica
+ * nas linhas 0–15 e a face da frente nas 16–23, para parecerem ter altura (vista 3/4). Sem
+ * contorno exterior, para as peças encostadas formarem uma parede contínua.
+ */
+const WALL_FRONT = 16;
+
+type Palette3 = readonly [dark: string, mid: string, light: string];
+const WOOD: Palette3 = ['bark', 'wood', 'wood_light'];
+const STONE: Palette3 = ['stone_dark', 'stone', 'stone_light'];
+
+/**
+ * Topo de uma parede de madeira: troncos deitados, mais escuros do que o chão de tábuas, com
+ * uma aresta clara em cima (luz de cima-esquerda) e escura em baixo.
+ */
+function woodTop(img: Bitmap): void {
+  img.fill(0, 0, 16, WALL_FRONT, c('bark'));
+  for (const y of [1, 5, 9, 13]) {
+    img.fill(0, y, 16, 2, c('wood'));
+    img.fill(0, y, 16, 1, c('wood_light'));
+  }
+  for (const [x, y] of [
+    [4, 2],
+    [11, 6],
+    [2, 10],
+    [9, 14],
+  ] as const) {
+    img.set(x, y, c('bark')); // nós na madeira
+  }
+  img.fill(0, 0, 16, 1, c('bark_dark'));
+  img.fill(0, WALL_FRONT - 1, 16, 1, c('bark_dark'));
+}
+
+/** Topo de uma parede de pedra: blocos com juntas desencontradas. */
+function stoneTop(img: Bitmap): void {
+  img.fill(0, 0, 16, WALL_FRONT, c('stone_light'));
+  for (const y of [0, 5, 10]) img.fill(0, y, 16, 1, c('stone'));
+  for (const [x, y] of [
+    [7, 1],
+    [3, 6],
+    [11, 6],
+    [7, 11],
+    [15, 1],
+  ] as const) {
+    img.fill(x, y, 1, 4, c('stone'));
+  }
+  img.fill(0, 0, 16, 1, c('stone_dark'));
+  img.fill(0, WALL_FRONT - 1, 16, 1, c('stone_dark'));
+}
+
+/** Face da frente (linhas 16–23): troncos na horizontal ou blocos de pedra. */
+function front(img: Bitmap, colors: Palette3, logs: boolean): void {
+  const [dark, mid, light] = colors;
+  img.fill(0, WALL_FRONT, 16, 8, c(mid));
+  if (logs) {
+    for (const y of [WALL_FRONT + 3, WALL_FRONT + 6]) img.fill(0, y, 16, 1, c(dark));
+    img.fill(0, WALL_FRONT, 16, 1, c(light));
+    img.fill(0, WALL_FRONT + 4, 16, 1, c(light));
+  } else {
+    img.fill(0, WALL_FRONT + 3, 16, 1, c(dark));
+    for (const [x, y] of [
+      [5, 0],
+      [12, 0],
+      [2, 4],
+      [9, 4],
+    ] as const) {
+      img.fill(x, WALL_FRONT + y, 1, 3, c(dark));
+    }
+    img.fill(1, WALL_FRONT + 1, 3, 1, c(light));
+  }
+  img.fill(0, 23, 16, 1, c('bark_dark'));
+}
+
+/** Porta vista de cima: moldura escura e a folha em tábuas claras, com o puxador. */
+function doorTop(img: Bitmap, vertical: boolean): void {
+  const [x, y, w, h] = vertical ? [4, 0, 8, WALL_FRONT] : [0, 3, 16, 10];
+  img.fill(x, y, w, h, c('bark_dark'));
+  img.fill(x + 1, y + 1, w - 2, h - 2, c('wood_light'));
+  if (vertical) for (const py of [y + 4, y + 8, y + 12]) img.fill(x + 1, py, w - 2, 1, c('wood'));
+  else for (const px of [x + 4, x + 8, x + 12]) img.fill(px, y + 1, 1, h - 2, c('wood'));
+  img.set(vertical ? x + 5 : x + 10, vertical ? y + 7 : y + 5, c('gold'));
+}
+
+/** Porta fechada na horizontal: moldura por cima e a porta na face da frente. */
+function doorFront(img: Bitmap): void {
+  img.fill(3, WALL_FRONT, 10, 8, c('bark'));
+  img.fill(4, WALL_FRONT + 1, 8, 7, c('wood'));
+  img.fill(7, WALL_FRONT + 1, 1, 7, c('bark'));
+  img.fill(4, WALL_FRONT + 1, 8, 1, c('wood_light'));
+  img.set(10, WALL_FRONT + 4, c('gold'));
+}
+
+const STRUCTURES: Sprite[] = [
+  {
+    file: 'foundation_wood',
+    width: 16,
+    height: 16,
+    paint: (img) => {
+      img.fill(0, 0, 16, 16, c('wood'));
+      for (const y of [0, 4, 8, 12]) {
+        img.fill(0, y, 16, 1, c('wood_light'));
+        img.fill(0, y + 3, 16, 1, c('bark'));
+      }
+      for (const [x, y] of [
+        [4, 1],
+        [11, 5],
+        [2, 9],
+        [13, 13],
+      ] as const) {
+        img.fill(x, y, 1, 2, c('bark')); // topos das tábuas desencontrados
+      }
+      for (const [x, y] of [
+        [1, 2],
+        [14, 2],
+        [1, 10],
+        [14, 10],
+      ] as const) {
+        img.set(x, y, c('stone_light')); // pregos
+      }
+      img.fill(0, 15, 16, 1, c('bark_dark'));
+      img.fill(15, 0, 1, 16, c('bark_dark'));
+    },
+  },
+  {
+    file: 'foundation_stone',
+    width: 16,
+    height: 16,
+    paint: (img) => {
+      img.fill(0, 0, 16, 16, c('stone'));
+      img.fill(0, 7, 16, 1, c('stone_dark'));
+      img.fill(0, 15, 16, 1, c('stone_dark'));
+      img.fill(9, 0, 1, 7, c('stone_dark'));
+      img.fill(4, 8, 1, 7, c('stone_dark'));
+      img.fill(15, 8, 1, 8, c('stone_dark'));
+      for (const [x, y, w] of [
+        [1, 1, 3],
+        [11, 1, 2],
+        [6, 9, 4],
+        [1, 9, 2],
+      ] as const) {
+        img.fill(x, y, w, 1, c('stone_light'));
+      }
+      img.set(12, 4, c('stone_dark'));
+      img.set(8, 12, c('stone_dark'));
+    },
+  },
+  {
+    file: 'wall_wood',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      woodTop(img);
+      front(img, WOOD, true);
+    },
+  },
+  {
+    file: 'wall_stone',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      stoneTop(img);
+      front(img, STONE, false);
+    },
+  },
+  {
+    file: 'door_wood',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      woodTop(img);
+      doorTop(img, false);
+      front(img, WOOD, true);
+      doorFront(img);
+    },
+  },
+  {
+    file: 'door_wood_open',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      // Só a moldura (ombreiras e verga): o jogador passa pelo meio e vê-se o chão.
+      for (const x of [0, 13]) {
+        img.fill(x, 0, 3, 24, c('wood'));
+        img.fill(x, 0, 1, 24, c('wood_light'));
+        img.fill(x + 2, 0, 1, 24, c('bark'));
+      }
+      img.fill(0, 0, 16, 3, c('wood_light'));
+      img.fill(0, 3, 16, 1, c('bark'));
+      img.fill(0, 23, 16, 1, c('bark_dark'));
+      img.fill(3, 4, 2, 18, c('wood')); // a porta, aberta contra a ombreira
+      img.fill(3, 4, 1, 18, c('wood_light'));
+    },
+  },
+  {
+    file: 'door_wood_v',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      woodTop(img);
+      doorTop(img, true);
+      front(img, WOOD, true);
+      img.fill(4, WALL_FRONT, 8, 7, c('bark_dark'));
+      img.fill(5, WALL_FRONT, 6, 7, c('wood'));
+    },
+  },
+  {
+    file: 'door_wood_v_open',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      // Moldura a norte e a sul; a porta aberta encostada a norte.
+      img.fill(0, 0, 16, 4, c('wood_light'));
+      img.fill(0, 0, 16, 1, c('bark_dark'));
+      img.fill(0, 3, 16, 1, c('bark'));
+      img.fill(0, 4, 3, 2, c('wood'));
+      img.fill(13, 4, 3, 2, c('wood'));
+      img.fill(3, 4, 10, 2, c('wood')); // porta aberta
+      img.fill(3, 4, 10, 1, c('wood_light'));
+      img.fill(0, WALL_FRONT - 2, 16, 2, c('wood_light'));
+      img.fill(0, WALL_FRONT, 16, 8, c('wood'));
+      img.fill(0, WALL_FRONT, 16, 1, c('bark'));
+      img.fill(0, 23, 16, 1, c('bark_dark'));
+    },
+  },
+  {
+    file: 'window_wood',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      woodTop(img);
+      front(img, WOOD, true);
+      img.fill(3, WALL_FRONT + 1, 10, 6, c('bark'));
+      img.fill(4, WALL_FRONT + 2, 8, 4, c('sky'));
+      img.fill(4, WALL_FRONT + 2, 3, 1, c('ice'));
+      img.fill(7, WALL_FRONT + 2, 1, 4, c('bark'));
+    },
+  },
+  {
+    file: 'window_wood_v',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      woodTop(img);
+      front(img, WOOD, true);
+      img.fill(5, 2, 6, 12, c('bark'));
+      img.fill(6, 3, 4, 10, c('sky'));
+      img.fill(6, 3, 1, 4, c('ice'));
+      img.fill(6, 7, 4, 1, c('bark'));
+    },
+  },
+  {
+    file: 'fence_wood',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      img.ellipse(8, 22.5, 7, 1.2, c('ink'), 60);
+      for (const y of [12, 17]) {
+        img.fill(0, y, 16, 2, c('wood'));
+        img.fill(0, y, 16, 1, c('wood_light'));
+      }
+      for (const x of [2, 12]) {
+        img.fill(x, 9, 3, 14, c('bark'));
+        img.fill(x, 9, 1, 14, c('wood'));
+        img.fill(x, 9, 3, 1, c('wood_light'));
+      }
+    },
+  },
+  {
+    file: 'fence_wood_v',
+    width: 16,
+    height: 24,
+    paint: (img) => {
+      img.ellipse(8, 22.5, 3, 1.2, c('ink'), 60);
+      img.fill(6, 4, 4, 16, c('wood'));
+      img.fill(6, 4, 1, 16, c('wood_light'));
+      img.fill(9, 4, 1, 16, c('bark'));
+      for (const y of [1, 15]) {
+        img.fill(6, y, 4, 8, c('bark'));
+        img.fill(6, y, 1, 8, c('wood'));
+        img.fill(6, y, 4, 1, c('wood_light'));
+      }
+    },
+  },
+];
+
 /** Ícones de itens (16×16, sem sombra). */
 const ICONS: Sprite[] = [
   {
@@ -642,6 +927,7 @@ mkdirSync(iconDir, { recursive: true });
 const rendered: Bitmap[] = [];
 for (const [dir, list] of [
   [outDir, SPRITES],
+  [outDir, STRUCTURES],
   [iconDir, ICONS],
 ] as const) {
   for (const sprite of list) {
@@ -652,7 +938,9 @@ for (const [dir, list] of [
     rendered.push(img);
   }
 }
-console.log(`sprites/: ${String(SPRITES.length)} sprites + ${String(ICONS.length)} ícones`);
+console.log(
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length)} sprites + ${String(ICONS.length)} ícones`,
+);
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).
 const previewIndex = process.argv.indexOf('--preview');

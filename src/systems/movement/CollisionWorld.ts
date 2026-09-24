@@ -64,6 +64,11 @@ export class CollisionWorld {
     this.keyed.set(key, rect);
   }
 
+  removeKeyed(key: number): void {
+    this.keyed.delete(key);
+    this.disabled.delete(key);
+  }
+
   setEnabled(key: number, enabled: boolean): void {
     if (enabled) this.disabled.delete(key);
     else this.disabled.add(key);
