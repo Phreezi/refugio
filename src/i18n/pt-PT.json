@@ -215,5 +215,16 @@
   "horde.won": "Horda vencida! Deixaram uma mochila com prémios.",
   "horde.lost": "A horda foi-se embora.",
   "horde.destroyed": "Uma peça foi destruída!",
-  "horde.repaired": "Reparado."
+  "horde.repaired": "Reparado.",
+  "enemy.zombie_tank": "Brutamontes",
+  "enemy.zombie_screamer": "Gritador",
+  "item.electronics": "Componentes elétricos",
+  "item.chemicals": "Químicos",
+  "item.medkit": "Kit médico",
+  "item.leather_jacket": "Casaco de couro",
+  "item.leather_pants": "Calças de couro",
+  "zone.industrial": "Zona Industrial",
+  "zone.hospital": "Hospital de Campanha",
+  "msg.bleeding": "Estás a sangrar! Usa uma ligadura.",
+  "hud.bleeding": "A sangrar"
 }

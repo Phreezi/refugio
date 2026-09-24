@@ -82,5 +82,31 @@
     "respawnDays": 2,
     "unlockLevel": 10,
     "nightEnemyMultiplier": 1.5
+  },
+  "zone_industrial": {
+    "name": "zone.industrial",
+    "map": "maps/industrial.json",
+    "danger": 3,
+    "worldMapPos": [88, 16],
+    "travelCost": {
+      "hunger": 8,
+      "thirst": 8
+    },
+    "respawnDays": 3,
+    "unlockLevel": 14,
+    "nightEnemyMultiplier": 1.5
+  },
+  "zone_hospital": {
+    "name": "zone.hospital",
+    "map": "maps/hospital.json",
+    "danger": 3,
+    "worldMapPos": [14, 86],
+    "travelCost": {
+      "hunger": 8,
+      "thirst": 9
+    },
+    "respawnDays": 3,
+    "unlockLevel": 16,
+    "nightEnemyMultiplier": 1.5
   }
 }

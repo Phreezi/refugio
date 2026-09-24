@@ -83,6 +83,7 @@ export class PlayerActions {
     player.thirst = clamp(player.thirst + (def.effects.thirst ?? 0));
     // Nunca mata: comida estragada tira vida, mas deixa pelo menos 1.
     player.hp = Math.max(Math.min(player.hp, 1), clamp(player.hp + (def.effects.hp ?? 0)));
+    if (def.stopsBleeding) player.bleed = 0;
 
     slot[1] -= 1;
     if (slot[1] === 0) container[ref.index] = null;

@@ -182,7 +182,8 @@
     "rarity": "uncommon",
     "effects": {
       "hp": 20
-    }
+    },
+    "stopsBleeding": true
   },
   "empty_bottle": {
     "name": "item.empty_bottle",
@@ -378,5 +379,50 @@
       "hunger": 8,
       "thirst": 12
     }
+  },
+  "electronics": {
+    "name": "item.electronics",
+    "icon": "icon_electronics",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "uncommon"
+  },
+  "chemicals": {
+    "name": "item.chemicals",
+    "icon": "icon_chemicals",
+    "type": "resource",
+    "stack": 50,
+    "rarity": "uncommon"
+  },
+  "medkit": {
+    "name": "item.medkit",
+    "icon": "icon_medkit",
+    "type": "consumable",
+    "stack": 5,
+    "rarity": "rare",
+    "effects": {
+      "hp": 60
+    },
+    "stopsBleeding": true
+  },
+  "leather_jacket": {
+    "name": "item.leather_jacket",
+    "icon": "icon_leather_jacket",
+    "type": "armor",
+    "stack": 1,
+    "rarity": "uncommon",
+    "durability": 220,
+    "armor": 20,
+    "equip": "body"
+  },
+  "leather_pants": {
+    "name": "item.leather_pants",
+    "icon": "icon_leather_pants",
+    "type": "armor",
+    "stack": 1,
+    "rarity": "uncommon",
+    "durability": 200,
+    "armor": 12,
+    "equip": "legs"
   }
 }

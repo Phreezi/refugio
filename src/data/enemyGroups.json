@@ -19,5 +19,11 @@
   "horde": [
     ["zombie_walker", 6, 6],
     ["zombie_runner", 2, 2]
+  ],
+  "tanks": [["zombie_tank", 1, 1]],
+  "screamer": [["zombie_screamer", 1, 1]],
+  "t3_mixed": [
+    ["zombie_walker", 1, 2],
+    ["zombie_runner", 1, 2]
   ]
 }

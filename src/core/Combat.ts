@@ -206,7 +206,8 @@ export class Combat {
         continue;
       }
       const result = stepEnemy(enemy, def, ctx);
-      if (result === 'attack') this.damagePlayer(def.damage, enemy);
+      if (result === 'attack') this.damagePlayer(def.damage, enemy, def.bleedPct ?? 0);
+      else if (result === 'scream' && def.scream) this.scream(enemy, def.scream);
       else if (result === 'siege' && enemy.siege !== null) {
         const amount = Math.round((def.damage * BALANCE.hordeStructureDamagePct) / 100);
         this.building?.damageStructure(enemy.siege, amount);
@@ -214,6 +215,20 @@ export class Combat {
       }
     }
     this.springTraps();
+  }
+
+  /** O gritador grita: os inimigos à volta vêm à procura do jogador durante `alertSec`. */
+  private scream(from: Enemy, scream: NonNullable<EnemyDef['scream']>): void {
+    const { enemies } = this.content();
+    const alert = secondsToTicks(scream.alertSec);
+    for (const enemy of this.enemies) {
+      if (enemy === from || enemies[enemy.id]?.behavior !== 'hostile') continue;
+      if (Math.hypot(enemy.x - from.x, enemy.y - from.y) > scream.radius) continue;
+      enemy.alert = Math.max(enemy.alert, alert);
+      if (enemy.state === 'idle' || enemy.state === 'wander' || enemy.state === 'return')
+        enemy.state = 'chase';
+    }
+    this.bus.emit('enemy:scream', { uid: from.uid, x: from.x, y: from.y, radius: scream.radius });
   }
 
   /** Peça construída sólida entre o inimigo e o jogador (o que a horda tem de partir). */
@@ -324,13 +339,20 @@ export class Combat {
     this.kill(enemy);
   }
 
-  /** Dano ao jogador (com armadura e invulnerabilidade curta a seguir). */
-  damagePlayer(amount: number, from: { x: number; y: number }): void {
+  /**
+   * Dano ao jogador (com armadura e invulnerabilidade curta a seguir).
+   * @param bleedPct % de hipótese de o pôr a sangrar (§7.8).
+   */
+  damagePlayer(amount: number, from: { x: number; y: number }, bleedPct = 0): void {
     if (amount <= 0 || this.playerInvulnerable) return;
     const player = this.state.data.player;
     const { items } = this.content();
     const dealt = reduceDamage(amount, armorPct(player.equipment, items, BALANCE.maxArmorReductionPct));
     player.hp = Math.max(0, player.hp - dealt);
+    if (bleedPct > 0 && nextRandom(this.state.data.world) * 100 < bleedPct) {
+      if (player.bleed === 0) this.bus.emit('player:bleeding', {});
+      player.bleed = secondsToTicks(BALANCE.bleedSec);
+    }
     // A armadura gasta-se um pouco com cada golpe.
     const armorSlots = player.equipment.flatMap((slot, i) =>
       slot && items[slot[0]]?.type === 'armor' ? [i] : [],

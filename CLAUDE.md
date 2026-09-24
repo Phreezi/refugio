@@ -1,6 +1,6 @@
 # CLAUDE.md — Projeto "Refúgio" (nome de código)
 
-> Jogo de sobrevivência top-down em pixel art, inspirado na jogabilidade de *Last Day on Earth: Survival* (LDoE), com estética próxima de *Stardew Valley*, dificuldade mais baixa e **apenas single player**.
+> Jogo de sobrevivência top-down em pixel art, inspirado na jogabilidade de *Last Day on Earth: Survival* (LDoE), com estética próxima de *Stardew Valley*, dificuldade mais baixa, **single player** e, no fim (Fase 15), **co-op online a 2** com um código de 5 caracteres.
 > Corre em HTML5 no browser, com saves locais constantes. Futuro: APK (Android) e YouTube Playables.
 
 Este ficheiro é a referência principal para qualquer trabalho no projeto. Lê-o sempre antes de alterar código. Se uma decisão aqui estiver desatualizada, atualiza este ficheiro na mesma tarefa.
@@ -22,7 +22,7 @@ Este ficheiro é a referência principal para qualquer trabalho no projeto. Lê-
 |---|---|
 | Género | Sobrevivência / crafting / construção de base, top-down |
 | Perspetiva | Top-down 3/4 (estilo Stardew Valley) |
-| Modo | Single player, offline |
+| Modo | Single player, offline; co-op online a 2 jogadores na Fase 15 |
 | Plataforma inicial | Browser desktop + mobile (HTML5) |
 | Plataformas futuras | Android (APK/AAB via Capacitor), YouTube Playables |
 | Sessão típica | 5–20 minutos (ir a uma zona, lootear, voltar, craftar) |
@@ -68,7 +68,7 @@ Base (casa) → escolher zona no mapa-mundo → viajar (custa um pouco de comida
 | Eventos temporários (quedas de avião, comboio) | Sim (fase posterior) | Recompensa garantida, sem limite de tempo apertado |
 | Veículo (moto/chopper) | Sim (fase tardia) | Reduz custo de viagem |
 | Moeda premium / anúncios agressivos | **Não** | — |
-| Multijogador / clãs | **Não** (fora do âmbito) | — |
+| Multijogador / clãs | **Só co-op a 2** (Fase 15) | Sem clãs, PvP nem trocas entre jogadores; entra-se com um código de 5 caracteres |
 
 ---
 
@@ -267,6 +267,7 @@ npm run map:pine   # gera maps/pine_forest.json (idem)
 npm run map:farm   # gera maps/farm.json (idem; usa scripts/mapgen.ts)
 npm run map:lake   # gera maps/lake.json (idem)
 npm run map:t2     # gera maps/road.json, village.json, deep_forest.json (idem)
+npm run map:t3     # gera maps/industrial.json, hospital.json (idem)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -406,6 +407,7 @@ Os nós de recurso reaparecem (ver zonas).
 - Ao levar dano: 0,6 s de invulnerabilidade (o boneco pisca) e um pequeno empurrão.
 - **Distância** (Fase 10): pistola/besta com munição; mira automática ao inimigo mais próximo.
 - Inimigos **telegrafam** ataques (0,4 s de aviso com piscar) — dá para recuar.
+- **Sangrar** (Fase 10): alguns inimigos (`bleedPct` em `enemies.json`: corredor, lobo, brutamontes) podem pôr o jogador a sangrar — perde 1 de vida a cada `bleedEverySec` durante `bleedSec` (nunca instantâneo); itens com `stopsBleeding` (ligadura, kit médico) estancam. Morrer também. Save: `player.bleed` (ticks).
 - Furtividade simples: andar devagar (segurar Shift/Ctrl / joystick parcial) reduz raio de deteção para metade (`sneakDetectMultiplier`).
 - Armadura reduz dano em percentagem (máx. 60%; soma das peças equipadas; cada golpe recebido gasta 1 de durabilidade a cada peça). Um golpe que acerta tira sempre pelo menos 1.
 - Os inimigos não se gravam: nascem nos pontos `enemy_spawn:<grupo>` ao entrar na zona (os grupos estão em `enemyGroups.json`).
@@ -417,8 +419,8 @@ Os nós de recurso reaparecem (ver zonas).
 | zombie_walker | Arrastado | 40 | 6 | 40 px/s | Básico, em grupos de 1–3 |
 | zombie_runner | Corredor | 30 | 5 | 90 px/s | Aparece a partir de T2 |
 | zombie_bloated | Inchado | 60 | 12 (área) | 30 px/s | Explode ao morrer (0,9 s a piscar a vermelho, raio 30 px); aviso claro |
-| zombie_tank | Brutamontes | 250 | 20 | 35 px/s | T3+, ataque lento e telegrafado |
-| zombie_screamer | Gritador | 35 | 0 | 50 px/s | Chama outros zombies; T3+ |
+| zombie_tank | Brutamontes | 250 | 20 | 35 px/s | T3+, aviso de 0,9 s (`windupSec`); pode fazer sangrar |
+| zombie_screamer | Gritador | 35 | 0 | 50 px/s | T3+; fica a ~56 px e grita a cada 8 s: quem estiver a 160 px vem à procura do jogador durante 12 s (sem leash) |
 | wolf | Lobo | 45 | 8 | 100 px/s | Animal, T2 florestas |
 | boar | Javali | 70 | 10 | carga | Aviso 2× mais longo, depois carga em linha reta (150 px/s, 0,7 s); dá carne e couro |
 | deer | Veado | 30 | 0 | foge | Presa pacífica |
@@ -830,14 +832,14 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** objetivos de longo prazo.
 
-- [ ] Zonas T3: **Zona Industrial**, **Hospital de Campanha**.
-- [ ] Inimigos: tank, screamer.
+- [x] Zonas T3: **Zona Industrial**, **Hospital de Campanha** (mapas gerados por `npm run map:t3`; armários industriais e de medicamentos).
+- [x] Inimigos: tank (aviso mais longo, `windupSec`), screamer (grita e alerta os outros, `scream`).
 - [ ] Armas à distância (besta, pistola) e munição craftável.
 - [ ] **Bunker**: 4 pisos, checkpoint por piso, chefe final, chave obtida em quest simples.
 - [ ] Zona T4: **Base Militar** (cartão de acesso), depois **Cidade em Ruínas**.
 - [ ] Zonas-evento: queda de avião, comboio, acampamento com comerciante (troca).
 - [ ] Veículo (moto): craft em várias peças, reduz custo de viagem.
-- [ ] Medicina: ligaduras, kits, estado "sangrar"/"infeção" leve (opcional, com cura fácil).
+- [x] Medicina: ligaduras (craft nas mãos), kits médicos, estado "sangrar" (`bleedPct` dos inimigos; uma ligadura estanca). *(Infeção fica de fora: era opcional.)* Casaco e calças de couro.
 
 **Aceitação:** é possível "acabar" o conteúdo (chefe do bunker + Cidade) em ~15–20 h.
 
@@ -906,6 +908,22 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 ---
 
+### Fase 15 — Co-op online a 2 (≈ 4–6 semanas)
+
+**Objetivo:** jogar com um amigo pela internet, no mundo de um dos dois.
+
+- [ ] **Código de sessão**: quem cria o jogo ("Jogar com um amigo") recebe um código de **5 caracteres** (letras e números sem os que se confundem — sem `0/O`, `1/I/L` —, ex.: `K7Q2M`; 31 símbolos → ~28 milhões de códigos). O código é **sempre único**: é o servidor que o gera e o reserva enquanto a sessão existir (nunca há duas sessões ativas com o mesmo código) e só o liberta algum tempo depois de a sessão acabar. O parceiro escreve o código e entra.
+- [ ] **Servidor pequeno** (sinalização + códigos): cria/valida códigos e liga os dois browsers; o jogo em si passa por **WebRTC** (DataChannel), com **TURN** para redes difíceis. Precisa de alojamento próprio (ou serviço gerido) e de dependências novas → decidir e pedir aprovação antes de começar (§5.4, regra 3).
+- [ ] **Anfitrião autoritativo**: a `Simulation` corre no anfitrião (o mundo e o save são dele); o convidado envia só input (movimento, ação, UI) e recebe o estado. A lógica já é pura e em passo fixo (§5.1, §5.2), por isso encaixa.
+- [ ] Segundo jogador no `GameState` (posição, vida, fome/sede, inventário, equipamento, nível); o convidado leva a sua personagem (guardada no save dele) — confirmar a regra antes de implementar.
+- [ ] Sincronizar jogadores, inimigos, recursos, contentores, estruturas, estações e mochilas no chão; os dois na mesma zona (a viagem é decidida pelo anfitrião).
+- [ ] Ligação perdida: o convidado volta a entrar com o mesmo código; se o anfitrião sair, a sessão acaba e o convidado fica com o progresso da personagem.
+- [ ] Verificar se Android (Fase 13) e YouTube Playables (Fase 14) permitem multijogador; se não, o co-op fica só na versão web/APK.
+
+**Aceitação:** dois jogadores em redes diferentes entram com o código, recolhem, constroem e combatem juntos durante 30 min sem dessincronizar; nunca aparecem duas sessões ativas com o mesmo código (teste no servidor).
+
+---
+
 ## 12. Balanceamento: `balance.json` inicial
 
 ```json
@@ -945,7 +963,7 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 
 ## 14. Fora do âmbito (por agora)
 
-- Multijogador, clãs, trocas entre jogadores.
+- Multijogador com mais de 2 jogadores, clãs, PvP, trocas entre jogadores (o co-op a 2 é a Fase 15).
 - Microtransações e moeda premium.
 - Geração procedimental completa de mapas.
 - Histórias/NPCs com diálogo extenso (talvez no futuro).
@@ -1023,3 +1041,6 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Sem pathfinding: a horda vai a direito para o jogador e parte o que a bloqueia | Simples, previsível e dá sentido às paredes e às armadilhas no caminho |
 | 2026-09-24 | Reparar com a ação contextual (a peça danificada passa a ser alvo) | Sem modo novo nem botões; custo de 25% como pede §7.13 |
 | 2026-09-24 | Save v9: `settings.hordes`, `horde`, `base.damage`; interruptor das hordas no menu inicial | A definição vive no save (vai com o Exportar/Importar); ainda não há menu de pausa (Fase 11) |
+| 2026-09-24 | Nova Fase 15: co-op online a 2 com código de 5 caracteres, único entre as sessões ativas | Pedido do jogador. Anfitrião autoritativo por WebRTC; os códigos são gerados e reservados pelo servidor de sinalização (única forma de garantir que não se repetem) |
+| 2026-09-24 | Fase 10 dividida em partes (A: T3 + medicina; B: armas à distância; C: bunker; D: T4; E: eventos e moto) | É a maior fase; cada parte é jogável e publicada à parte |
+| 2026-09-24 | Save v10: `player.bleed`; sem infeção | O sangramento dá uso às ligaduras e aos kits; a infeção era opcional e acrescentava gestão sem ganho |

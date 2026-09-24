@@ -49,12 +49,13 @@
     },
     "zombie_tank": {
       "type": "image",
+      "file": "sprites/zombie_tank.png",
       "placeholder": {
         "width": 24,
         "height": 32,
         "color": "plum",
         "border": "ink",
-        "letter": "Z"
+        "letter": "B"
       }
     },
     "tree_small": {
@@ -1021,6 +1022,94 @@
         "color": "bark",
         "border": "ink",
         "letter": "E"
+      }
+    },
+    "zombie_screamer": {
+      "type": "image",
+      "file": "sprites/zombie_screamer.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "ice",
+        "border": "ink",
+        "letter": "G"
+      }
+    },
+    "locker": {
+      "type": "image",
+      "file": "sprites/locker.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "teal",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "medical_cabinet": {
+      "type": "image",
+      "file": "sprites/medical_cabinet.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "cream",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_electronics": {
+      "type": "image",
+      "file": "sprites/icons/electronics.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "forest",
+        "border": "ink",
+        "letter": "E"
+      }
+    },
+    "icon_chemicals": {
+      "type": "image",
+      "file": "sprites/icons/chemicals.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "ice",
+        "border": "ink",
+        "letter": "Q"
+      }
+    },
+    "icon_medkit": {
+      "type": "image",
+      "file": "sprites/icons/medkit.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "cream",
+        "border": "ink",
+        "letter": "K"
+      }
+    },
+    "icon_leather_jacket": {
+      "type": "image",
+      "file": "sprites/icons/leather_jacket.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_leather_pants": {
+      "type": "image",
+      "file": "sprites/icons/leather_pants.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark",
+        "border": "ink",
+        "letter": "C"
       }
     }
   }

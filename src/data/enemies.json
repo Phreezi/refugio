@@ -1,5 +1,5 @@
 {
-  "$comment": "Inimigos e animais (CLAUDE.md §7.9). Distâncias em px, tempos em segundos de jogo. behavior: hostile (persegue e ataca, com aviso de windup) ou flee (foge). drops: [item, mín, máx] (mín pode ser 0).",
+  "$comment": "Inimigos e animais (CLAUDE.md §7.9). Distâncias em px, tempos em segundos de jogo. behavior: hostile (persegue e ataca, com aviso de windup) ou flee (foge). drops: [item, mín, máx] (mín pode ser 0). windupSec: aviso próprio. bleedPct: % de pôr o jogador a sangrar. scream: gritador (raio, intervalo, distância a que fica, duração do alerta).",
   "zombie_walker": {
     "sprite": "zombie_walker",
     "footprint": {
@@ -38,7 +38,8 @@
       ["cloth", 0, 1],
       ["scrap_metal", 1, 2]
     ],
-    "xp": 12
+    "xp": 12,
+    "bleedPct": 10
   },
   "deer": {
     "sprite": "deer",
@@ -78,7 +79,8 @@
       ["raw_meat", 1, 2],
       ["leather", 1, 2]
     ],
-    "xp": 15
+    "xp": 15,
+    "bleedPct": 25
   },
   "zombie_bloated": {
     "sprite": "zombie_bloated",
@@ -129,5 +131,54 @@
       ["raw_meat", 2, 4],
       ["leather", 1, 2]
     ]
+  },
+  "zombie_tank": {
+    "sprite": "zombie_tank",
+    "footprint": {
+      "width": 14,
+      "height": 7
+    },
+    "behavior": "hostile",
+    "hp": 250,
+    "damage": 20,
+    "speed": 35,
+    "detectRadius": 80,
+    "leashRadius": 220,
+    "attackRange": 14,
+    "attackSec": 2.2,
+    "windupSec": 0.9,
+    "bleedPct": 30,
+    "drops": [
+      ["scrap_metal", 2, 4],
+      ["nails", 1, 3],
+      ["chemicals", 0, 1]
+    ],
+    "xp": 60
+  },
+  "zombie_screamer": {
+    "sprite": "zombie_screamer",
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 35,
+    "damage": 0,
+    "speed": 50,
+    "detectRadius": 96,
+    "leashRadius": 240,
+    "attackRange": 1,
+    "attackSec": 1,
+    "scream": {
+      "radius": 160,
+      "everySec": 8,
+      "keepAway": 56,
+      "alertSec": 12
+    },
+    "drops": [
+      ["cloth", 0, 2],
+      ["electronics", 0, 1]
+    ],
+    "xp": 20
   }
 }
