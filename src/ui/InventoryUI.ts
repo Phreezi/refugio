@@ -86,6 +86,10 @@ export class InventoryUI {
       eventBus.on('container:open', ({ chestId }) => {
         this.open(chestId);
       }),
+      // Abrir uma estação fecha a mochila (só um painel de cada vez).
+      eventBus.on('station:open', () => {
+        if (this.isOpen) this.close();
+      }),
     ];
     this.refresh();
   }

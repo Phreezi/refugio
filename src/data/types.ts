@@ -327,3 +327,126 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
   if (problems.length > 0) throw new DataError('items.json', problems);
   return defs;
 }
+
+/** Estação de crafting colocada no mundo (fogueira, bancada…). */
+export interface StationDef extends WorldObjectDef {
+  /** Máximo de trabalhos em fila (CLAUDE.md §7.5: 3). */
+  queue: number;
+  /** A bancada repara ferramentas (§2: reparação barata). */
+  repair: boolean;
+}
+
+export type StationDefs = Readonly<Record<string, StationDef>>;
+
+/** Estação especial: craft instantâneo no próprio inventário. */
+export const HANDS = 'hands';
+
+export type RecipeCategory = 'tools' | 'materials' | 'weapons' | 'food';
+export const RECIPE_CATEGORIES: readonly RecipeCategory[] = ['tools', 'materials', 'weapons', 'food'];
+
+export interface Recipe {
+  id: string;
+  /** `hands` ou um id de `stations.json`. */
+  station: string;
+  category: RecipeCategory;
+  inputs: readonly { item: string; qty: number }[];
+  output: string;
+  qty: number;
+  /** 0 nas mãos (instantâneo); 5–60 s nas estações (tempo de jogo). */
+  timeSec: number;
+  unlockLevel: number;
+}
+
+export type Recipes = readonly Recipe[];
+
+/** Valida `stations.json`. */
+export function parseStations(input: unknown, spriteKeys: Iterable<string>): StationDefs {
+  return parseWorldObjects(input, spriteKeys, 'stations.json', ['queue', 'repair'], (id, raw, problems) => {
+    if (!isPositiveInt(raw.queue)) problems.push(`"${id}": queue tem de ser um inteiro > 0`);
+    if (raw.repair !== undefined && typeof raw.repair !== 'boolean') {
+      problems.push(`"${id}": repair tem de ser true/false`);
+    }
+    return { queue: isPositiveInt(raw.queue) ? raw.queue : 1, repair: raw.repair === true };
+  });
+}
+
+const RECIPE_KEYS = new Set([
+  'id',
+  'station',
+  'category',
+  'inputs',
+  'output',
+  'qty',
+  'timeSec',
+  'unlockLevel',
+]);
+
+/**
+ * Valida `recipes.json` (CLAUDE.md §9.3): ids únicos, itens e estações existentes, tempos
+ * (mãos = 0 s; estações > 0 s).
+ */
+export function parseRecipes(
+  input: unknown,
+  itemIds: Iterable<string>,
+  stationIds: Iterable<string>,
+): Recipes {
+  if (!Array.isArray(input)) throw new DataError('recipes.json', ['tem de ser uma lista de receitas']);
+  const items = new Set(itemIds);
+  const stations = new Set(stationIds);
+  const seen = new Set<string>();
+  const problems: string[] = [];
+  const recipes: Recipe[] = [];
+  for (const [index, raw] of (input as unknown[]).entries()) {
+    const where = isObject(raw) && typeof raw.id === 'string' ? `"${raw.id}"` : `[${String(index)}]`;
+    if (!isObject(raw)) {
+      problems.push(`${where}: tem de ser um objeto`);
+      continue;
+    }
+    for (const key of Object.keys(raw)) {
+      if (!RECIPE_KEYS.has(key)) problems.push(`${where}: campo desconhecido "${key}"`);
+    }
+    const id = typeof raw.id === 'string' ? raw.id : '';
+    if (!ID_PATTERN.test(id)) problems.push(`${where}: id tem de estar em snake_case`);
+    if (seen.has(id)) problems.push(`${where}: id repetido`);
+    seen.add(id);
+    const station = typeof raw.station === 'string' ? raw.station : '';
+    if (station !== HANDS && !stations.has(station))
+      problems.push(`${where}: estação desconhecida "${station}"`);
+    const category = RECIPE_CATEGORIES.find((c) => c === raw.category);
+    if (!category) problems.push(`${where}: category inválida ${describe(raw.category)}`);
+    const output = typeof raw.output === 'string' ? raw.output : '';
+    if (!items.has(output)) problems.push(`${where}: output desconhecido "${output}"`);
+    if (!isPositiveInt(raw.qty)) problems.push(`${where}: qty tem de ser um inteiro > 0`);
+    if (!isPositiveInt(raw.unlockLevel)) problems.push(`${where}: unlockLevel tem de ser um inteiro > 0`);
+    const timeSec = raw.timeSec;
+    const timeOk =
+      typeof timeSec === 'number' &&
+      Number.isInteger(timeSec) &&
+      (station === HANDS ? timeSec === 0 : timeSec > 0 && timeSec <= 60);
+    if (!timeOk) problems.push(`${where}: timeSec tem de ser 0 nas mãos e 1–60 nas estações`);
+    const inputs: { item: string; qty: number }[] = [];
+    if (!Array.isArray(raw.inputs) || raw.inputs.length === 0) {
+      problems.push(`${where}: inputs tem de ser [[item, qtd], …]`);
+    } else {
+      for (const entry of raw.inputs as unknown[]) {
+        const [item, qty] = Array.isArray(entry) ? (entry as unknown[]) : [];
+        if (typeof item !== 'string' || !items.has(item))
+          problems.push(`${where}: ingrediente desconhecido ${describe(item)}`);
+        else if (!isPositiveInt(qty)) problems.push(`${where}: quantidade de ${item} inválida`);
+        else inputs.push({ item, qty });
+      }
+    }
+    recipes.push({
+      id,
+      station,
+      category: category ?? 'materials',
+      inputs,
+      output,
+      qty: isPositiveInt(raw.qty) ? raw.qty : 1,
+      timeSec: typeof timeSec === 'number' ? timeSec : 0,
+      unlockLevel: isPositiveInt(raw.unlockLevel) ? raw.unlockLevel : 1,
+    });
+  }
+  if (problems.length > 0) throw new DataError('recipes.json', problems);
+  return recipes;
+}

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import props from '../../src/data/props.json';
 import resources from '../../src/data/resources.json';
+import stations from '../../src/data/stations.json';
 import { BASE_TILES, BASE_TILESET_NAME } from '../../src/world/tileset';
 import { parseZoneMap, ZoneMapError, type ZoneMapRules } from '../../src/world/zoneMap';
 
@@ -10,6 +11,7 @@ const RULES: ZoneMapRules = {
   tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
   resourceIds: Object.keys(resources).filter((id) => id !== '$comment'),
   propIds: Object.keys(props).filter((id) => id !== '$comment'),
+  stationIds: Object.keys(stations).filter((id) => id !== '$comment'),
 };
 
 /** Mapa 3×2 mínimo válido; `patch` altera partes para testar erros. */

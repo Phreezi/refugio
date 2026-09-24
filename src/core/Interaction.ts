@@ -1,5 +1,5 @@
 import { BALANCE } from '../data/balance';
-import type { ItemDefs, PropDefs, ResourceDefs } from '../data/types';
+import type { ItemDefs, PropDefs, ResourceDefs, StationDefs } from '../data/types';
 import { bestTool, hitPower, maxDrops, rollDrops, wearTool } from '../systems/gathering/gathering';
 import { addItem, spaceFor } from '../systems/inventory/inventory';
 import { pickTarget, type Target } from '../systems/interaction/targeting';
@@ -9,6 +9,7 @@ import type { ResourcePlacement, ZoneMap } from '../world/zoneMap';
 import { secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
 import { zoneState, type GameState } from './GameState';
+import { stationKey } from './Crafting';
 import type { PlayerActions } from './PlayerActions';
 
 /** Tudo o que a lógica precisa de saber da zona onde o jogador está. */
@@ -19,12 +20,14 @@ export interface ZoneContext {
   items: ItemDefs;
   resources: ResourceDefs;
   props: PropDefs;
+  stations: StationDefs;
 }
 
 export type TargetData =
   | { type: 'resource'; placement: ResourcePlacement }
   | { type: 'chest'; placement: ResourcePlacement }
-  | { type: 'drink'; placement: ResourcePlacement };
+  | { type: 'drink'; placement: ResourcePlacement }
+  | { type: 'station'; placement: ResourcePlacement };
 
 /** Área de interação de objetos sem caixa sólida (ex.: erva): um pouco à volta dos pés. */
 const LOOSE_AREA = { width: 10, height: 6 } as const;
@@ -93,6 +96,13 @@ export class Interaction {
         data: { type: 'chest', placement },
       });
     }
+    for (const placement of zone.map.stations) {
+      list.push({
+        kind: 'container',
+        area: areaOf(placement, zone.stations[placement.id]?.footprint),
+        data: { type: 'station', placement },
+      });
+    }
     for (const placement of zone.map.props) {
       const def = zone.props[placement.id];
       if (def?.action === 'drink') {
@@ -130,6 +140,9 @@ export class Interaction {
     else if (data.type === 'chest') {
       this.bus.emit('player:action', { kind: 'open' });
       this.bus.emit('container:open', { chestId: data.placement.id });
+    } else if (data.type === 'station') {
+      this.bus.emit('player:action', { kind: 'open' });
+      this.bus.emit('station:open', { stationKey: stationKey(data.placement.id, data.placement.objectId) });
     } else {
       this.bus.emit('player:action', { kind: 'use' });
       this.actions.drink();

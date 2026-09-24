@@ -1,0 +1,94 @@
+[
+  {
+    "id": "r_stone_axe",
+    "station": "hands",
+    "category": "tools",
+    "inputs": [
+      ["wood", 3],
+      ["stone", 3]
+    ],
+    "output": "stone_axe",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_stone_pickaxe",
+    "station": "hands",
+    "category": "tools",
+    "inputs": [
+      ["wood", 3],
+      ["stone", 4]
+    ],
+    "output": "stone_pickaxe",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_rope",
+    "station": "hands",
+    "category": "materials",
+    "inputs": [["fiber", 3]],
+    "output": "rope",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_wooden_club",
+    "station": "hands",
+    "category": "weapons",
+    "inputs": [
+      ["wood", 4],
+      ["rope", 1]
+    ],
+    "output": "wooden_club",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_wood_plank",
+    "station": "wood_bench",
+    "category": "materials",
+    "inputs": [["wood", 2]],
+    "output": "wood_plank",
+    "qty": 2,
+    "timeSec": 5,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_empty_bottle",
+    "station": "wood_bench",
+    "category": "tools",
+    "inputs": [
+      ["wood", 1],
+      ["fiber", 1]
+    ],
+    "output": "empty_bottle",
+    "qty": 1,
+    "timeSec": 8,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_cooked_meat",
+    "station": "campfire",
+    "category": "food",
+    "inputs": [["raw_meat", 1]],
+    "output": "cooked_meat",
+    "qty": 1,
+    "timeSec": 10,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_water_clean",
+    "station": "campfire",
+    "category": "food",
+    "inputs": [["water_dirty", 1]],
+    "output": "water_clean",
+    "qty": 1,
+    "timeSec": 8,
+    "unlockLevel": 1
+  }
+]

@@ -403,6 +403,56 @@ const SPRITES: Sprite[] = [
       img.set(7, 9, c('amber'));
     },
   },
+
+  {
+    file: 'campfire',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 13.5, 7, 2);
+      // Pedras em anel, lenha cruzada e chama.
+      for (const [x, y] of [
+        [2, 11],
+        [5, 13],
+        [9, 13],
+        [12, 11],
+        [3, 9],
+        [12, 9],
+      ] as const) {
+        img.ellipse(x + 1, y, 1.8, 1.4, c('stone'));
+      }
+      img.fill(4, 10, 8, 2, c('bark'));
+      img.fill(6, 9, 4, 1, c('bark_dark'));
+      img.ellipse(8, 7, 3, 4, c('orange'));
+      img.ellipse(8, 8, 2, 2.5, c('amber'));
+      img.ellipse(8, 9, 1, 1.5, c('gold'));
+      img.set(8, 2, c('orange'));
+      img.set(6, 4, c('amber'));
+    },
+  },
+  {
+    file: 'wood_bench',
+    width: 32,
+    height: 20,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 16, 18, 14, 1.5);
+      img.fill(3, 4, 26, 5, c('wood_light')); // tampo
+      img.fill(3, 4, 26, 1, c('wheat'));
+      img.fill(3, 8, 26, 1, c('wood'));
+      for (const x of [4, 26]) {
+        img.fill(x, 9, 2, 9, c('bark'));
+        img.fill(x + 1, 9, 1, 9, c('bark_dark'));
+      }
+      img.fill(6, 13, 20, 1, c('bark')); // travessa
+      // Ferramentas e uma serra em cima.
+      img.fill(8, 2, 6, 2, c('stone_light'));
+      img.fill(12, 1, 1, 1, c('stone'));
+      img.fill(19, 3, 5, 1, c('bark_dark'));
+      img.fill(23, 2, 2, 2, c('red'));
+    },
+  },
 ];
 
 /** Ícones de itens (16×16, sem sombra). */

@@ -27,6 +27,10 @@ export interface GameEvents {
   'action:blocked': { reason: 'needs_tool' | 'inventory_full'; tool?: string };
   /** Abrir o baú `chestId` (a UI mostra-o ao lado da mochila). */
   'container:open': { chestId: string };
+  /** Abrir o painel de crafting de uma estação (`<tipo>_<id do objeto>`). */
+  'station:open': { stationKey: string };
+  /** Um craft terminou (mãos: já está no inventário; estação: à espera de ser recolhido). */
+  'craft:finished': { stationKey: string; item: string };
 }
 
 /** Emissor de eventos tipado e sem dependências do Phaser (testável com Vitest). */

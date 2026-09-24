@@ -18,8 +18,9 @@ describe('GameState', () => {
     expect(state.world).toEqual({ tick: 0, rng: 1 });
     expect(state.player.inventory).toHaveLength(20);
     expect(state.player.hotbar).toEqual([['berries', 5], ['water_clean', 2], null, null]);
-    expect(state.base).toEqual({ chests: {} });
+    expect(state.base.chests.base_1?.[0]).toEqual(['raw_meat', 3]);
     expect(state.zones).toEqual({});
+    expect(state.stations).toEqual({});
   });
 
   it('o estado é serializável em JSON sem perdas', () => {

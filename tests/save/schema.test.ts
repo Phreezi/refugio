@@ -91,6 +91,15 @@ describe('save: migrações', () => {
     expect(parsed.state.world).toEqual({ tick: 999, rng: 1 });
     expect(parsed.state.base).toEqual({ chests: {} });
     expect(parsed.state.zones).toEqual({});
+    expect(parsed.state.stations).toEqual({});
+  });
+
+  it('v2 → v3 (Fase 4): acrescenta as estações', () => {
+    const v2 = structuredClone(STATE) as unknown as Record<string, unknown>;
+    delete v2.stations;
+    const stateJson = JSON.stringify(v2);
+    const text = `{"version":2,"timestamp":7,"checksum":"${checksum(`2|7|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.stations).toEqual({});
   });
 
   it('valida os slots do inventário', () => {

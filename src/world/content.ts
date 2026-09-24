@@ -1,4 +1,4 @@
-import type { ItemDefs, PropDefs, ResourceDefs } from '../data/types';
+import type { ItemDefs, PropDefs, Recipes, ResourceDefs, StationDefs } from '../data/types';
 import type { ZoneMap } from './zoneMap';
 
 /**
@@ -7,6 +7,8 @@ import type { ZoneMap } from './zoneMap';
  */
 class Content {
   private itemDefs: ItemDefs | null = null;
+  private stationDefs: StationDefs | null = null;
+  private recipeList: Recipes | null = null;
   private resourceDefs: ResourceDefs | null = null;
   private propDefs: PropDefs | null = null;
   private readonly zoneMaps = new Map<string, ZoneMap>();
@@ -18,6 +20,21 @@ class Content {
   get items(): ItemDefs {
     if (this.itemDefs === null) throw new Error('Content: itens ainda não carregados.');
     return this.itemDefs;
+  }
+
+  setCrafting(stations: StationDefs, recipes: Recipes): void {
+    this.stationDefs = stations;
+    this.recipeList = recipes;
+  }
+
+  get stations(): StationDefs {
+    if (this.stationDefs === null) throw new Error('Content: estações ainda não carregadas.');
+    return this.stationDefs;
+  }
+
+  get recipes(): Recipes {
+    if (this.recipeList === null) throw new Error('Content: receitas ainda não carregadas.');
+    return this.recipeList;
   }
 
   setResources(defs: ResourceDefs): void {

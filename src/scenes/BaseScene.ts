@@ -85,6 +85,10 @@ export class BaseScene extends Phaser.Scene {
     }
     const chestSprite = content.props.chest?.sprite;
     if (chestSprite) for (const p of zone.chests) place(p, chestSprite);
+    for (const p of zone.stations) {
+      const def = content.stations[p.id];
+      if (def) place(p, def.sprite);
+    }
 
     this.createPlayerAnimations();
     const { x, y, facing } = gameState.data.player;
@@ -110,10 +114,11 @@ export class BaseScene extends Phaser.Scene {
     simulation.setZone({
       zoneId: BASE_ZONE_ID,
       map: zone,
-      collision: CollisionWorld.fromZone(zone, content.resources, content.props),
+      collision: CollisionWorld.fromZone(zone, content.resources, content.props, content.stations),
       items: content.items,
       resources: content.resources,
       props: content.props,
+      stations: content.stations,
     });
     simulation.setRespawnPoint(zone.playerSpawn);
     simulation.reset();

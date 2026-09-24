@@ -8,9 +8,12 @@ import {
   DataError,
   parseItems,
   parseProps,
+  parseRecipes,
   parseResources,
+  parseStations,
   type ItemDefs,
   type PropDefs,
+  type StationDefs,
   type ResourceDefs,
 } from '../src/data/types.ts';
 import { BASE_TILES, BASE_TILESET_NAME } from '../src/world/tileset.ts';
@@ -169,6 +172,30 @@ function loadProps(): PropDefs | string[] {
   }
 }
 
+function loadStations(): StationDefs | string[] {
+  try {
+    return parseStations(readJson('src/data/stations.json'), manifestKeys());
+  } catch (error) {
+    if (error instanceof DataError) return error.problems.map((p) => `stations.json: ${p}`);
+    throw error;
+  }
+}
+
+/** Estações e receitas (ingredientes, resultados e estações existem; tempos válidos). */
+function checkCrafting(): string[] {
+  const items = loadItems();
+  const stations = loadStations();
+  if (Array.isArray(items)) return ['items.json inválido (ver acima)'];
+  if (Array.isArray(stations)) return stations;
+  try {
+    parseRecipes(readJson('src/data/recipes.json'), Object.keys(items), Object.keys(stations));
+    return [];
+  } catch (error) {
+    if (error instanceof DataError) return error.problems.map((p) => `recipes.json: ${p}`);
+    throw error;
+  }
+}
+
 function checkProps(): string[] {
   const props = loadProps();
   return Array.isArray(props) ? props : [];
@@ -179,6 +206,8 @@ function checkMaps(): string[] {
   if (Array.isArray(resources)) return ['resources.json inválido (ver acima)'];
   const props = loadProps();
   if (Array.isArray(props)) return ['props.json inválido (ver acima)'];
+  const stations = loadStations();
+  if (Array.isArray(stations)) return ['stations.json inválido (ver acima)'];
   const problems: string[] = [];
   for (const file of MAP_FILES) {
     if (!existsExactCase(file, 'public/assets/')) {
@@ -193,6 +222,7 @@ function checkMaps(): string[] {
           tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
           resourceIds: Object.keys(resources),
           propIds: Object.keys(props),
+          stationIds: Object.keys(stations),
         },
         file,
       );
@@ -246,6 +276,7 @@ const checks: [string, () => string[]][] = [
   ['itens', checkItems],
   ['recursos', checkResources],
   ['obstáculos', checkProps],
+  ['crafting', checkCrafting],
   ['mapas', checkMaps],
   ['i18n', checkI18n],
 ];

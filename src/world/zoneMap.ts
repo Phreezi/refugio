@@ -48,6 +48,8 @@ export interface ZoneMap {
   props: readonly ResourcePlacement[];
   /** Baús (`chest:<id>`): o id é a chave do conteúdo em `base.chests` no save. */
   chests: readonly ResourcePlacement[];
+  /** Estações de crafting (`station:<tipo>`): o id é o tipo (ex.: `campfire`). */
+  stations: readonly ResourcePlacement[];
   containers: readonly TaggedPoint[];
   enemySpawns: readonly TaggedPoint[];
 }
@@ -60,6 +62,8 @@ export interface ZoneMapRules {
   resourceIds: Iterable<string>;
   /** Ids válidos em `prop:<id>`. */
   propIds: Iterable<string>;
+  /** Tipos válidos em `station:<tipo>`. */
+  stationIds: Iterable<string>;
 }
 
 export class ZoneMapError extends Error {
@@ -208,6 +212,8 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
   const propIds = new Set(rules.propIds);
   const props: ResourcePlacement[] = [];
   const chests: ResourcePlacement[] = [];
+  const stations: ResourcePlacement[] = [];
+  const stationIds = new Set(rules.stationIds);
   const objectIds = new Set<number>();
   const spawns: Point[] = [];
   const exits: Point[] = [];
@@ -247,6 +253,9 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
       } else if (kind === 'prop' && id !== null) {
         if (propIds.has(id)) props.push({ id, objectId, ...point });
         else problems.push(`${label}: obstáculo desconhecido "${id}"`);
+      } else if (kind === 'station' && id !== null) {
+        if (stationIds.has(id)) stations.push({ id, objectId, ...point });
+        else problems.push(`${label}: estação desconhecida "${id}"`);
       } else if (kind === 'chest' && id) {
         if (chests.some((c) => c.id === id)) problems.push(`${label}: baú "${id}" repetido`);
         else chests.push({ id, objectId, ...point });
@@ -254,7 +263,7 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
       else if (kind === 'enemy_spawn' && id) enemySpawns.push({ id, ...point });
       else {
         problems.push(
-          `${label}: nome inválido (player_spawn, exit, resource:<id>, prop:<id>, chest:<id>, container:<id>, enemy_spawn:<id>)`,
+          `${label}: nome inválido (player_spawn, exit, resource:<id>, prop:<id>, chest:<id>, station:<tipo>, container:<id>, enemy_spawn:<id>)`,
         );
       }
     }
@@ -281,6 +290,7 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
     resources,
     props,
     chests,
+    stations,
     containers,
     enemySpawns,
   };
