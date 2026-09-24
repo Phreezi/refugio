@@ -140,5 +140,28 @@
     "qty": 1,
     "timeSec": 0,
     "unlockLevel": 1
+  },
+  {
+    "id": "r_fishing_rod",
+    "station": "hands",
+    "category": "tools",
+    "inputs": [
+      ["wood", 2],
+      ["rope", 2]
+    ],
+    "output": "fishing_rod",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_cooked_fish",
+    "station": "campfire",
+    "category": "food",
+    "inputs": [["fish", 1]],
+    "output": "cooked_fish",
+    "qty": 1,
+    "timeSec": 8,
+    "unlockLevel": 1
   }
 ]

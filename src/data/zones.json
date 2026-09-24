@@ -1,13 +1,44 @@
 {
-  "$comment": "Zonas (CLAUDE.md §8.2). danger: 0 = segura (base), 1–4 = T1–T4. Até haver mapa-mundo (Fase 7), as saídas exit:<zona> dos mapas levam diretamente à zona.",
+  "$comment": "Zonas (CLAUDE.md §8.2, §9.4). danger: 0 = segura (base), 1–4 = T1–T4. worldMapPos: posição no mapa-mundo (0–100). travelCost: fome/sede para lá chegar. respawnDays: dias de jogo até os contentores voltarem a ter loot. unlockLevel: verificado a partir da Fase 8 (níveis).",
   "zone_base": {
     "name": "zone.base",
     "map": "maps/base.json",
-    "danger": 0
+    "danger": 0,
+    "worldMapPos": [50, 50]
   },
   "zone_pine_forest": {
     "name": "zone.pine_forest",
     "map": "maps/pine_forest.json",
-    "danger": 1
+    "danger": 1,
+    "worldMapPos": [30, 30],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 1
+  },
+  "zone_farm": {
+    "name": "zone.farm",
+    "map": "maps/farm.json",
+    "danger": 1,
+    "worldMapPos": [75, 35],
+    "travelCost": {
+      "hunger": 3,
+      "thirst": 3
+    },
+    "respawnDays": 1,
+    "unlockLevel": 2
+  },
+  "zone_lake": {
+    "name": "zone.lake",
+    "map": "maps/lake.json",
+    "danger": 1,
+    "worldMapPos": [35, 75],
+    "travelCost": {
+      "hunger": 4,
+      "thirst": 2
+    },
+    "respawnDays": 1,
+    "unlockLevel": 3
   }
 }

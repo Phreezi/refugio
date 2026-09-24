@@ -9,10 +9,10 @@ import {
   type Container,
 } from '../systems/inventory/inventory';
 import type { EventBus, GameEvents } from './EventBus';
-import { chestContents, type GameState } from './GameState';
+import { chestContents, zoneState, type GameState } from './GameState';
 
 /** Onde está um slot: mochila, hotbar ou um baú (`chest:<id>`). */
-export type ContainerRef = 'inventory' | 'hotbar' | 'equipment' | `chest:${string}`;
+export type ContainerRef = 'inventory' | 'hotbar' | 'equipment' | `chest:${string}` | `loot:${string}`;
 
 export interface SlotRef {
   container: ContainerRef;
@@ -39,6 +39,11 @@ export class PlayerActions {
     if (ref === 'inventory') return data.player.inventory;
     if (ref === 'hotbar') return data.player.hotbar;
     if (ref === 'equipment') return data.player.equipment;
+    if (ref.startsWith('loot:')) {
+      // loot:<zona>:<id do objeto>
+      const [, zoneId = '', objectId = ''] = ref.split(':');
+      return zoneState(data, zoneId).loot[objectId]?.[1] ?? [];
+    }
     return chestContents(data, ref.slice('chest:'.length));
   }
 
@@ -138,14 +143,36 @@ export class PlayerActions {
   }
 
   /** "Guardar tudo semelhante" da mochila para o baú. @returns quantidade movida. */
-  storeSimilar(chestId: string): number {
-    const moved = storeSimilar(
-      this.state.data.player.inventory,
-      this.container(`chest:${chestId}`),
-      this.items(),
-    );
+  storeSimilar(ref: ContainerRef): number {
+    const moved = storeSimilar(this.state.data.player.inventory, this.container(ref), this.items());
     if (moved > 0) this.changed();
     return moved;
+  }
+
+  /**
+   * "Apanhar tudo" de um contentor para a mochila/hotbar (o que tem desgaste vai inteiro para um
+   * slot vazio). @returns true se o contentor ficou vazio.
+   */
+  takeAll(ref: ContainerRef): boolean {
+    const source = this.container(ref);
+    const targets = this.pickupContainers();
+    let moved = false;
+    for (const [i, slot] of source.entries()) {
+      if (!slot) continue;
+      if (slot[2] !== undefined) {
+        const target = targets.find((c) => c.includes(null));
+        if (!target) continue;
+        target[target.indexOf(null)] = slot;
+        source[i] = null;
+        moved = true;
+        continue;
+      }
+      const left = addItem(targets, slot[0], slot[1], this.items());
+      if (left < slot[1]) moved = true;
+      source[i] = left > 0 ? [slot[0], left] : null;
+    }
+    if (moved) this.changed();
+    return source.every((slot) => slot === null);
   }
 
   /** Beber água diretamente de uma fonte (poço da base). */

@@ -1181,6 +1181,132 @@ const WEAPON_ICONS: Sprite[] = [
   },
 ];
 
+/** Objetos das zonas da Fase 7 (argila, cais de pesca, armário). */
+const ZONE_OBJECTS: Sprite[] = [
+  {
+    file: 'clay_pit',
+    width: 16,
+    height: 12,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 10.5, 7, 1.5);
+      img.ellipse(8, 7, 7, 4, c('bark'));
+      img.ellipse(7.5, 6, 5.5, 2.8, c('orange'));
+      img.ellipse(6, 5, 2.5, 1.2, c('peach'));
+      img.set(11, 7, c('bark_dark'));
+      img.set(4, 8, c('bark_dark'));
+    },
+  },
+  {
+    file: 'dock',
+    width: 32,
+    height: 24,
+    paint: (img) => {
+      // Pontão de tábuas a entrar na água (vista de cima), com estacas.
+      img.fill(8, 0, 16, 22, c('wood'));
+      for (let y = 0; y < 22; y += 4) {
+        img.fill(8, y, 16, 1, c('wood_light'));
+        img.fill(8, y + 3, 16, 1, c('bark'));
+      }
+      img.fill(8, 0, 1, 22, c('bark_dark'));
+      img.fill(23, 0, 1, 22, c('bark_dark'));
+      for (const [x, y] of [
+        [6, 2],
+        [24, 2],
+        [6, 18],
+        [24, 18],
+      ] as const) {
+        img.fill(x, y, 2, 5, c('bark_dark'));
+      }
+      img.fill(8, 22, 16, 2, c('shadow'));
+    },
+  },
+  {
+    file: 'cabinet',
+    width: 16,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 22.5, 7, 1.5);
+      img.fill(2, 2, 12, 20, c('wood'));
+      img.fill(2, 2, 12, 2, c('wood_light'));
+      img.fill(3, 5, 10, 7, c('bark'));
+      img.fill(3, 13, 10, 8, c('bark'));
+      img.fill(4, 6, 8, 5, c('wood'));
+      img.fill(4, 14, 8, 6, c('wood'));
+      img.set(11, 8, c('gold'));
+      img.set(11, 16, c('gold'));
+      img.fill(13, 2, 1, 20, c('bark_dark'));
+    },
+  },
+];
+
+const FOOD_ICONS: Sprite[] = [
+  {
+    file: 'fish',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(7, 8, 5, 3, c('sky'));
+      img.ellipse(6.5, 7, 3.5, 1.5, c('ice'));
+      img.fill(12, 5, 2, 7, c('sky'));
+      img.set(14, 5, c('sky'));
+      img.set(14, 11, c('sky'));
+      img.set(4, 7, c('ink'));
+    },
+  },
+  {
+    file: 'cooked_fish',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(7, 8, 5, 3, c('wood'));
+      img.ellipse(6.5, 7, 3.5, 1.5, c('amber'));
+      img.fill(12, 5, 2, 7, c('bark'));
+      img.set(14, 5, c('bark'));
+      img.set(14, 11, c('bark'));
+      for (const x of [6, 8, 10]) img.set(x, 9, c('bark_dark'));
+    },
+  },
+  {
+    file: 'fishing_rod',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 12; i++) img.set(2 + i, 14 - i, c(i < 4 ? 'bark' : 'wood'));
+      for (let y = 3; y < 12; y++) img.set(14, y, c('stone_light')); // linha
+      img.set(14, 12, c('red'));
+      img.fill(3, 11, 2, 2, c('stone')); // carreto
+    },
+  },
+  {
+    file: 'clay',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 9, 5.5, 4, c('orange'));
+      img.ellipse(7, 8, 3, 2, c('peach'));
+      img.set(10, 11, c('bark'));
+    },
+  },
+  {
+    file: 'bandage',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 8, 5, 5, c('cream'));
+      img.ellipse(8, 8, 2, 2, c('parchment'));
+      img.fill(7, 3, 2, 3, c('red'));
+      img.fill(6, 4, 4, 1, c('red'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -1189,8 +1315,10 @@ for (const [dir, list] of [
   [outDir, SPRITES],
   [outDir, STRUCTURES],
   [outDir, CREATURES],
+  [outDir, ZONE_OBJECTS],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
+  [iconDir, FOOD_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -1201,7 +1329,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

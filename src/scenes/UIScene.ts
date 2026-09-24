@@ -16,6 +16,7 @@ import { BuildUI } from '../ui/BuildUI';
 import { buildMode, pickTile, type Tile } from '../ui/buildMode';
 import { gameSpeed, nextGameSpeed } from '../ui/gameSpeed';
 import { CraftingUI } from '../ui/CraftingUI';
+import { FishingUI } from '../ui/FishingUI';
 import { InventoryUI } from '../ui/InventoryUI';
 import { Label } from '../ui/text';
 import { uiState } from '../ui/uiState';
@@ -76,6 +77,7 @@ export class UIScene extends Phaser.Scene {
   private inventory: InventoryUI | null = null;
   private crafting: CraftingUI | null = null;
   private build: BuildUI | null = null;
+  private fishing: FishingUI | null = null;
   /** Botão de ação (toque): escondido no modo construção. */
   private actionButton: { setVisible(visible: boolean): unknown }[] = [];
   /** Botão "Construir": escondido no modo construção (a paleta ocupa o sítio; há o Sair). */
@@ -114,6 +116,7 @@ export class UIScene extends Phaser.Scene {
     this.inventory = new InventoryUI(this, simulation.actions);
     this.crafting = new CraftingUI(this, simulation);
     this.build = new BuildUI(this, simulation, this.inventory.hotbarRect().y);
+    this.fishing = new FishingUI(this, simulation);
     this.build.onToggle = (open) => {
       for (const obj of this.actionButton) obj.setVisible(!open);
       this.buildButton?.setVisible(!open);
@@ -144,6 +147,8 @@ export class UIScene extends Phaser.Scene {
       this.crafting = null;
       this.build?.destroy();
       this.build = null;
+      this.fishing?.destroy();
+      this.fishing = null;
       this.actionButton = [];
       this.buildButton = null;
       this.joystickBase = null;
@@ -158,6 +163,7 @@ export class UIScene extends Phaser.Scene {
     if (!gameState.hasGame) return;
     this.crafting?.update();
     this.build?.update();
+    this.fishing?.update();
     const { player, world } = gameState.data;
     const low = (BALANCE.statMax * BALANCE.lowStatPct) / 100;
     const blinkOff = Math.floor(time / BLINK_MS) % 2 === 1;
@@ -192,6 +198,7 @@ export class UIScene extends Phaser.Scene {
       eventBus.on('action:blocked', ({ reason, tool }) => {
         if (reason === 'inventory_full') this.showNotice(t('msg.inventory_full'));
         else if (reason === 'door_blocked') this.showNotice(t('build.problem.door_blocked'));
+        else if (reason === 'needs_rod') this.showNotice(t('fish.needs'));
         else this.showNotice(t(tool === 'pickaxe' ? 'msg.needs_pickaxe' : 'msg.needs_axe'));
       }),
       eventBus.on('item:broken', ({ item }) => {

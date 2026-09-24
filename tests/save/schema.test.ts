@@ -142,7 +142,15 @@ describe('save: migrações', () => {
     const text = `{"version":4,"timestamp":9,"checksum":"${checksum(`4|9|${stateJson}`)}","state":${stateJson}}`;
     const { state } = parseSave(text);
     expect(state.player.equipment).toEqual([null, null, null, null, null, null]);
-    expect(state.zones).toEqual({ zone_base: { depleted: { '7': 90 }, bags: [] } });
+    expect(state.zones).toEqual({ zone_base: { depleted: { '7': 90 }, bags: [], loot: {} } });
+  });
+
+  it('v5 → v6 (Fase 7): contentores com loot por zona', () => {
+    const v5 = structuredClone(STATE) as unknown as { zones: Record<string, unknown> };
+    v5.zones = { zone_pine_forest: { depleted: {}, bags: [] } };
+    const stateJson = JSON.stringify(v5);
+    const text = `{"version":5,"timestamp":3,"checksum":"${checksum(`5|3|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.zones).toEqual({ zone_pine_forest: { depleted: {}, bags: [], loot: {} } });
   });
 
   it('valida as peças construídas', () => {

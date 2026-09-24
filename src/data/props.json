@@ -59,5 +59,9 @@
       "width": 12,
       "height": 6
     }
+  },
+  "dock": {
+    "sprite": "dock",
+    "action": "fish"
   }
 }

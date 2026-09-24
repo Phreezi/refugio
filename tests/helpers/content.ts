@@ -4,6 +4,7 @@ import { PALETTE_NAMES } from '../../src/assets/palette';
 import enemies from '../../src/data/enemies.json';
 import enemyGroups from '../../src/data/enemyGroups.json';
 import items from '../../src/data/items.json';
+import lootTables from '../../src/data/lootTables.json';
 import props from '../../src/data/props.json';
 import recipes from '../../src/data/recipes.json';
 import resources from '../../src/data/resources.json';
@@ -13,6 +14,7 @@ import {
   parseEnemies,
   parseEnemyGroups,
   parseItems,
+  parseLootTables,
   parseProps,
   parseRecipes,
   parseResources,
@@ -36,6 +38,7 @@ export function loadContent() {
     recipes: parseRecipes(recipes, Object.keys(itemDefs), Object.keys(stationDefs)),
     structures: parseStructures(structures, keys, Object.keys(itemDefs), Object.keys(stationDefs)),
     enemies: enemyDefs,
+    lootTables: parseLootTables(lootTables, keys, Object.keys(itemDefs)),
     enemyGroups: parseEnemyGroups(enemyGroups, Object.keys(enemyDefs)),
   };
 }

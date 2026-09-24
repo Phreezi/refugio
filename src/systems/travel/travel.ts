@@ -11,12 +11,25 @@ interface TravelMap {
   exits: readonly { x: number; y: number; to: string | null }[];
 }
 
+export interface TravelCost {
+  hunger: number;
+  thirst: number;
+}
+
+/** Pode pagar a viagem? Fica sempre com pelo menos 1 de fome e de sede (viajar nunca mata). */
+export function canTravel(player: { hunger: number; thirst: number }, cost: TravelCost): boolean {
+  return player.hunger > cost.hunger && player.thirst > cost.thirst;
+}
+
 /**
- * Onde o jogador aparece ao chegar a uma zona vindo de `from`: junto à saída que leva de volta
+ * Onde o jogador aparece ao chegar a uma zona vindo de `from` (null = do mapa-mundo): junto à saída que leva de volta
  * (um pouco para dentro do mapa, para não sair logo), ou no `player_spawn` se não houver.
  */
-export function arrivalPoint(map: TravelMap, from: string): Vec2 {
-  const exit = map.exits.find((e) => e.to === from);
+export function arrivalPoint(map: TravelMap, from: string | null, via?: Vec2): Vec2 {
+  // Pela saída indicada (voltar do mapa-mundo pelo mesmo sítio), senão pela que leva a `from`.
+  const exit =
+    (via ? map.exits.find((e) => e.x === via.x && e.y === via.y) : undefined) ??
+    map.exits.find((e) => e.to === from);
   if (!exit) return { ...map.playerSpawn };
   const cx = (map.width * map.tileSize) / 2;
   const cy = (map.height * map.tileSize) / 2;

@@ -209,6 +209,7 @@ describe('Combate', () => {
     state.data.zones[ZONE] = {
       depleted: {},
       bags: [{ x: 1, y: 1, items: [['wood', 1]], expiresAt: Date.now() - 1, death: true }],
+      loot: {},
     };
     const zone = map([]);
     sim.setZone({

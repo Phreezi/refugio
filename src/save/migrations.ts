@@ -49,6 +49,14 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     }
     return { ...s, player: { ...player, equipment: emptySlots(6) }, zones };
   },
+  // v5 → v6 (Fase 7): contentores com loot já abertos, por zona.
+  5: (s) => {
+    const zones: Record<string, unknown> = {};
+    for (const [id, zone] of Object.entries(s.zones as Record<string, Record<string, unknown>>)) {
+      zones[id] = { ...zone, loot: {} };
+    }
+    return { ...s, zones };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

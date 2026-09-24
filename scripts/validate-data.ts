@@ -9,6 +9,7 @@ import {
   parseEnemies,
   parseEnemyGroups,
   parseItems,
+  parseLootTables,
   parseProps,
   parseRecipes,
   parseResources,
@@ -272,6 +273,30 @@ function loadZones(): ZoneDefs | string[] {
   }
 }
 
+function loadLootIds(): string[] | null {
+  const items = loadItems();
+  if (Array.isArray(items)) return null;
+  try {
+    return Object.keys(
+      parseLootTables(readJson('src/data/lootTables.json'), manifestKeys(), Object.keys(items)),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function checkLoot(): string[] {
+  const items = loadItems();
+  if (Array.isArray(items)) return ['items.json inválido (ver acima)'];
+  try {
+    parseLootTables(readJson('src/data/lootTables.json'), manifestKeys(), Object.keys(items));
+    return [];
+  } catch (error) {
+    if (error instanceof DataError) return error.problems.map((p) => `lootTables.json: ${p}`);
+    throw error;
+  }
+}
+
 function checkZones(): string[] {
   const zones = loadZones();
   if (Array.isArray(zones)) return zones;
@@ -315,6 +340,7 @@ function checkMaps(): string[] {
           floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
           zoneIds: Object.keys(zones),
           enemyGroupIds: Object.keys(groups),
+          lootTableIds: loadLootIds() ?? [],
         },
         file,
       );
@@ -371,6 +397,7 @@ const checks: [string, () => string[]][] = [
   ['crafting', checkCrafting],
   ['construção', checkStructures],
   ['inimigos', checkEnemies],
+  ['loot', checkLoot],
   ['zonas', checkZones],
   ['mapas', checkMaps],
   ['i18n', checkI18n],

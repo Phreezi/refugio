@@ -154,6 +154,7 @@ refugio/
 │   │   ├── Crafting.ts       # craft nas mãos/estações, fila, recolher, reparar
 │   │   ├── Building.ts       # construção: colocar, desfazer, demolir, portas (§7.7)
 │   │   ├── Combat.ts         # inimigos da zona, golpes, dano/armadura, mochilas no chão (§7.8–§7.12)
+│   │   ├── Fishing.ts        # pesca (mini-jogo de 1 botão) e encher garrafas no lago
 │   │   ├── offline.ts        # tempo offline (§7.6)
 │   │   ├── Clock.ts          # tempo de jogo, dia/noite
 │   │   └── Rng.ts            # RNG com seed
@@ -166,12 +167,12 @@ refugio/
 │   │   ├── crafting/
 │   │   ├── building/         # grelha de peças, regras de colocação, colisão, reembolso
 │   │   ├── combat/           # arma/punhos, armadura, desgaste, drops de inimigos
-│   │   ├── loot/
+│   │   ├── loot/             # sorteio do loot (pesos, quantidades, "pity")
 │   │   ├── ai/               # IA dos inimigos (idle/wander/chase/windup/recover/return; flee)
 │   │   ├── progression/
-│   │   └── travel/           # ponto de chegada a uma zona
+│   │   └── travel/           # ponto de chegada a uma zona, custo da viagem
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
-│   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, BuildUI (+ buildMode), gameSpeed, uiState, fileTransfer, fatalError
+│   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, BuildUI (+ buildMode), FishingUI, gameSpeed, uiState, fileTransfer, fatalError
 │   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
 │   ├── save/
 │   │   ├── index.ts          # instâncias (saves, autosave) + gravar ao esconder a página
@@ -197,7 +198,7 @@ refugio/
 │   │   ├── enemies.json      # inimigos/animais (vida, dano, velocidade, deteção, leash, drops)
 │   │   ├── enemyGroups.json  # grupos dos pontos enemy_spawn:<grupo>
 │   │   ├── zones.json        # zonas (nome, mapa, perigo)
-│   │   ├── lootTables.json
+│   │   ├── lootTables.json   # contentores com loot (sprite, footprint, tiragens, entradas, pity)
 │   │   └── balance.json
 │   └── i18n/
 │       ├── pt-PT.json
@@ -259,6 +260,8 @@ npm run tiles      # regenera public/assets/tiles/base_tiles.png (ordem = src/wo
 npm run sprites    # regenera public/assets/sprites/*.png (pixel art de recursos e obstáculos; `-- --preview f.png`)
 npm run map:base   # gera maps/base.json (recusa substituir sem `-- --force`: o mapa edita-se no Tiled)
 npm run map:pine   # gera maps/pine_forest.json (idem)
+npm run map:farm   # gera maps/farm.json (idem; usa scripts/mapgen.ts)
+npm run map:lake   # gera maps/lake.json (idem)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -359,7 +362,8 @@ A **ação contextual** escolhe automaticamente o alvo mais próximo em frente (
 | Arbusto de bagas | mão | 1 | 2–4 bagas |
 | Erva alta | mão | 1 | 1–2 fibra |
 | Filão de ferro | picareta | — / 5 | 2–3 minério de ferro |
-| Água (lago) | garrafa vazia | 1 | água suja |
+| Água (lago) | garrafa vazia (num cais, sem cana) | 1 | água suja |
+| Argila (lago) | mão ou picareta | 4 / 2 | 2–3 argila |
 
 Os nós de recurso reaparecem (ver zonas).
 
@@ -419,7 +423,8 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 
 - Contentores com tabela de loot (`lootTables.json`): pesos, quantidades min/max, raridade.
 - Raridades: comum, incomum, raro, épico (cores standard).
-- Respawn de contentores e recursos por zona (tempo de jogo).
+- Respawn de contentores e recursos por zona (tempo de jogo): um contentor sorteia o loot quando se abre e só volta a encher ao fim de `respawnDays` dias de jogo da zona (save: `zones.<zona>.loot[id] = [tick em que volta a encher, conteúdo]`; o tempo offline também conta). Contentores vazios aparecem escurecidos.
+- Os contentores abrem-se ao lado da mochila, com "Apanhar tudo".
 - "Pity" simples: um contentor raro garante pelo menos 1 item incomum.
 
 ### 7.11 Dia e noite
@@ -448,9 +453,9 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 
 ### 8.1 Mapa-mundo
 
-- Ecrã próprio (`WorldMapScene`) com a base ao centro e zonas à volta.
-- Viajar custa comida e água proporcional à distância (valores baixos). A zona mais próxima é gratuita.
-- Zonas bloqueadas mostram cadeado + requisito (nível do jogador ou item, ex.: "precisa de mapa da estrada").
+- Ecrã próprio (`WorldMapScene`) com a base ao centro e zonas à volta. Abre-se ao pisar uma saída `exit` (sem destino); o tempo de jogo fica parado enquanto está aberto; "Voltar" regressa pela mesma saída.
+- Viajar custa comida e água (`zones.json` → `travelCost`, valores baixos; o Pinhal é gratuito). Não se viaja se isso deixasse a fome ou a sede a 0.
+- Zonas bloqueadas mostram cadeado + requisito (nível do jogador ou item, ex.: "precisa de mapa da estrada"). *(Até haver níveis — Fase 8 — o nível pedido aparece só como informação e todas as zonas estão abertas.)*
 - Ícones de estado: zona segura/perigosa, recursos disponíveis, mochila caída, evento ativo.
 - Cada zona tem **nível de perigo** T1–T4 (cor verde, amarelo, laranja, vermelho).
 
@@ -758,14 +763,14 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** o core loop completo.
 
-- [ ] `WorldMapScene` com base, zonas, estado de cada uma e custo de viagem.
+- [x] `WorldMapScene` com base, zonas, estado de cada uma (perigo, mochila caída) e custo de viagem.
 - [x] `ZoneScene` genérica que carrega qualquer zona a partir de `zones.json` (Fase 6: a base e o Pinhal).
-- [ ] Zonas: **Pinhal** (feito na Fase 6, para haver onde combater; liga-se à base diretamente pelas saídas até haver mapa-mundo), **Quinta Abandonada**, **Margem do Lago**.
-- [ ] Contentores com tabelas de loot e raridade.
-- [ ] Respawn de recursos/contentores por zona (tempo de jogo).
+- [x] Zonas: **Pinhal**, **Quinta Abandonada**, **Margem do Lago** (mapas gerados por script; editam-se no Tiled).
+- [x] Contentores com tabelas de loot e raridade (caixote, barril, armário com "pity", caixa do pescador).
+- [x] Respawn de recursos/contentores por zona (tempo de jogo).
 - [x] Transição suave entre zonas (fade) com save automático.
-- [ ] Pesca simples no lago (mini-jogo de 1 botão).
-- [ ] Água suja → ferver na fogueira → água limpa.
+- [x] Pesca simples no lago (mini-jogo de 1 botão, nos cais; cana de pesca; peixe → fogueira → peixe assado).
+- [x] Água suja → ferver na fogueira → água limpa (garrafa vazia enche-se num cais do lago).
 
 **Aceitação:** sair da base, ir ao Pinhal, lootear, voltar, craftar algo novo com o que se trouxe — tudo em menos de 10 minutos, com save em todas as transições.
 
@@ -979,3 +984,8 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Inimigos não se gravam (nascem ao entrar na zona) | Save pequeno; recarregar a meio de um combate repõe os inimigos (sem vantagem real) |
 | 2026-09-24 | Save v5: `player.equipment` (6 slots, ordem de `EQUIP_SLOTS`) e `zones.<zona>.bags` (mochilas no chão com hora de expirar) | Morte sem perder nada (§7.12); o equipamento fica ao morrer |
 | 2026-09-24 | O ataque anunciado (windup) não é interrompido por golpes | Senão bastava bater sem parar; assim recuar no aviso é a jogada certa (como pede a aceitação) |
+| 2026-09-24 | Fase 7: saídas `exit` abrem o mapa-mundo; viajar paga fome/sede à partida; voltar à zona de onde se saiu é grátis | Como no original; o tempo não corre no mapa-mundo |
+| 2026-09-24 | Loot sorteado quando se abre o contentor (não ao entrar na zona) e guardado até voltar a encher | Save pequeno (só os contentores abertos) e o mesmo contentor não muda de conteúdo ao sair e voltar |
+| 2026-09-24 | Save v6: `zones.<zona>.loot` | Migração v5 → v6 com teste |
+| 2026-09-24 | Pesca: mini-jogo de 1 botão (marcador que vai e volta, zona verde aleatória); o botão de ação normal "puxa" | Funciona igual com teclado, rato e toque; sem cana, o cais serve para encher garrafas |
+| 2026-09-24 | Desbloqueio das zonas por nível adiado para a Fase 8 | Ainda não há níveis: bloquear a Quinta (nível 2) e o Lago (nível 3) deixava-os inacessíveis |

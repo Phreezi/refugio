@@ -1,6 +1,6 @@
 import { LOOSE_OBJECT_AREA } from '../config';
 import { BALANCE } from '../data/balance';
-import type { ItemDefs, PropDefs, ResourceDefs, StationDefs, StructureDefs } from '../data/types';
+import type { ItemDefs, LootTables, PropDefs, ResourceDefs, StationDefs, StructureDefs } from '../data/types';
 import { structureArea, structureFeet } from '../systems/building/building';
 import { bestTool, hitPower, maxDrops, rollDrops, wearTool } from '../systems/gathering/gathering';
 import { addItem, spaceFor } from '../systems/inventory/inventory';
@@ -13,6 +13,8 @@ import type { EventBus, GameEvents } from './EventBus';
 import { zoneState, type GameState } from './GameState';
 import { structureChestId, structureStationKey, type Building } from './Building';
 import type { Combat } from './Combat';
+import type { Fishing } from './Fishing';
+import { rollLoot } from '../systems/loot/loot';
 import { stationKey } from './Crafting';
 import type { PlayerActions } from './PlayerActions';
 
@@ -26,6 +28,9 @@ export interface ZoneContext {
   props: PropDefs;
   stations: StationDefs;
   structures: StructureDefs;
+  lootTables: LootTables;
+  /** Dias de jogo até os contentores voltarem a encher (zones.json; omisso = 1). */
+  respawnDays?: number;
 }
 
 /**
@@ -39,7 +44,9 @@ export type TargetData =
   | { type: 'station'; placement: ResourcePlacement; key: string }
   | { type: 'door'; placement: ResourcePlacement; uid: number }
   | { type: 'enemy'; placement: ResourcePlacement; uid: number }
-  | { type: 'bag'; placement: ResourcePlacement; index: number };
+  | { type: 'bag'; placement: ResourcePlacement; index: number }
+  | { type: 'loot'; placement: ResourcePlacement }
+  | { type: 'fish'; placement: ResourcePlacement };
 /** Os recursos que reaparecem verificam-se uma vez por segundo de jogo. */
 const RESPAWN_CHECK_TICKS = 20;
 
@@ -54,6 +61,7 @@ export class Interaction {
   private readonly actions: PlayerActions;
   private readonly building: Building;
   private readonly combat: Combat;
+  private readonly fishing: Fishing;
   private zone: ZoneContext | null = null;
   /** Vida dos recursos já golpeados (não se grava: ao recarregar voltam a estar inteiros). */
   private readonly nodeHp = new Map<number, number>();
@@ -64,12 +72,45 @@ export class Interaction {
     actions: PlayerActions,
     building: Building,
     combat: Combat,
+    fishing: Fishing,
   ) {
     this.state = state;
     this.bus = bus;
     this.actions = actions;
     this.building = building;
     this.combat = combat;
+    this.fishing = fishing;
+  }
+
+  /** O contentor está vazio (já aberto e ainda sem voltar a encher)? */
+  isLooted(objectId: number): boolean {
+    const zone = this.zone;
+    if (!zone) return false;
+    const entry = zoneState(this.state.data, zone.zoneId).loot[String(objectId)];
+    return entry !== undefined && this.state.data.world.tick < entry[0] && entry[1].every((s) => s === null);
+  }
+
+  /**
+   * Abre um contentor (§7.10): na primeira vez (ou quando voltou a encher) sorteia o loot, que
+   * fica guardado até ao fim de `respawnDays` dias de jogo. O painel mostra-o ao lado da mochila.
+   */
+  private openLoot(placement: ResourcePlacement): void {
+    const zone = this.zone;
+    const table = zone?.lootTables[placement.id];
+    if (!zone || !table) return;
+    const loot = zoneState(this.state.data, zone.zoneId).loot;
+    const key = String(placement.objectId);
+    const world = this.state.data.world;
+    const entry = loot[key];
+    if (!entry || world.tick >= entry[0]) {
+      const days = zone.respawnDays ?? 1;
+      loot[key] = [
+        world.tick + secondsToTicks(days * BALANCE.dayLengthSec),
+        rollLoot(table, zone.items, world),
+      ];
+      this.state.markDirty();
+    }
+    this.bus.emit('container:open', { container: `loot:${zone.zoneId}:${key}` });
   }
 
   setZone(zone: ZoneContext | null): void {
@@ -124,13 +165,20 @@ export class Interaction {
     }
     for (const placement of zone.map.props) {
       const def = zone.props[placement.id];
-      if (def?.action === 'drink') {
+      if (def?.action) {
         list.push({
           kind: 'container',
           area: areaOf(placement, def.footprint),
-          data: { type: 'drink', placement },
+          data: { type: def.action, placement },
         });
       }
+    }
+    for (const placement of zone.map.containers) {
+      list.push({
+        kind: 'container',
+        area: areaOf(placement, zone.lootTables[placement.id]?.footprint),
+        data: { type: 'loot', placement },
+      });
     }
     list.push(...this.structureTargets());
     this.combat.bags().forEach((bag, index) => {
@@ -204,10 +252,15 @@ export class Interaction {
     } else if (data.type === 'bag') {
       this.bus.emit('player:action', { kind: 'open' });
       this.combat.takeBag(data.index);
+    } else if (data.type === 'loot') {
+      this.bus.emit('player:action', { kind: 'open' });
+      this.openLoot(data.placement);
+    } else if (data.type === 'fish') {
+      this.fishing.start();
     } else if (data.type === 'resource') this.gather(data.placement);
     else if (data.type === 'chest') {
       this.bus.emit('player:action', { kind: 'open' });
-      this.bus.emit('container:open', { chestId: data.chestId });
+      this.bus.emit('container:open', { container: `chest:${data.chestId}` });
     } else if (data.type === 'station') {
       this.bus.emit('player:action', { kind: 'open' });
       this.bus.emit('station:open', { stationKey: data.key });

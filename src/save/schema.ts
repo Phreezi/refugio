@@ -4,7 +4,7 @@ import { MIGRATIONS, migrate, type Migration } from './migrations';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -159,7 +159,11 @@ export function validateState(input: unknown): GameStateData {
         isObject(z.depleted) &&
         Object.values(z.depleted).every(stat) &&
         Array.isArray(z.bags) &&
-        z.bags.every(validBag),
+        z.bags.every(validBag) &&
+        isObject(z.loot) &&
+        Object.values(z.loot).every(
+          (entry) => Array.isArray(entry) && entry.length === 2 && stat(entry[0]) && validContainer(entry[1]),
+        ),
     )
   ) {
     problems.push('zones inválido');

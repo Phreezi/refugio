@@ -2,6 +2,7 @@ import type {
   EnemyDefs,
   EnemyGroups,
   ItemDefs,
+  LootTables,
   PropDefs,
   Recipes,
   ResourceDefs,
@@ -25,6 +26,7 @@ class Content {
   private enemyDefs: EnemyDefs | null = null;
   private groups: EnemyGroups | null = null;
   private zoneDefs: ZoneDefs | null = null;
+  private lootDefs: LootTables | null = null;
   private readonly zoneMaps = new Map<string, ZoneMap>();
 
   setItems(defs: ItemDefs): void {
@@ -91,6 +93,15 @@ class Content {
   get enemyGroups(): EnemyGroups {
     if (this.groups === null) throw new Error('Content: grupos de inimigos ainda não carregados.');
     return this.groups;
+  }
+
+  setLootTables(defs: LootTables): void {
+    this.lootDefs = defs;
+  }
+
+  get lootTables(): LootTables {
+    if (this.lootDefs === null) throw new Error('Content: tabelas de loot ainda não carregadas.');
+    return this.lootDefs;
   }
 
   setZones(defs: ZoneDefs): void {

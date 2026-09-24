@@ -34,7 +34,7 @@ function setup() {
   bus.on('resource:hit', ({ hp }) => events.push(`hit:${String(hp)}`));
   bus.on('item:gained', ({ item, qty }) => events.push(`+${String(qty)} ${item}`));
   bus.on('action:blocked', ({ reason }) => events.push(`blocked:${reason}`));
-  bus.on('container:open', ({ chestId }) => events.push(`open:${chestId}`));
+  bus.on('container:open', ({ container }) => events.push(`open:${container.replace('chest:', '')}`));
   bus.on('resource:respawned', () => events.push('respawned'));
   const sim = new Simulation(
     state,
@@ -154,7 +154,7 @@ describe('PlayerActions', () => {
     state.data.base.chests.base_1 = new Array<null>(BALANCE.chestSlots).fill(null);
     sim.actions.move({ container: 'inventory', index: 0 }, { container: 'chest:base_1', index: 3 });
     expect(state.data.base.chests.base_1[3]).toEqual(['wood', 10]);
-    expect(sim.actions.storeSimilar('base_1')).toBe(5);
+    expect(sim.actions.storeSimilar('chest:base_1')).toBe(5);
     expect(state.data.base.chests.base_1[3]).toEqual(['wood', 15]);
     expect(state.data.base.chests.base_1).toHaveLength(BALANCE.chestSlots);
   });
