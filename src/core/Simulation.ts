@@ -13,6 +13,7 @@ import { Combat, type CombatContent } from './Combat';
 import { Fishing } from './Fishing';
 import { Homestead } from './Homestead';
 import { Horde, type HordeContent } from './Horde';
+import { Stats } from './Stats';
 import { Progression, type ProgressionContent } from './Progression';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
@@ -40,6 +41,7 @@ export class Simulation {
   readonly fishing: Fishing;
   readonly homestead: Homestead;
   readonly horde: Horde;
+  readonly stats: Stats;
   readonly progression: Progression;
   /** Zona para onde o jogador está a sair (a cena faz a transição). */
   private leavingTo: string | null = null;
@@ -94,6 +96,7 @@ export class Simulation {
     this.building.isUnlocked = (id) => this.progression.isStructureUnlocked(id);
     this.combat = new Combat(state, bus, this.actions, combat);
     this.combat.building = this.building;
+    this.stats = new Stats(state, bus);
     this.horde = new Horde(state, bus, this.combat, horde);
     this.fishing = new Fishing(state, bus, this.actions, items);
     this.homestead = new Homestead(state, bus, this.actions, this.building, items);
@@ -234,6 +237,7 @@ export class Simulation {
     this.interaction.tick(world.tick);
     this.combat.tick(this.sneaking);
     this.horde.tick();
+    this.stats.tick();
     this.crafting.advance(1);
     tickSurvival(this.state.data.player, world.tick, this.survival);
     this.tickBleeding(world.tick);

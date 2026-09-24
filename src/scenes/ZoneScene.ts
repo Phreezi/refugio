@@ -6,6 +6,7 @@ import { itemName, t, tKey } from '../i18n';
 import { Label } from '../ui/text';
 import { gameSpeed } from '../ui/gameSpeed';
 import { uiState } from '../ui/uiState';
+import { preferences } from '../ui/preferences';
 import { CHARACTER_COLUMNS, CHARACTER_ROWS, characterFrame } from '../assets/characterSheet';
 import { zoneMapKey } from '../config';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
@@ -267,7 +268,8 @@ export class ZoneScene extends Phaser.Scene {
     // 16,7 ms com a janela sem foco, o que atrasaria o relógio do jogo.
     // Velocidade do jogo (x1/x2/x3): mais tempo de jogo por frame (no máx. 5 ticks por frame).
     const speed = gameSpeed();
-    simulation.update(this.game.loop.rawDelta * speed);
+    // Menu de pausa aberto: o tempo de jogo pára (o ecrã continua a ser desenhado).
+    if (!uiState.paused) simulation.update(this.game.loop.rawDelta * speed);
     if (this.player) this.player.anims.timeScale = speed;
     this.renderPlayer();
     this.renderEnemies();
@@ -521,7 +523,8 @@ export class ZoneScene extends Phaser.Scene {
         }
       }),
       eventBus.on('enemy:hit', ({ uid, damage, x, y }) => {
-        this.floatText(`-${String(damage)}`, Math.round(x), Math.round(y) - 2, 'gold');
+        if (preferences().damageNumbers)
+          this.floatText(`-${String(damage)}`, Math.round(x), Math.round(y) - 2, 'gold');
         const sprite = this.enemyViews.get(uid)?.sprite;
         sprite?.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
         this.time.delayedCall(80, () => sprite?.clearTint());
@@ -572,7 +575,8 @@ export class ZoneScene extends Phaser.Scene {
         });
       }),
       eventBus.on('player:damaged', ({ amount, x, y }) => {
-        this.floatText(`-${String(amount)}`, Math.round(x), Math.round(y) - 34, 'red');
+        if (preferences().damageNumbers)
+          this.floatText(`-${String(amount)}`, Math.round(x), Math.round(y) - 34, 'red');
         this.hurtUntil = this.time.now + 150;
         this.cameras.main.shake(100, 0.004);
       }),

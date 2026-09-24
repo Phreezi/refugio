@@ -9,4 +9,8 @@ export const uiState = {
   modalOpen: false,
   /** Mensagem a mostrar quando o HUD abrir (ex.: resumo do tempo offline). */
   pendingNotice: null as string | null,
+  /** Menu de pausa aberto: o tempo de jogo pára. */
+  paused: false,
+  /** Reabrir o menu de pausa nesta vista quando o HUD se refizer (mudou a língua/tamanho). */
+  reopenPause: null as 'main' | 'settings' | 'stats' | null,
 };

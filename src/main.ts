@@ -11,10 +11,12 @@ import { MainMenuScene } from './scenes/MainMenuScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { UIScene } from './scenes/UIScene';
 import { installSaveOnHide } from './save';
+import { preferences } from './ui/preferences';
 
 const params = new URLSearchParams(window.location.search);
 const language = params.get(LANGUAGE_QUERY_PARAM);
-if (language !== null && isLanguage(language)) setLanguage(language);
+// ?lang= manda (testes); senão, a língua escolhida nas definições.
+setLanguage(language !== null && isLanguage(language) ? language : preferences().language);
 document.documentElement.lang = getLanguage();
 
 const host = document.getElementById('game');
