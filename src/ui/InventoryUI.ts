@@ -8,7 +8,7 @@ import { getView } from '../display/view';
 import { itemName, t } from '../i18n';
 import { content } from '../world/content';
 import { Button } from './Button';
-import { SLOT_GAP, SLOT_SIZE, SlotView } from './SlotView';
+import { SLOT_GAP, SLOT_SIZE, SlotView, slotSize } from './SlotView';
 import { Label } from './text';
 import { uiState } from './uiState';
 
@@ -30,9 +30,19 @@ interface Rect {
   h: number;
 }
 
-function gridSize(slots: number, cols: number): { w: number; h: number } {
+function gridSize(slots: number, cols: number, scale: number): { w: number; h: number } {
   const rows = Math.ceil(slots / cols);
-  return { w: cols * SLOT_SIZE + (cols - 1) * SLOT_GAP, h: rows * SLOT_SIZE + (rows - 1) * SLOT_GAP };
+  const size = slotSize(scale);
+  return { w: cols * size + (cols - 1) * SLOT_GAP, h: rows * size + (rows - 1) * SLOT_GAP };
+}
+
+interface PanelLayout {
+  scale: number;
+  bag: { w: number; h: number };
+  chest: { w: number; h: number } | null;
+  sideBySide: boolean;
+  w: number;
+  h: number;
 }
 
 /**
@@ -209,27 +219,40 @@ export class InventoryUI {
     this.panelSlots = [];
   }
 
+  /**
+   * Tamanho do painel com os slots à escala `scale`: lado a lado se couber, senão (telemóvel ao
+   * alto) um por cima do outro. null se não couber no espaço acima da hotbar.
+   */
+  private layout(scale: number): PanelLayout | null {
+    const { width } = getView();
+    const bag = gridSize(BALANCE.inventorySlots, INVENTORY_COLS, scale);
+    const chest = this.chestId ? gridSize(BALANCE.chestSlots, CHEST_COLS, scale) : null;
+    const sideBySide = chest !== null && bag.w + chest.w + PAD * 3 <= width - 8;
+    const block = (g: { w: number; h: number }): { w: number; h: number } => ({ w: g.w, h: TITLE_H + g.h });
+    const blocks = [block(bag), ...(chest ? [block(chest)] : [])];
+    const contentW = sideBySide
+      ? blocks.reduce((sum, b) => sum + b.w, 0) + PAD
+      : Math.max(...blocks.map((b) => b.w));
+    const contentH = sideBySide
+      ? Math.max(...blocks.map((b) => b.h))
+      : blocks.reduce((sum, b) => sum + b.h, 0) + PAD;
+    const w = contentW + PAD * 2;
+    const h = contentH + INFO_H + PAD * 2;
+    if (w > width - 4 || h > this.hotbarRect().y - 8) return null;
+    return { scale, bag, chest, sideBySide, w, h };
+  }
+
   /** (Re)constrói o painel: fundo escurecido, grelhas, título e barra de informação. */
   private buildPanel(): void {
     this.clearPanel();
     const scene = this.scene;
     const { width, height } = getView();
-    const bag = gridSize(BALANCE.inventorySlots, INVENTORY_COLS);
-    const chest = this.chestId ? gridSize(BALANCE.chestSlots, CHEST_COLS) : null;
     const hotbarTop = this.hotbarRect().y;
-
-    // Lado a lado se couber; senão (telemóvel ao alto) um por cima do outro.
-    const sideBySide = chest !== null && bag.w + chest.w + PAD * 3 <= width - 8;
-    const block = (g: { w: number; h: number }): { w: number; h: number } => ({ w: g.w, h: TITLE_H + g.h });
-    const blocks = [block(bag), ...(chest ? [block(chest)] : [])];
-    const contentW = sideBySide
-      ? blocks.reduce((s, b) => s + b.w, 0) + PAD
-      : Math.max(...blocks.map((b) => b.w));
-    const contentH = sideBySide
-      ? Math.max(...blocks.map((b) => b.h))
-      : blocks.reduce((s, b) => s + b.h, 0) + PAD;
-    const w = contentW + PAD * 2;
-    const h = contentH + INFO_H + PAD * 2;
+    // Nos ecrãs táteis, slots ×2 (mais fáceis de tocar) se couberem.
+    const touch = scene.sys.game.device.input.touch;
+    const layout = (touch ? this.layout(2) : null) ?? this.layout(1) ?? this.layoutFallback();
+    const { scale, bag, chest, sideBySide, w, h } = layout;
+    const size = slotSize(scale);
     const x = Math.round((width - w) / 2);
     const y = Math.max(4, Math.round((hotbarTop - 4 - h) / 2));
     this.panelRect = { x, y, w, h };
@@ -257,9 +280,11 @@ export class InventoryUI {
     ): void => {
       add(new Label(scene, gx, gy, title, { size: 8, bold: true, color: 'wheat' })).setDepth(DEPTH.slots);
       for (let i = 0; i < slots; i++) {
-        const sx = gx + (i % cols) * (SLOT_SIZE + SLOT_GAP);
-        const sy = gy + TITLE_H + Math.floor(i / cols) * (SLOT_SIZE + SLOT_GAP);
-        this.panelSlots.push(new SlotView(scene, sx, sy, { container: ref, index: i }).setDepth(DEPTH.slots));
+        const sx = gx + (i % cols) * (size + SLOT_GAP);
+        const sy = gy + TITLE_H + Math.floor(i / cols) * (size + SLOT_GAP);
+        this.panelSlots.push(
+          new SlotView(scene, sx, sy, { container: ref, index: i }, null, scale).setDepth(DEPTH.slots),
+        );
       }
     };
     const gx = x + PAD;
@@ -289,6 +314,14 @@ export class InventoryUI {
 
     this.buildInfo(x + PAD, y + h - PAD - INFO_H + 4, w - PAD * 2, add);
     this.refresh();
+  }
+
+  /** Ecrã demasiado pequeno para qualquer escala: usa ×1 mesmo que fique cortado. */
+  private layoutFallback(): PanelLayout {
+    const bag = gridSize(BALANCE.inventorySlots, INVENTORY_COLS, 1);
+    const chest = this.chestId ? gridSize(BALANCE.chestSlots, CHEST_COLS, 1) : null;
+    const h = TITLE_H + bag.h + (chest ? TITLE_H + chest.h + PAD : 0) + INFO_H + PAD * 2;
+    return { scale: 1, bag, chest, sideBySide: false, w: Math.max(bag.w, chest?.w ?? 0) + PAD * 2, h };
   }
 
   /**

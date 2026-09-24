@@ -320,7 +320,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 
 | Ação | Teclado/rato | Touch |
 |---|---|---|
-| Mover | WASD / setas | Joystick virtual (lado esquerdo) |
+| Mover | WASD / setas | Joystick virtual flutuante (aparece onde o dedo tocar, fora dos botões) |
 | Andar agachado (metade da velocidade) | Shift | Joystick pouco empurrado (até 55% do raio) |
 | Zoom (até metade) | Ctrl + roda do rato, +/− | Pinça com 2 dedos |
 | Velocidade do jogo x1/x2/x3 | Botão por baixo do relógio | Idem |
@@ -944,4 +944,6 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Botão de velocidade x1/x2/x3 | Pedido do jogador: acelera todo o tempo de jogo (útil para testar e para esperas) |
 | 2026-09-24 | Andar agachado com Shift / joystick pouco empurrado (pedido do jogador) | Antecipa a furtividade da Fase 6; spritesheet da personagem passa a 10 colunas (frames agachados) |
 | 2026-09-24 | Cópia de emergência síncrona (localStorage) ao esconder/fechar a página | Testado: ao recarregar, o Chrome corta a escrita assíncrona no IndexedDB e perdiam-se os últimos segundos |
-| 2026-09-24 | Joystick virtual flutuante na metade esquerda (só toque), 8 direções, zona morta 25% | Metade direita fica livre para o botão de ação (Fase 3). O teclado tem prioridade sobre o joystick |
+| 2026-09-24 | Joystick virtual flutuante (só toque), 8 direções, zona morta 25% | Primeiro só na metade esquerda; o jogador preferiu poder tocar em qualquer lado (fora dos botões/hotbar), sem joystick parado no canto. O teclado tem prioridade |
+| 2026-09-24 | Ficheiros de `public/` pedidos com `?v=<build>` (`versioned()` em config.ts) | O browser juntou JS novo com um manifest antigo em cache (GitHub Pages: 10 min) e o arranque falhou |
+| 2026-09-24 | Slots ×2 (ícones 32 px) no painel da mochila/baú em ecrãs táteis, quando cabe | Pedido do jogador: no telemóvel ao alto os slots eram pequenos para os dedos |

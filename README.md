@@ -35,7 +35,7 @@ Design, regras e plano por fases: [CLAUDE.md](CLAUDE.md).
 ## Controlos (Fase 1)
 
 - **PC:** WASD ou setas para andar (8 direções).
-- **Telemóvel:** joystick virtual — tocar e arrastar na metade esquerda do ecrã. Funciona na
+- **Telemóvel:** joystick virtual — tocar e arrastar em qualquer ponto do ecrã. Funciona na
   horizontal e na vertical.
 - **Agachar** (anda devagar): Shift no PC; no telemóvel, empurrar o joystick só um pouco.
 - **Zoom:** Ctrl + roda do rato ou teclas +/− no PC; pinça com dois dedos no telemóvel (até metade).

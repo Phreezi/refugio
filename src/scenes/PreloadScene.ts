@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { AssetManifest } from '../assets/manifest';
 import { paletteNumber } from '../assets/palette';
 import { ensurePlaceholderTextures } from '../assets/placeholders';
-import { BASE_MAP_FILE, BASE_MAP_KEY, TILE_SIZE } from '../config';
+import { BASE_MAP_FILE, BASE_MAP_KEY, TILE_SIZE, versioned } from '../config';
 import { BASE_ZONE_ID } from '../core/GameState';
 import itemsJson from '../data/items.json';
 import propsJson from '../data/props.json';
@@ -65,14 +65,14 @@ export class PreloadScene extends Phaser.Scene {
     this.load.setPath('assets/');
     for (const [key, entry] of Object.entries(this.manifest.assets)) {
       if (entry.file === undefined) continue;
-      if (entry.type === 'image') this.load.image(key, entry.file);
+      if (entry.type === 'image') this.load.image(key, versioned(entry.file));
       else
-        this.load.spritesheet(key, entry.file, {
+        this.load.spritesheet(key, versioned(entry.file), {
           frameWidth: entry.frameWidth,
           frameHeight: entry.frameHeight,
         });
     }
-    this.load.tilemapTiledJSON(BASE_MAP_KEY, BASE_MAP_FILE);
+    this.load.tilemapTiledJSON(BASE_MAP_KEY, versioned(BASE_MAP_FILE));
   }
 
   create(): void {

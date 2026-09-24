@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { parseManifest } from '../assets/manifest';
 import { PALETTE_NAMES } from '../assets/palette';
-import { ASSET_MANIFEST_URL } from '../config';
+import { ASSET_MANIFEST_URL, versioned } from '../config';
 import { showFatalError } from '../ui/fatalError';
 import { SceneKey } from './keys';
 import type { PreloadSceneData } from './PreloadScene';
@@ -15,7 +15,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.json(MANIFEST_CACHE_KEY, ASSET_MANIFEST_URL);
+    this.load.json(MANIFEST_CACHE_KEY, versioned(ASSET_MANIFEST_URL));
   }
 
   create(): void {
