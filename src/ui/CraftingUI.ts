@@ -12,7 +12,7 @@ import { itemName, t, tKey } from '../i18n';
 import { missingInputs, outputCount } from '../systems/crafting/crafting';
 import { countItem } from '../systems/inventory/inventory';
 import { content } from '../world/content';
-import { Button } from './Button';
+import { Button, CLOSE_ICON } from './Button';
 import { Label } from './text';
 import { uiState } from './uiState';
 
@@ -196,7 +196,7 @@ export class CraftingUI {
 
     const title = type === HANDS ? t('craft.hands') : tKey(`station.${type}`);
     this.label(x + PAD, y + PAD, title, { size: 9, bold: true, color: 'wheat' });
-    this.button(x + w - 10, y + 9, '×', 12, () => {
+    this.button(x + w - 10, y + 9, CLOSE_ICON, 12, () => {
       this.close();
     });
 
@@ -332,7 +332,7 @@ export class CraftingUI {
       );
       const time = this.label(bx + BAR_W + 4, jy + 3, '', { size: 7, color: 'stone_light' });
       this.bars.push({ index: i, fill, time });
-      this.button(x + w - PAD - 8, jy + 8, '×', 14, () => {
+      this.button(x + w - PAD - 8, jy + 8, CLOSE_ICON, 14, () => {
         if (!this.sim.crafting.cancel(key, i)) this.message(t('msg.inventory_full'));
         this.build();
       });

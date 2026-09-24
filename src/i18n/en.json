@@ -55,6 +55,7 @@
   "inv.use": "Use",
   "inv.split": "Split",
   "inv.store_similar": "Store similar",
+  "inv.sort": "Sort",
   "inv.close": "Close",
   "inv.hint": "Drag to move · tap to select",
   "msg.needs_axe": "You need an axe.",
