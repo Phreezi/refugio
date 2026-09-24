@@ -12,6 +12,7 @@ import { BASE_ZONE_ID, gameState } from '../core/GameState';
 import { simulation } from '../core/Simulation';
 import { getView } from '../display/view';
 import { onWorldZoomChange, stepWorldZoom, worldZoomFor } from '../display/worldZoom';
+import { installShortcutGuard } from '../input/browserShortcuts';
 import { keyboardDirection } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
 import { autosave } from '../save';
@@ -124,6 +125,7 @@ export class BaseScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, applyZoom);
     const offZoom = onWorldZoomChange(applyZoom);
     const offZoomInput = this.listenForZoomInput();
+    const offShortcuts = installShortcutGuard();
 
     this.keys = this.createMoveKeys();
     simulation.setZone({
@@ -155,6 +157,7 @@ export class BaseScene extends Phaser.Scene {
       this.scale.off(Phaser.Scale.Events.RESIZE, applyZoom);
       offZoom();
       offZoomInput();
+      offShortcuts();
       this.scene.stop(SceneKey.UI);
       autosave.stop();
       void autosave.flush();
@@ -478,7 +481,8 @@ export class BaseScene extends Phaser.Scene {
       left: add(KeyCodes.A, KeyCodes.LEFT),
       right: add(KeyCodes.D, KeyCodes.RIGHT),
       action: add(KeyCodes.SPACE),
-      sneak: add(KeyCodes.SHIFT),
+      // Shift ou Ctrl (o Ctrl é o "agachar" habitual nos jogos de PC).
+      sneak: add(KeyCodes.SHIFT, KeyCodes.CTRL),
     };
   }
 
