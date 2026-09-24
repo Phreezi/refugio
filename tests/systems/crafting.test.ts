@@ -166,6 +166,7 @@ describe('Fase 4 — aceitação: madeira → machado → cortar mais depressa �
       height: 12,
       tileSize: 16,
       solid: new Array<boolean>(144).fill(false),
+      floor: new Array<boolean>(144).fill(false),
       playerSpawn: { x: 96, y: 96 },
       exits: [],
       resources: [

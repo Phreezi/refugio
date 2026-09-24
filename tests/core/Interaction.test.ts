@@ -17,6 +17,7 @@ function setup() {
     height: 10,
     tileSize: 16,
     solid: new Array<boolean>(100).fill(false),
+    floor: new Array<boolean>(100).fill(false),
     playerSpawn: { x: 80, y: 80 },
     exits: [],
     resources: [{ id: 'tree_small', x: 80, y: 92, objectId: 7 }],

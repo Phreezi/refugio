@@ -11,12 +11,13 @@ import {
   parseRecipes,
   parseResources,
   parseStations,
+  parseStructures,
   type ItemDefs,
   type PropDefs,
   type StationDefs,
   type ResourceDefs,
 } from '../src/data/types.ts';
-import { BASE_TILES, BASE_TILESET_NAME } from '../src/world/tileset.ts';
+import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../src/world/tileset.ts';
 import { ZoneMapError, parseZoneMap } from '../src/world/zoneMap.ts';
 
 const ROOT = new URL('../', import.meta.url);
@@ -196,6 +197,36 @@ function checkCrafting(): string[] {
   }
 }
 
+/** Peças de construção (sprites, custos, estações) com nome traduzido em todas as línguas. */
+function checkStructures(): string[] {
+  const items = loadItems();
+  const stations = loadStations();
+  if (Array.isArray(items)) return ['items.json inválido (ver acima)'];
+  if (Array.isArray(stations)) return ['stations.json inválido (ver acima)'];
+  let defs;
+  try {
+    defs = parseStructures(
+      readJson('src/data/structures.json'),
+      manifestKeys(),
+      Object.keys(items),
+      Object.keys(stations),
+    );
+  } catch (error) {
+    if (error instanceof DataError) return error.problems.map((p) => `structures.json: ${p}`);
+    throw error;
+  }
+  const problems: string[] = [];
+  for (const lang of ['pt-PT', 'en']) {
+    const dict = readJson(`src/i18n/${lang}.json`);
+    if (!isStringRecord(dict)) continue;
+    for (const id of Object.keys(defs)) {
+      if (!(`structure.${id}` in dict))
+        problems.push(`structures.json: "${id}" sem nome em i18n/${lang}.json (structure.${id})`);
+    }
+  }
+  return problems;
+}
+
 function checkProps(): string[] {
   const props = loadProps();
   return Array.isArray(props) ? props : [];
@@ -223,6 +254,7 @@ function checkMaps(): string[] {
           resourceIds: Object.keys(resources),
           propIds: Object.keys(props),
           stationIds: Object.keys(stations),
+          floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
         },
         file,
       );
@@ -277,6 +309,7 @@ const checks: [string, () => string[]][] = [
   ['recursos', checkResources],
   ['obstáculos', checkProps],
   ['crafting', checkCrafting],
+  ['construção', checkStructures],
   ['mapas', checkMaps],
   ['i18n', checkI18n],
 ];

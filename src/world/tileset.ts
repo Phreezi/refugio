@@ -31,3 +31,6 @@ export type BaseTile = (typeof BASE_TILES)[number];
 export function baseTileIndex(tile: BaseTile): number {
   return BASE_TILES.indexOf(tile);
 }
+
+/** Tiles do chão que contam como fundação (o chão da casa em ruínas, CLAUDE.md §7.7). */
+export const BASE_FLOOR_TILES: readonly BaseTile[] = ['floor_wood', 'floor_concrete'];

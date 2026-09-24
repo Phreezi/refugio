@@ -153,6 +153,7 @@ refugio/
 │   │   ├── Interaction.ts    # ação contextual, recolha, respawn de recursos (ZoneContext)
 │   │   ├── PlayerActions.ts  # usar/mover/dividir/guardar semelhantes/beber
 │   │   ├── Crafting.ts       # craft nas mãos/estações, fila, recolher, reparar
+│   │   ├── Building.ts       # construção: colocar, desfazer, demolir, portas (§7.7)
 │   │   ├── offline.ts        # tempo offline (§7.6)
 │   │   ├── Clock.ts          # tempo de jogo, dia/noite
 │   │   └── Rng.ts            # RNG com seed
@@ -163,14 +164,14 @@ refugio/
 │   │   ├── survival/         # fome, sede, vida
 │   │   ├── inventory/
 │   │   ├── crafting/
-│   │   ├── building/
+│   │   ├── building/         # grelha de peças, regras de colocação, colisão, reembolso
 │   │   ├── combat/
 │   │   ├── loot/
 │   │   ├── ai/
 │   │   ├── progression/
 │   │   └── travel/
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
-│   ├── ui/                   # Label, Button, SlotView, InventoryUI, gameSpeed, uiState, fileTransfer, fatalError
+│   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, BuildUI (+ buildMode), gameSpeed, uiState, fileTransfer, fatalError
 │   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
 │   ├── save/
 │   │   ├── index.ts          # instâncias (saves, autosave) + gravar ao esconder a página
@@ -192,7 +193,7 @@ refugio/
 │   │   ├── props.json        # obstáculos/decoração livres no mapa (sprite + footprint)
 │   │   ├── items.json
 │   │   ├── recipes.json
-│   │   ├── structures.json
+│   │   ├── structures.json   # peças de construção (camada, tamanho, custo, colisão, porta, estação, baú)
 │   │   ├── enemies.json
 │   │   ├── zones.json
 │   │   ├── lootTables.json
@@ -330,7 +331,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Ação contextual (bater, recolher, abrir, atacar) | Espaço / clique | Botão grande (lado direito) |
 | Inventário | I / Tab | Botão mochila |
 | Craft | C | Botão "Fabricar" (à esquerda da hotbar) |
-| Modo construção | B | Botão planta (só na base) |
+| Modo construção | B (dentro: clique/Espaço coloca, R roda, Z desfaz, X demolir, B/Esc sai) | Botão "Construir" (por cima do "Fabricar"); toque curto no mundo escolhe o tile, botões Colocar/Rodar/Desfazer/Demolir/Sair |
 | Comer/beber rápido | 1–4 (hotbar) | Hotbar de 4 slots |
 
 A **ação contextual** escolhe automaticamente o alvo mais próximo em frente (como no original): zombie > contentor > recurso.
@@ -372,12 +373,15 @@ Os nós de recurso reaparecem (ver zonas).
 
 ### 7.7 Construção da base
 
-- A base é um mapa fixo com uma área construível em grelha de 16×16.
-- Peças: fundação (madeira → pedra → metal), parede, porta, janela, vedação.
-- Colocação: pré-visualização verde/vermelha, rodar, desfazer nos últimos 10 s com reembolso total.
-- Demolir devolve 50% dos materiais.
+- A base é um mapa fixo; constrói-se em qualquer tile livre da grelha de 16×16 (não em tiles de colisão, obstáculos sólidos, baús do mapa, nem recursos por apanhar — corta-se a árvore para abrir espaço; um recurso apanhado só reaparece quando não houver peças por cima).
+- Peças (`structures.json`): fundação (madeira, pedra; metal mais tarde), parede (madeira, pedra), porta, janela, vedação, fogueira, bancada, baú. Duas camadas por tile: `floor` (fundação) e `top` (o resto).
+- Paredes, janelas, vedações e portas fechadas bloqueiam o tile inteiro; estações e baús bloqueiam com o `footprint`. Peças sólidas não se põem em cima do jogador, no ponto onde ele aparece nem nas saídas.
+- Colocação: pré-visualização verde/vermelha (com o motivo), rodar (portas, janelas, vedações: horizontal/vertical), desfazer nos últimos 10 s (de jogo) com reembolso total. A peça vai para o tile à frente do jogador, ou para o tile do rato/toque.
+- Demolir devolve 50% dos materiais (arredondado para baixo); só demole se o reembolso couber na mochila. Não se demole uma fundação com estação/baú por cima, uma estação com trabalhos/itens nem um baú com itens.
+- Portas abrem/fecham com a ação contextual (não fecham com o jogador lá dentro).
 - Estruturas **não decaem**.
-- Estações e baús só podem ser colocados sobre fundação.
+- Estações e baús só podem ser colocados sobre fundação (o chão da casa em ruínas do mapa também conta).
+- Save: `base.structures = [[uid, id, tx, ty, rot, estado]]` (estado 1 = porta aberta) e `base.nextStructureId`. Estações construídas: `stations["<tipo>_s<uid>"]`; baús: `base.chests["s<uid>"]`.
 
 ### 7.8 Combate
 
@@ -471,7 +475,8 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 
 - Camadas: `ground`, `decor_low`, `collision`, `decor_high` (por cima do jogador), `objects`.
 - Camada `objects` contém pontos de spawn: `player_spawn`, `exit`, `resource:<id>`, `prop:<id>`, `chest:<id>`, `station:<tipo>`, `container:<lootTableId>`, `enemy_spawn:<groupId>`.
-- Estado de uma estação no save: `stations["<tipo>_<id do objeto>"] = { queue: [[receita, ticks que faltam]], output: Slot[] }`.
+- Estado de uma estação no save: `stations["<tipo>_<id do objeto>"] = { queue: [[receita, ticks que faltam]], output: Slot[] }` (estações construídas: `<tipo>_s<uid>`).
+- O chão da camada `ground` com os tiles `floor_wood`/`floor_concrete` conta como fundação (`BASE_FLOOR_TILES`).
 - O **id do objeto no Tiled** identifica cada recurso no save (`zones.<zona>.depleted`): não reutilizar ids (o Tiled nunca o faz).
 - **Obstáculos livres** (`prop:<id>`, definidos em `props.json`): troncos, cepos, caixotes, barris, vedação partida, carros abandonados, poço, pedrinhas… Colocam-se em **qualquer posição** (fora da grelha) e bloqueiam com o seu `footprint` (ou são decoração atravessável sem ele). É assim que se dá realismo ao mapa sem mudar a escala.
 - Cada zona tem **pelo menos 2 saídas** para o mapa-mundo e uma área segura perto da entrada.
@@ -699,7 +704,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 - [x] `recipes.json` e sistema de crafting puro (verificar ingredientes, consumir, produzir) com testes.
 - [x] Craft nas mãos (instantâneo) e em estações (com tempo de jogo e fila de 3; o resultado espera na estação até ser recolhido — ao abrir a estação é recolhido logo).
-- [x] Estações iniciais: fogueira (à porta da casa) e bancada de madeira (quarto de madeira), colocadas no mapa (`station:<tipo>`; `stations.json`). Na Fase 5 passam a ser construídas.
+- [x] Estações iniciais: fogueira e bancada de madeira (`stations.json`). Na Fase 4 estavam no mapa (`station:<tipo>`); desde a Fase 5 são construídas.
 - [x] Ferramentas com durabilidade e bónus de recolha; reparação na bancada (`repairCostPct`% dos ingredientes, proporcional ao desgaste).
 - [x] UI de crafting (C / botão "Fabricar"; ação junto da estação): separadores por categoria, ingredientes em falta a vermelho, fila com barra de progresso, cancelar, recolher.
 - [x] Timers de craft (e respawn de recursos) a avançar offline (máx. 8 h) ao carregar "Continuar".
@@ -712,12 +717,12 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** construir a casa.
 
-- [ ] `structures.json` (fundação, parede, porta, janela, vedação; tiers madeira/pedra).
-- [ ] Modo construção: grelha, pré-visualização verde/vermelha, rotação, custo visível.
-- [ ] Regras: estações e baús só em fundação; portas abrem/fecham; colisão atualizada.
-- [ ] Desfazer (10 s, reembolso total) e demolir (50%).
-- [ ] Estações de crafting passam a ser estruturas construídas.
-- [ ] Guardar estruturas no save de forma compacta.
+- [x] `structures.json` (fundação, parede, porta, janela, vedação; tiers madeira/pedra nas fundações e paredes; fogueira, bancada e baú).
+- [x] Modo construção: grelha, pré-visualização verde/vermelha (com o motivo), rotação, custo visível (e quanto se tem).
+- [x] Regras: estações e baús só em fundação; portas abrem/fecham; colisão atualizada.
+- [x] Desfazer (10 s, reembolso total) e demolir (50%).
+- [x] Estações de crafting passam a ser estruturas construídas (as do mapa passam a peças por migração).
+- [x] Guardar estruturas no save de forma compacta (save v4).
 
 **Aceitação:** constrói-se uma casa 6×6 fechada com porta, baús, fogueira e bancada, e tudo reaparece após reload.
 
@@ -955,3 +960,7 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Ficheiros de `public/` pedidos com `?v=<build>` (`versioned()` em config.ts) | O browser juntou JS novo com um manifest antigo em cache (GitHub Pages: 10 min) e o arranque falhou |
 | 2026-09-24 | Slots ×2 (ícones 32 px) no painel da mochila/baú em ecrãs táteis, quando cabe | Pedido do jogador: no telemóvel ao alto os slots eram pequenos para os dedos |
 | 2026-09-24 | Botão "Ordenar" na mochila e no baú; "×" de fechar desenhado em píxeis | Pedido do jogador. O glifo "×" da fonte não ficava centrado no botão |
+| 2026-09-24 | Fase 5: peças numa grelha de 2 camadas (fundação + peça de cima), paredes de 1 tile inteiro com 8 px de altura desenhada (16×24) | Simples de colocar e de colidir; a vista 3/4 vem do sprite. Portas, janelas e vedações têm variante vertical (`_v`) |
+| 2026-09-24 | Save v4: `base.structures` + `nextStructureId`; a fogueira e a bancada do mapa passam a peças por migração (com as filas) | Os jogadores antigos mantêm as estações; os jogos novos constroem-nas |
+| 2026-09-24 | Pode-se construir onde um recurso foi apanhado (só reaparece com o sítio livre) | A base tem muitas árvores: sem isto não havia espaço para uma casa 6×6 |
+| 2026-09-24 | Desfazer guardado só em memória (não no save) | A janela é de 10 s; perder o Desfazer ao recarregar não custa nada (continua a dar para demolir a 50%) |

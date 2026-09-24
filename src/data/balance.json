@@ -20,6 +20,7 @@
   "autosaveSec": 15,
   "offlineCapHours": 8,
   "repairCostPct": 50,
+  "undoWindowSec": 10,
   "deathBagHoursReal": 48,
   "respawnHpPct": 50,
   "demolishRefundPct": 50,

@@ -4,7 +4,7 @@ import { MIGRATIONS, migrate, type Migration } from './migrations';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -85,6 +85,22 @@ function validSlot(slot: unknown): boolean {
   );
 }
 
+/** Peça construída: [uid ≥ 1, id, tx, ty, rot 0/1, estado 0/1]. */
+function validStructure(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length !== 6) return false;
+  const [uid, id, tx, ty, rot, state] = value as unknown[];
+  return (
+    stat(uid) &&
+    uid >= 1 &&
+    typeof id === 'string' &&
+    id !== '' &&
+    stat(tx) &&
+    stat(ty) &&
+    (rot === 0 || rot === 1) &&
+    (state === 0 || state === 1)
+  );
+}
+
 function validContainer(value: unknown): boolean {
   return Array.isArray(value) && value.every(validSlot);
 }
@@ -114,6 +130,12 @@ export function validateState(input: unknown): GameStateData {
   const base = isObject(input) ? input.base : undefined;
   if (!isObject(base) || !isObject(base.chests) || !Object.values(base.chests).every(validContainer)) {
     problems.push('base.chests inválido');
+  }
+  if (!isObject(base) || !Array.isArray(base.structures) || !base.structures.every(validStructure)) {
+    problems.push('base.structures inválido');
+  }
+  if (!isObject(base) || !stat(base.nextStructureId) || base.nextStructureId < 1) {
+    problems.push('base.nextStructureId inválido');
   }
   const zones = isObject(input) ? input.zones : undefined;
   if (

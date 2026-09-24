@@ -505,6 +505,138 @@
         "border": "ink",
         "letter": "M"
       }
+    },
+    "foundation_wood": {
+      "type": "image",
+      "file": "sprites/foundation_wood.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "F"
+      }
+    },
+    "foundation_stone": {
+      "type": "image",
+      "file": "sprites/foundation_stone.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone",
+        "border": "stone_dark",
+        "letter": "F"
+      }
+    },
+    "wall_wood": {
+      "type": "image",
+      "file": "sprites/wall_wood.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "wood_light",
+        "border": "bark_dark",
+        "letter": "P"
+      }
+    },
+    "wall_stone": {
+      "type": "image",
+      "file": "sprites/wall_stone.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "stone_light",
+        "border": "stone_dark",
+        "letter": "P"
+      }
+    },
+    "door_wood": {
+      "type": "image",
+      "file": "sprites/door_wood.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "D"
+      }
+    },
+    "door_wood_open": {
+      "type": "image",
+      "file": "sprites/door_wood_open.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "wood_light",
+        "border": "bark_dark",
+        "letter": "d"
+      }
+    },
+    "door_wood_v": {
+      "type": "image",
+      "file": "sprites/door_wood_v.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "D"
+      }
+    },
+    "door_wood_v_open": {
+      "type": "image",
+      "file": "sprites/door_wood_v_open.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "wood_light",
+        "border": "bark_dark",
+        "letter": "d"
+      }
+    },
+    "window_wood": {
+      "type": "image",
+      "file": "sprites/window_wood.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "sky",
+        "border": "bark_dark",
+        "letter": "J"
+      }
+    },
+    "window_wood_v": {
+      "type": "image",
+      "file": "sprites/window_wood_v.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "sky",
+        "border": "bark_dark",
+        "letter": "J"
+      }
+    },
+    "fence_wood": {
+      "type": "image",
+      "file": "sprites/fence_wood.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "V"
+      }
+    },
+    "fence_wood_v": {
+      "type": "image",
+      "file": "sprites/fence_wood_v.png",
+      "placeholder": {
+        "width": 16,
+        "height": 24,
+        "color": "wood",
+        "border": "bark_dark",
+        "letter": "V"
+      }
     }
   }
 }

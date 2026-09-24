@@ -24,7 +24,13 @@ export interface GameEvents {
   'item:broken': { item: string };
   'player:consumed': { item: string };
   /** A ação não foi possível (a UI mostra o motivo). */
-  'action:blocked': { reason: 'needs_tool' | 'inventory_full'; tool?: string };
+  'action:blocked': { reason: 'needs_tool' | 'inventory_full' | 'door_blocked'; tool?: string };
+  /** Peça construída colocada (CLAUDE.md §7.7). */
+  'structure:placed': { uid: number };
+  /** Peça demolida ou desfeita. */
+  'structure:removed': { uid: number };
+  /** Uma peça mudou de estado (porta aberta/fechada). */
+  'structure:changed': { uid: number };
   /** Abrir o baú `chestId` (a UI mostra-o ao lado da mochila). */
   'container:open': { chestId: string };
   /** Abrir o painel de crafting de uma estação (`<tipo>_<id do objeto>`). */

@@ -15,7 +15,10 @@ import { onWorldZoomChange, stepWorldZoom, worldZoomFor } from '../display/world
 import { keyboardDirection } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
 import { autosave } from '../save';
+import { structureSprite } from '../data/types';
+import { structureArea, structureFeet, type StructureRecord } from '../systems/building/building';
 import { CollisionWorld } from '../systems/movement/CollisionWorld';
+import { buildMode, buildTargetTile } from '../ui/buildMode';
 import type { Facing } from '../systems/movement/movement';
 import { content } from '../world/content';
 import { BASE_TILESET_NAME } from '../world/tileset';
@@ -44,6 +47,12 @@ const LAYER_DEPTH: Readonly<Record<TileLayerName, number>> = {
   collision: -1,
   decor_high: 1_000_000,
 };
+/** Fundações: por cima do chão do mapa, por baixo de tudo o que tem Y-sort. */
+const FOUNDATION_DEPTH = -0.5;
+/** Realce dos tiles no modo construção: no chão, por cima das fundações. */
+const GHOST_AREA_DEPTH = FOUNDATION_DEPTH + 0.2;
+const GHOST_OK = 0x78ae48;
+const GHOST_BAD = 0xb33a3a;
 
 const walkAnimationKey = (facing: Facing): string => `${PLAYER_TEXTURE}_walk_${facing}`;
 const sneakAnimationKey = (facing: Facing): string => `${PLAYER_TEXTURE}_sneak_${facing}`;
@@ -57,7 +66,13 @@ export class BaseScene extends Phaser.Scene {
   private keys: MoveKeys | null = null;
   /** Sprites dos recursos, pelo id do objeto no Tiled (para golpes, esconder e reaparecer). */
   private resourceSprites = new Map<number, Phaser.GameObjects.Image>();
+  /** Sprites das peças construídas, pelo uid. */
+  private structureSprites = new Map<number, Phaser.GameObjects.Image>();
   private marker: Phaser.GameObjects.Image | null = null;
+  private ghost: Phaser.GameObjects.Image | null = null;
+  private ghostArea: Phaser.GameObjects.Rectangle | null = null;
+  /** Peça tingida de vermelho (alvo da demolição). */
+  private demolishTinted: number | null = null;
   private attackUntil = 0;
 
   constructor() {
@@ -119,13 +134,19 @@ export class BaseScene extends Phaser.Scene {
       resources: content.resources,
       props: content.props,
       stations: content.stations,
+      structures: content.structures,
     });
     simulation.setRespawnPoint(zone.playerSpawn);
     simulation.reset();
     for (const [objectId, sprite] of this.resourceSprites) {
       sprite.setVisible(!simulation.interaction.isDepleted(objectId));
     }
+    this.structureSprites = new Map();
+    for (const record of simulation.building.structures()) this.addStructureSprite(record);
     this.marker = this.add.image(0, 0, this.markerTexture()).setOrigin(0.5, 1).setVisible(false);
+    this.ghost = this.add.image(0, 0, '__DEFAULT').setOrigin(0.5, 1).setAlpha(0.75).setVisible(false);
+    this.ghostArea = this.add.rectangle(0, 0, 16, 16, GHOST_OK, 0.3).setOrigin(0).setVisible(false);
+    this.ghostArea.setDepth(GHOST_AREA_DEPTH);
     const offFeedback = this.listenForFeedback();
     autosave.start();
     this.scene.launch(SceneKey.UI, {});
@@ -141,7 +162,12 @@ export class BaseScene extends Phaser.Scene {
       simulation.setZone(null);
       simulation.setRespawnPoint(null);
       this.resourceSprites.clear();
+      this.structureSprites.clear();
       this.marker = null;
+      this.ghost = null;
+      this.ghostArea = null;
+      this.demolishTinted = null;
+      buildMode.active = false;
       moveInput.reset();
       this.player = null;
       this.keys = null;
@@ -154,8 +180,9 @@ export class BaseScene extends Phaser.Scene {
     // Com a mochila/baú aberto o jogador fica parado.
     const blocked = uiState.modalOpen;
     simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction, moveInput.sneak);
-    const actionKey = this.keys?.action.some((key) => key.isDown) ?? false;
-    simulation.setActionHeld(!blocked && (actionKey || uiState.actionHeld));
+    // No modo construção, Espaço/clique colocam peças (UIScene) em vez da ação contextual.
+    const actionKey = !buildMode.active && (this.keys?.action.some((key) => key.isDown) ?? false);
+    simulation.setActionHeld(!blocked && !buildMode.active && (actionKey || uiState.actionHeld));
     // rawDelta = tempo real entre frames; o delta "suavizado" do Phaser fica limitado a
     // 16,7 ms com a janela sem foco, o que atrasaria o relógio do jogo.
     // Velocidade do jogo (x1/x2/x3): mais tempo de jogo por frame (no máx. 5 ticks por frame).
@@ -163,7 +190,81 @@ export class BaseScene extends Phaser.Scene {
     simulation.update(this.game.loop.rawDelta * speed);
     if (this.player) this.player.anims.timeScale = speed;
     this.renderPlayer();
+    // Com toque, andar volta a pôr a peça à frente do jogador.
+    if (simulation.playerMoved && buildMode.pickedBy === 'touch') {
+      buildMode.picked = null;
+      buildMode.pickedBy = null;
+    }
     this.renderMarker();
+    this.renderGhost();
+  }
+
+  private addStructureSprite(record: StructureRecord): void {
+    const [uid, id, tx, ty, rot, state] = record;
+    const def = content.structures[id];
+    if (!def) return;
+    const feet = structureFeet(def, tx, ty, simulation.building.tileSize);
+    const sprite = this.add
+      .image(feet.x, feet.y, structureSprite(def, rot, state === 1))
+      .setOrigin(0.5, 1)
+      .setDepth(def.layer === 'floor' ? FOUNDATION_DEPTH : feet.y);
+    this.structureSprites.set(uid, sprite);
+  }
+
+  /**
+   * Pré-visualização do modo construção: a peça escolhida no tile alvo, verde se der para a
+   * pôr ou vermelha se não; a demolir, a peça alvo fica vermelha.
+   */
+  private renderGhost(): void {
+    const ghost = this.ghost;
+    const area = this.ghostArea;
+    if (!ghost || !area) return;
+    if (this.demolishTinted !== null) {
+      this.structureSprites.get(this.demolishTinted)?.clearTint();
+      this.demolishTinted = null;
+    }
+    if (!buildMode.active || uiState.modalOpen) {
+      ghost.setVisible(false);
+      area.setVisible(false);
+      return;
+    }
+    const building = simulation.building;
+    const tileSize = building.tileSize;
+    const { tx, ty } = buildTargetTile();
+    if (buildMode.demolish) {
+      ghost.setVisible(false);
+      const record = building.demolishTarget(tx, ty);
+      const def = record ? building.def(record[1]) : undefined;
+      const rect =
+        record && def
+          ? structureArea(def, record[2], record[3], tileSize)
+          : { x: tx * tileSize, y: ty * tileSize, w: tileSize, h: tileSize };
+      const ok = record !== null && building.demolishProblem(record) === null;
+      area
+        .setPosition(rect.x, rect.y)
+        .setSize(rect.w, rect.h)
+        .setFillStyle(ok ? 0xf0a445 : GHOST_BAD, 0.35);
+      area.setVisible(true);
+      if (record) {
+        this.structureSprites.get(record[0])?.setTint(GHOST_BAD);
+        this.demolishTinted = record[0];
+      }
+      return;
+    }
+    const def = building.def(buildMode.selected);
+    if (!def) return;
+    const ok = building.check(buildMode.selected, tx, ty) === null;
+    const color = ok ? GHOST_OK : GHOST_BAD;
+    const feet = structureFeet(def, tx, ty, tileSize);
+    // Com a profundidade que a peça terá (o jogador passa à frente/atrás dela como da real).
+    ghost
+      .setTexture(structureSprite(def, buildMode.rot, false))
+      .setPosition(feet.x, feet.y)
+      .setDepth(def.layer === 'floor' ? FOUNDATION_DEPTH + 0.1 : feet.y + 0.5)
+      .setTint(color)
+      .setVisible(true);
+    const rect = structureArea(def, tx, ty, tileSize);
+    area.setPosition(rect.x, rect.y).setSize(rect.w, rect.h).setFillStyle(color, 0.3).setVisible(true);
   }
 
   /** Seta por cima do alvo atual da ação contextual (para se saber o que o Espaço faz). */
@@ -176,7 +277,10 @@ export class BaseScene extends Phaser.Scene {
       return;
     }
     const placement = target.data.placement;
-    const sprite = this.resourceSprites.get(placement.objectId);
+    const sprite =
+      placement.objectId < 0
+        ? this.structureSprites.get(-placement.objectId)
+        : this.resourceSprites.get(placement.objectId);
     const top = sprite ? sprite.y - sprite.height : Math.round(placement.y) - 16;
     const bob = Math.floor(this.time.now / 300) % 2;
     marker
@@ -230,6 +334,20 @@ export class BaseScene extends Phaser.Scene {
         if (!sprite) return;
         sprite.setVisible(true).setAlpha(0);
         this.tweens.add({ targets: sprite, alpha: 1, duration: 600 });
+      }),
+      eventBus.on('structure:placed', ({ uid }) => {
+        const record = simulation.building.get(uid);
+        if (record) this.addStructureSprite(record);
+      }),
+      eventBus.on('structure:removed', ({ uid }) => {
+        this.structureSprites.get(uid)?.destroy();
+        this.structureSprites.delete(uid);
+      }),
+      eventBus.on('structure:changed', ({ uid }) => {
+        const record = simulation.building.get(uid);
+        const def = record ? content.structures[record[1]] : undefined;
+        if (record && def)
+          this.structureSprites.get(uid)?.setTexture(structureSprite(def, record[4], record[5] === 1));
       }),
       eventBus.on('item:gained', ({ item, qty, x, y }) => {
         this.floatText(t('msg.gained', { qty, item: itemName(item) }), Math.round(x), Math.round(y) - 20);

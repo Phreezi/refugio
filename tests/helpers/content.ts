@@ -6,7 +6,15 @@ import props from '../../src/data/props.json';
 import recipes from '../../src/data/recipes.json';
 import resources from '../../src/data/resources.json';
 import stations from '../../src/data/stations.json';
-import { parseItems, parseProps, parseRecipes, parseResources, parseStations } from '../../src/data/types';
+import structures from '../../src/data/structures.json';
+import {
+  parseItems,
+  parseProps,
+  parseRecipes,
+  parseResources,
+  parseStations,
+  parseStructures,
+} from '../../src/data/types';
 
 /** Conteúdo real do jogo (JSON validados), para testes de integração da lógica. */
 export function loadContent() {
@@ -21,5 +29,6 @@ export function loadContent() {
     props: parseProps(props, keys),
     stations: stationDefs,
     recipes: parseRecipes(recipes, Object.keys(itemDefs), Object.keys(stationDefs)),
+    structures: parseStructures(structures, keys, Object.keys(itemDefs), Object.keys(stationDefs)),
   };
 }

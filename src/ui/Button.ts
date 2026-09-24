@@ -101,6 +101,14 @@ export class Button {
     return this;
   }
 
+  setVisible(visible: boolean): this {
+    this.border.setVisible(visible);
+    this.fill.setVisible(visible);
+    this.label.setVisible(visible);
+    for (const px of this.cross) px.setVisible(visible);
+    return this;
+  }
+
   destroy(): void {
     this.border.destroy();
     this.fill.destroy();

@@ -1,0 +1,69 @@
+{
+  "$comment": "Peças de construção da base (CLAUDE.md §7.7), pela ordem da paleta do modo construção. layer: floor (fundação) ou top. size: [largura, altura] em tiles. solid: bloqueia os tiles inteiros; footprint: caixa sólida nos pés. rotatable: sprites <sprite> e <sprite>_v; door: também <sprite>_open. needsFoundation: só sobre fundação (ou chão da casa em ruínas).",
+  "foundation_wood": { "sprite": "foundation_wood", "layer": "floor", "cost": [["wood", 1]] },
+  "foundation_stone": { "sprite": "foundation_stone", "layer": "floor", "cost": [["stone", 2]] },
+  "wall_wood": { "sprite": "wall_wood", "layer": "top", "solid": true, "cost": [["wood", 2]] },
+  "wall_stone": { "sprite": "wall_stone", "layer": "top", "solid": true, "cost": [["stone", 3]] },
+  "door_wood": {
+    "sprite": "door_wood",
+    "layer": "top",
+    "solid": true,
+    "rotatable": true,
+    "door": true,
+    "cost": [
+      ["wood_plank", 2],
+      ["rope", 1]
+    ]
+  },
+  "window_wood": {
+    "sprite": "window_wood",
+    "layer": "top",
+    "solid": true,
+    "rotatable": true,
+    "cost": [
+      ["wood_plank", 2],
+      ["wood", 1]
+    ]
+  },
+  "fence_wood": {
+    "sprite": "fence_wood",
+    "layer": "top",
+    "solid": true,
+    "rotatable": true,
+    "cost": [["wood", 1]]
+  },
+  "campfire": {
+    "sprite": "campfire",
+    "layer": "top",
+    "station": "campfire",
+    "footprint": { "width": 12, "height": 6 },
+    "needsFoundation": true,
+    "cost": [
+      ["wood", 4],
+      ["stone", 3]
+    ]
+  },
+  "wood_bench": {
+    "sprite": "wood_bench",
+    "layer": "top",
+    "size": [2, 1],
+    "station": "wood_bench",
+    "footprint": { "width": 22, "height": 6 },
+    "needsFoundation": true,
+    "cost": [
+      ["wood", 10],
+      ["stone", 4]
+    ]
+  },
+  "storage_chest": {
+    "sprite": "chest",
+    "layer": "top",
+    "chest": true,
+    "footprint": { "width": 12, "height": 6 },
+    "needsFoundation": true,
+    "cost": [
+      ["wood_plank", 4],
+      ["wood", 2]
+    ]
+  }
+}

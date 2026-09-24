@@ -1,4 +1,5 @@
 import { BALANCE } from '../data/balance';
+import type { StructureRecord } from '../systems/building/building';
 import { createStationState, type StationState } from '../systems/crafting/crafting';
 import { createContainer, type Container } from '../systems/inventory/inventory';
 import type { Facing } from '../systems/movement/movement';
@@ -30,8 +31,12 @@ export interface WorldState {
 }
 
 export interface BaseState {
-  /** Conteúdo dos baús, pelo id do objeto `chest:<id>` no mapa. */
+  /** Conteúdo dos baús: pelo id do objeto `chest:<id>` no mapa, ou `s<uid>` (baús construídos). */
   chests: Record<string, Container>;
+  /** Peças construídas (CLAUDE.md §7.7), compactas. */
+  structures: StructureRecord[];
+  /** Próximo uid de peça (nunca se reutilizam: identificam estações e baús). */
+  nextStructureId: number;
 }
 
 export interface ZoneState {
@@ -77,7 +82,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       hotbar,
     },
     world: { tick: 0, rng: seed >>> 0 },
-    base: { chests: { [STARTING_CHEST_ID]: startingChest() } },
+    base: { chests: { [STARTING_CHEST_ID]: startingChest() }, structures: [], nextStructureId: 1 },
     zones: {},
     stations: {},
   };

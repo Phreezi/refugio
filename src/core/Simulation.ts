@@ -8,6 +8,7 @@ import { respawnVitals, survivalRules, tickSurvival } from '../systems/survival/
 import { eventBus, type EventBus, type GameEvents } from './EventBus';
 import { FixedStep } from './FixedStep';
 import { gameState, type GameState } from './GameState';
+import { Building } from './Building';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
 import { PlayerActions } from './PlayerActions';
@@ -27,6 +28,7 @@ export class Simulation {
   readonly actions: PlayerActions;
   readonly interaction: Interaction;
   readonly crafting: Crafting;
+  readonly building: Building;
   private actionHeld = false;
   private actionQueued = false;
   private nextActionTick = 0;
@@ -54,13 +56,15 @@ export class Simulation {
     this.state = state;
     this.bus = bus;
     this.actions = new PlayerActions(state, bus, items);
-    this.interaction = new Interaction(state, bus, this.actions);
+    this.building = new Building(state, bus, this.actions);
+    this.interaction = new Interaction(state, bus, this.actions, this.building);
     this.crafting = new Crafting(state, bus, crafting, this.actions);
   }
 
   /** Zona onde o jogador está: colisões, recursos, baús… (null = fora de uma cena de jogo). */
   setZone(zone: ZoneContext | null): void {
     this.world = zone?.collision ?? null;
+    this.building.setZone(zone);
     this.interaction.setZone(zone);
   }
 
@@ -151,8 +155,8 @@ export class Simulation {
     const done = this.interaction.act(PLAYER_FOOTPRINT);
     if (done === null) return;
     this.nextActionTick = tick + this.actionCooldownTicks;
-    // Abrir um baú ou beber não se repete com a tecla presa (só golpes em recursos).
-    if (done === 'chest' || done === 'drink') this.actionHeld = false;
+    // Abrir um baú, beber ou abrir uma porta não se repete com a tecla presa (só golpes em recursos).
+    if (done === 'chest' || done === 'drink' || done === 'door') this.actionHeld = false;
   }
 
   private respawn(): void {

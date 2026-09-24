@@ -20,6 +20,26 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   },
   // v2 → v3 (Fase 4): filas e saídas das estações de crafting.
   2: (s) => ({ ...s, stations: {} }),
+  // v3 → v4 (Fase 5): peças construídas. A fogueira e a bancada deixaram de estar no mapa da
+  // base (objetos 90 e 91) e passam a ser peças, nos mesmos sítios, com as filas que tinham.
+  3: (s) => {
+    const base = s.base as Record<string, unknown>;
+    const stations = { ...(s.stations as Record<string, unknown>) };
+    const structures: [number, string, number, number, number, number][] = [];
+    for (const [objectId, id, tx, ty] of [
+      [90, 'campfire', 28, 24],
+      [91, 'wood_bench', 20, 15],
+    ] as const) {
+      const uid = structures.length + 1;
+      structures.push([uid, id, tx, ty, 0, 0]);
+      const oldKey = `${id}_${String(objectId)}`;
+      if (oldKey in stations) {
+        stations[`${id}_s${String(uid)}`] = stations[oldKey];
+        Reflect.deleteProperty(stations, oldKey);
+      }
+    }
+    return { ...s, base: { ...base, structures, nextStructureId: structures.length + 1 }, stations };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

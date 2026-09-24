@@ -96,6 +96,7 @@ describe('CollisionWorld', () => {
       height: 1,
       tileSize: 16,
       solid: [false, true],
+      floor: [false, false],
       playerSpawn: { x: 8, y: 8 },
       exits: [],
       resources: [

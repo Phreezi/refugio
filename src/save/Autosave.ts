@@ -47,8 +47,14 @@ export class Autosave {
       this.bus.on('player:died', () => {
         this.request();
       }),
-      // CLAUDE.md §10.2: gravar logo no fim de um craft.
+      // CLAUDE.md §10.2: gravar logo no fim de um craft e ao construir/demolir.
       this.bus.on('craft:finished', () => {
+        this.request();
+      }),
+      this.bus.on('structure:placed', () => {
+        this.request();
+      }),
+      this.bus.on('structure:removed', () => {
         this.request();
       }),
     ];
