@@ -91,8 +91,9 @@ Base (casa) → escolher zona no mapa-mundo → viajar (custa um pouco de comida
 
 - Tamanho de tile: **16×16 px**.
 - Personagens: **16×32 px** (estilo Stardew).
-- Resolução interna: **480×270** (16:9), escalada por inteiros (×2, ×3, ×4) com `pixelArt: true` e `roundPixels: true`.
-  - Implementação (`src/display/`): o Phaser 4 não tem modo de escala inteira nem usa o `devicePixelRatio`. Usa-se `Scale.NONE` + `scale.setZoom(zoomDispositivo / dpr)`, com a posição do canvas alinhada a píxeis físicos. Assim cada píxel de jogo ocupa exatamente N×N píxeis reais, também com DPR 1,25 ou 2,625.
+- Resolução interna **adaptável ao ecrã**, escalada por inteiros (×2, ×3, ×4…) com `pixelArt: true` e `roundPixels: true`: escolhe-se o zoom inteiro (em píxeis do dispositivo) cuja altura de jogo fica mais perto de **400 px** (≈ 25 tiles; **320 px** em ecrãs táteis), e a largura enche o ecrã (proporção entre 4:3 e 21:9; fora disso, barras). Ex.: 1920×1080 → 640×360 ×3; janela 1600×830 → 800×415 ×2; telemóvel 2400×1080 físicos → 800×360 ×3. Mínimo 240 px de altura (abaixo disso, zoom fracionário). Valores em `DISPLAY` (`src/config.ts`).
+  - Implementação (`src/display/`): o Phaser 4 não tem modo de escala inteira nem usa o `devicePixelRatio`. Usa-se `Scale.NONE` + `scale.resize(w, h)` (resolução) + `scale.setZoom(zoomDispositivo / dpr)`, com a posição do canvas alinhada a píxeis físicos. Assim cada píxel de jogo ocupa exatamente N×N píxeis reais, também com DPR 1,25 ou 2,625.
+  - Consequência: **nenhuma cena pode assumir um tamanho fixo**. Usar `this.scale.width/height` e reagir a `Phaser.Scale.Events.RESIZE` (removendo o listener no SHUTDOWN).
   - A câmara fica **sempre com zoom 1** (zoom ≠ 1 desliga o arredondamento ao píxel).
 - Em mobile retrato: mostrar aviso "roda o ecrã" (o jogo é só landscape).
 - 60 FPS alvo; lógica de jogo com passo fixo (ver 5.2).
@@ -897,7 +898,7 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | Data | Decisão | Motivo |
 |---|---|---|
 | (início) | Phaser + TS + Vite | Web-first, fácil port para Capacitor e Playables |
-| (início) | Tiles 16 px, 480×270 | Aspeto Stardew, escala limpa |
+| (início) | Tiles 16 px, 480×270 | Aspeto Stardew, escala limpa (a resolução fixa foi substituída em 2026-09-24, ver abaixo) |
 | (início) | Hordas desligadas por defeito | Dificuldade menor que o original |
 | (início) | Save desde a Fase 2 | Evitar reescrever sistemas mais tarde |
 | 2026-09-24 | **Phaser 4.2** em vez do 3 | O 4.0 saiu estável em 04/2026 e o 3.90 (05/2025) já não recebe desenvolvimento. API quase igual; ver armadilhas em §5.6 |
@@ -910,4 +911,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Colisões próprias (`systems/movement`) em vez da física Arcade do Phaser | O movimento corre no passo fixo de 50 ms, sem Phaser, testável em Vitest e determinista. Caixa dos pés (10×6 px) contra tiles `collision` + footprints; eixo X depois Y (desliza nas paredes); o render interpola entre ticks |
 | 2026-09-24 | Mapa da base gerado por script uma vez, depois editado no Tiled | Não há Tiled no ambiente do agente; o script descreve o layout em código e produz JSON do Tiled válido. Não reescreve sem `--force` |
 | 2026-09-24 | Jogador como spritesheet 7×4 (parado, andar ×4, atacar ×2 por direção) com placeholder desenhado por código (`style: "character"`) | Animação visível desde já; trocar pela arte final = pôr o PNG com o mesmo layout e `file` no manifest |
+| 2026-09-24 | Resolução interna adaptável (alvo 400 px de altura; 320 com toque) em vez de 480×270 fixo | Pedido do jogador: com 480×270 os tiles pareciam enormes ("Minecraft"). Agora cabem ~2–2,5× mais tiles, sem barras pretas e com píxeis exatos. O alvo pode vir a ser uma definição ("tamanho", Fase 11) |
 | 2026-09-24 | Joystick virtual flutuante na metade esquerda (só toque), 8 direções, zona morta 25% | Metade direita fica livre para o botão de ação (Fase 3). O teclado tem prioridade sobre o joystick |

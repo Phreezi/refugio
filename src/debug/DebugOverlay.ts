@@ -13,6 +13,9 @@ export interface DebugInfo {
   /** Píxeis do dispositivo por píxel de jogo. */
   deviceZoom: number;
   devicePixelRatio: number;
+  /** Resolução interna do jogo (adaptável ao ecrã). */
+  gameWidth: number;
+  gameHeight: number;
 }
 
 const REFRESH_MS = 250;
@@ -34,7 +37,9 @@ export function formatDebugInfo(info: DebugInfo): string {
     lines.push(`pos ${round1(x)}, ${round1(y)} · tile ${String(tx)}, ${String(ty)}`);
   }
   lines.push(`cenas ${info.scenes.length > 0 ? info.scenes.join(' + ') : '—'}`);
-  lines.push(`escala ×${round1(info.deviceZoom)} · dpr ${round1(info.devicePixelRatio)}`);
+  lines.push(
+    `jogo ${String(info.gameWidth)}×${String(info.gameHeight)} · escala ×${round1(info.deviceZoom)} · dpr ${round1(info.devicePixelRatio)}`,
+  );
   return lines.join('\n');
 }
 

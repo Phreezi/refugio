@@ -10,13 +10,15 @@ describe('formatDebugInfo', () => {
       scenes: ['Base', 'UI'],
       deviceZoom: 4,
       devicePixelRatio: 2.625,
+      gameWidth: 480,
+      gameHeight: 270,
     });
     expect(text.split('\n')).toEqual([
       'FPS 60',
       'tick 1234 · 61.7 s',
       'pos 384, 390.3 · tile 24, 24',
       'cenas Base + UI',
-      'escala ×4 · dpr 2.6',
+      'jogo 480×270 · escala ×4 · dpr 2.6',
     ]);
   });
 
@@ -28,6 +30,8 @@ describe('formatDebugInfo', () => {
       scenes: [],
       deviceZoom: 2,
       devicePixelRatio: 1,
+      gameWidth: 640,
+      gameHeight: 360,
     });
     expect(text).toContain('tick —');
     expect(text).toContain('pos —');

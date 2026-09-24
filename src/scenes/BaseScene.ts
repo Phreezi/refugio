@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { PALETTE } from '../assets/palette';
 import { CHARACTER_COLUMNS, CHARACTER_ROWS, characterFrame } from '../assets/characterSheet';
 import { BASE_MAP_KEY } from '../config';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
@@ -59,6 +60,8 @@ export class BaseScene extends Phaser.Scene {
       .setDepth(y);
 
     const camera = this.cameras.main;
+    // Em ecrãs mais largos do que o mapa, o que fica fora dele é "noite".
+    camera.setBackgroundColor(PALETTE.ink);
     camera.setBounds(0, 0, zone.width * zone.tileSize, zone.height * zone.tileSize);
     // O 2.º argumento TEM de ser true: startFollow sobrepõe camera.roundPixels.
     camera.startFollow(this.player, true);

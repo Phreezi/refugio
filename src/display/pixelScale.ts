@@ -1,5 +1,24 @@
+// Resolução interna adaptável + escala inteira em píxeis do DISPOSITIVO (CLAUDE.md §3.1).
+// Lógica pura (sem Phaser nem DOM), testável em Vitest.
+
+export interface PixelScaleOptions {
+  /**
+   * Altura desejada do jogo, em píxeis de jogo. Escolhe-se o zoom inteiro que mais se aproxima
+   * dela; a largura acompanha o formato do ecrã. Mais alto = mais tiles no ecrã, tudo mais pequeno.
+   */
+  targetHeight: number;
+  /** Abaixo disto o zoom passa a fracionário (ecrãs minúsculos), para a UI caber sempre. */
+  minHeight: number;
+  /** Proporção largura/altura permitida; fora dela ficam barras (ex.: janelas estreitas, ultrawide). */
+  minAspect: number;
+  maxAspect: number;
+}
+
 export interface PixelScale {
-  /** Píxeis do dispositivo por píxel de jogo. Inteiro ≥ 1, exceto em ecrãs menores do que o jogo. */
+  /** Tamanho do jogo (resolução interna), em píxeis de jogo. */
+  gameWidth: number;
+  gameHeight: number;
+  /** Píxeis do dispositivo por píxel de jogo. Inteiro ≥ 1, exceto em ecrãs muito pequenos. */
   deviceZoom: number;
   /** Tamanho do canvas em píxeis CSS (pode ser fracionário quando devicePixelRatio ≠ 1). */
   cssWidth: number;
@@ -12,40 +31,58 @@ export interface PixelScale {
   offsetY: number;
 }
 
-// Tolerância para erros de vírgula flutuante (ex.: 1536 × 1.25 = 1920 deve dar zoom 4).
+// Tolerância para erros de vírgula flutuante (ex.: 1536 × 1.25 = 1920).
 const EPSILON = 1e-6;
 
 /**
- * Maior escala inteira, em píxeis REAIS do dispositivo, com que o jogo cabe no ecrã.
- * Contar em píxeis do dispositivo (e não em píxeis CSS) garante que cada píxel de
- * jogo ocupa exatamente N×N píxeis físicos também com devicePixelRatio 1.25, 2.625, etc.
- * Se o ecrã for menor do que o jogo, reduz (fracionário) para caber.
+ * Escolhe o zoom inteiro (em píxeis REAIS do dispositivo) cuja altura de jogo fica mais perto de
+ * `targetHeight`, e dá ao jogo o tamanho que enche o ecrã com esse zoom. Contar em píxeis do
+ * dispositivo (e não CSS) garante que cada píxel de jogo ocupa exatamente N×N píxeis físicos,
+ * também com devicePixelRatio 1,25 ou 2,625.
  */
 export function computePixelScale(
   viewportCssWidth: number,
   viewportCssHeight: number,
   devicePixelRatio: number,
-  gameWidth: number,
-  gameHeight: number,
+  options: PixelScaleOptions,
 ): PixelScale {
   const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
-  const fit = Math.min((viewportCssWidth * dpr) / gameWidth, (viewportCssHeight * dpr) / gameHeight);
+  const valid = (v: number): number => (Number.isFinite(v) && v > 0 ? v : 0);
+  const deviceWidth = Math.floor(valid(viewportCssWidth) * dpr + EPSILON);
+  const deviceHeight = Math.floor(valid(viewportCssHeight) * dpr + EPSILON);
+  const { targetHeight, minHeight, minAspect, maxAspect } = options;
 
-  let deviceZoom: number;
-  if (!Number.isFinite(fit) || fit <= 0) deviceZoom = 1;
-  else if (fit + EPSILON >= 1) deviceZoom = Math.floor(fit + EPSILON);
-  else deviceZoom = fit;
+  let deviceZoom = Math.max(1, Math.round(deviceHeight / targetHeight));
+  let gameHeight = Math.floor(deviceHeight / deviceZoom);
+  let gameWidth = Math.floor(deviceWidth / deviceZoom);
 
-  const deviceWidth = gameWidth * deviceZoom;
-  const deviceHeight = gameHeight * deviceZoom;
-  const margin = (viewportCss: number, contentDevice: number): number =>
-    Math.max(0, Math.floor((viewportCss * dpr - contentDevice) / 2 + EPSILON)) / dpr;
+  // Janela mais estreita do que minAspect: o jogo fica mais baixo (barras em cima e em baixo).
+  if (gameWidth < gameHeight * minAspect) gameHeight = Math.floor(gameWidth / minAspect);
+  gameWidth = Math.min(gameWidth, Math.floor(gameHeight * maxAspect));
+
+  // Ecrã minúsculo (ou inválido): tamanho mínimo, reduzido com zoom fracionário.
+  if (gameHeight < minHeight) {
+    gameHeight = minHeight;
+    gameWidth = Math.max(
+      Math.round(minHeight * minAspect),
+      Math.min(gameWidth, Math.floor(minHeight * maxAspect)),
+    );
+    const fit = Math.min(deviceWidth / gameWidth, deviceHeight / gameHeight);
+    deviceZoom = fit > 0 ? Math.min(1, fit) : 1;
+  }
+
+  const contentWidth = gameWidth * deviceZoom;
+  const contentHeight = gameHeight * deviceZoom;
+  const margin = (device: number, content: number): number =>
+    Math.max(0, Math.floor((device - content) / 2 + EPSILON)) / dpr;
 
   return {
+    gameWidth,
+    gameHeight,
     deviceZoom,
-    cssWidth: deviceWidth / dpr,
-    cssHeight: deviceHeight / dpr,
-    offsetX: margin(viewportCssWidth, deviceWidth),
-    offsetY: margin(viewportCssHeight, deviceHeight),
+    cssWidth: contentWidth / dpr,
+    cssHeight: contentHeight / dpr,
+    offsetX: margin(deviceWidth, contentWidth),
+    offsetY: margin(deviceHeight, contentHeight),
   };
 }

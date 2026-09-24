@@ -18,6 +18,8 @@ export function installDebugOverlay(
     scenes: game.scene.getScenes(true).map((scene) => scene.scene.key),
     deviceZoom: scaling.current.deviceZoom,
     devicePixelRatio: scaling.devicePixelRatio,
+    gameWidth: scaling.current.gameWidth,
+    gameHeight: scaling.current.gameHeight,
   }));
 
   window.addEventListener('keydown', (event) => {
