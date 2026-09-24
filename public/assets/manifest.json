@@ -516,7 +516,8 @@
         "color": "bark",
         "border": "ink",
         "letter": "M"
-      }
+      },
+      "file": "sprites/icons/small_backpack.png"
     },
     "foundation_wood": {
       "type": "image",
@@ -1225,6 +1226,39 @@
     "icon_military_keycard": {
       "type": "image",
       "file": "sprites/icons/military_keycard.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "forest",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_large_backpack": {
+      "type": "image",
+      "file": "sprites/icons/large_backpack.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "forest",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_military_helmet": {
+      "type": "image",
+      "file": "sprites/icons/military_helmet.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "forest",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "icon_military_vest": {
+      "type": "image",
+      "file": "sprites/icons/military_vest.png",
       "placeholder": {
         "width": 16,
         "height": 16,

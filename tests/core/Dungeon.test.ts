@@ -133,3 +133,18 @@ describe('Bunker (Fase 10)', () => {
     sim.update(FIXED_STEP_MS);
   });
 });
+
+describe('Zonas T4 (Fase 10)', () => {
+  it('a Base Militar pede o cartão do chefe; a Cidade é a zona final', () => {
+    const { state, sim } = setup();
+    expect(sim.progression.missingItem('zone_military')).toBe('military_keycard');
+    state.data.player.hotbar[3] = ['military_keycard', 1];
+    expect(sim.progression.missingItem('zone_military')).toBeNull();
+    expect(content.zones.zone_city?.unlockLevel).toBe(25);
+    const military = realMap('zone_military');
+    expect(military.containers.filter((c) => c.id === 'armory').length).toBeGreaterThanOrEqual(6);
+    const city = realMap('zone_city');
+    expect(city.containers.filter((c) => c.id === 'city_store')).toHaveLength(16);
+    expect(city.enemySpawns.length).toBeGreaterThanOrEqual(10);
+  });
+});

@@ -489,5 +489,33 @@
     "type": "key",
     "stack": 1,
     "rarity": "epic"
+  },
+  "military_helmet": {
+    "name": "item.military_helmet",
+    "icon": "icon_military_helmet",
+    "type": "armor",
+    "stack": 1,
+    "rarity": "rare",
+    "durability": 300,
+    "armor": 15,
+    "equip": "head"
+  },
+  "military_vest": {
+    "name": "item.military_vest",
+    "icon": "icon_military_vest",
+    "type": "armor",
+    "stack": 1,
+    "rarity": "epic",
+    "durability": 320,
+    "armor": 30,
+    "equip": "body"
+  },
+  "large_backpack": {
+    "name": "item.large_backpack",
+    "icon": "icon_large_backpack",
+    "type": "backpack",
+    "stack": 1,
+    "rarity": "rare",
+    "slots": 20
   }
 }

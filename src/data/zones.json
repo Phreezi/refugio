@@ -4,13 +4,19 @@
     "name": "zone.base",
     "map": "maps/base.json",
     "danger": 0,
-    "worldMapPos": [50, 50]
+    "worldMapPos": [
+      50,
+      50
+    ]
   },
   "zone_pine_forest": {
     "name": "zone.pine_forest",
     "map": "maps/pine_forest.json",
     "danger": 1,
-    "worldMapPos": [30, 30],
+    "worldMapPos": [
+      30,
+      30
+    ],
     "travelCost": {
       "hunger": 0,
       "thirst": 0
@@ -22,7 +28,10 @@
     "name": "zone.farm",
     "map": "maps/farm.json",
     "danger": 1,
-    "worldMapPos": [75, 35],
+    "worldMapPos": [
+      75,
+      35
+    ],
     "travelCost": {
       "hunger": 3,
       "thirst": 3
@@ -35,7 +44,10 @@
     "name": "zone.lake",
     "map": "maps/lake.json",
     "danger": 1,
-    "worldMapPos": [35, 75],
+    "worldMapPos": [
+      35,
+      75
+    ],
     "travelCost": {
       "hunger": 4,
       "thirst": 2
@@ -48,7 +60,10 @@
     "name": "zone.road",
     "map": "maps/road.json",
     "danger": 2,
-    "worldMapPos": [85, 70],
+    "worldMapPos": [
+      85,
+      70
+    ],
     "travelCost": {
       "hunger": 5,
       "thirst": 5
@@ -61,7 +76,10 @@
     "name": "zone.village",
     "map": "maps/village.json",
     "danger": 2,
-    "worldMapPos": [62, 88],
+    "worldMapPos": [
+      62,
+      82
+    ],
     "travelCost": {
       "hunger": 6,
       "thirst": 6
@@ -74,7 +92,10 @@
     "name": "zone.deep_forest",
     "map": "maps/deep_forest.json",
     "danger": 2,
-    "worldMapPos": [12, 48],
+    "worldMapPos": [
+      12,
+      48
+    ],
     "travelCost": {
       "hunger": 6,
       "thirst": 7
@@ -87,7 +108,10 @@
     "name": "zone.industrial",
     "map": "maps/industrial.json",
     "danger": 3,
-    "worldMapPos": [88, 16],
+    "worldMapPos": [
+      88,
+      16
+    ],
     "travelCost": {
       "hunger": 8,
       "thirst": 8
@@ -100,7 +124,10 @@
     "name": "zone.hospital",
     "map": "maps/hospital.json",
     "danger": 3,
-    "worldMapPos": [14, 86],
+    "worldMapPos": [
+      18,
+      78
+    ],
     "travelCost": {
       "hunger": 8,
       "thirst": 9
@@ -113,7 +140,10 @@
     "name": "zone.bunker",
     "map": "maps/bunker_1.json",
     "danger": 4,
-    "worldMapPos": [58, 10],
+    "worldMapPos": [
+      58,
+      10
+    ],
     "travelCost": {
       "hunger": 8,
       "thirst": 8
@@ -133,7 +163,10 @@
     "name": "zone.bunker_2",
     "map": "maps/bunker_2.json",
     "danger": 4,
-    "worldMapPos": [58, 10],
+    "worldMapPos": [
+      58,
+      10
+    ],
     "travelCost": {
       "hunger": 8,
       "thirst": 8
@@ -152,7 +185,10 @@
     "name": "zone.bunker_3",
     "map": "maps/bunker_3.json",
     "danger": 4,
-    "worldMapPos": [58, 10],
+    "worldMapPos": [
+      58,
+      10
+    ],
     "travelCost": {
       "hunger": 8,
       "thirst": 8
@@ -171,7 +207,10 @@
     "name": "zone.bunker_4",
     "map": "maps/bunker_4.json",
     "danger": 4,
-    "worldMapPos": [58, 10],
+    "worldMapPos": [
+      58,
+      10
+    ],
     "travelCost": {
       "hunger": 8,
       "thirst": 8
@@ -185,5 +224,39 @@
       "id": "bunker",
       "floor": 4
     }
+  },
+  "zone_military": {
+    "name": "zone.military",
+    "map": "maps/military.json",
+    "danger": 4,
+    "worldMapPos": [
+      95,
+      45
+    ],
+    "travelCost": {
+      "hunger": 10,
+      "thirst": 10
+    },
+    "respawnDays": 4,
+    "unlockLevel": 20,
+    "nightEnemyMultiplier": 1.5,
+    "requiresItem": "military_keycard",
+    "hint": "map.military_hint"
+  },
+  "zone_city": {
+    "name": "zone.city",
+    "map": "maps/city.json",
+    "danger": 4,
+    "worldMapPos": [
+      8,
+      14
+    ],
+    "travelCost": {
+      "hunger": 10,
+      "thirst": 12
+    },
+    "respawnDays": 4,
+    "unlockLevel": 25,
+    "nightEnemyMultiplier": 1.5
   }
 }

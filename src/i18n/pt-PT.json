@@ -245,5 +245,11 @@
   "map.checkpoint": "Entras no piso {floor} (checkpoint).",
   "msg.checkpoint": "Piso {floor}: checkpoint guardado.",
   "msg.boss_defeated": "Chefe derrotado! Volta daqui a uma semana.",
-  "map.bunker_hint": "Dizem que a chave está num cofre da Zona Industrial."
+  "map.bunker_hint": "Dizem que a chave está num cofre da Zona Industrial.",
+  "item.military_helmet": "Capacete militar",
+  "item.military_vest": "Colete militar",
+  "item.large_backpack": "Mochila grande",
+  "zone.military": "Base Militar",
+  "zone.city": "Cidade em Ruínas",
+  "map.military_hint": "O Guarda do Bunker tinha um cartão de acesso."
 }

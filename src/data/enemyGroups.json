@@ -26,5 +26,14 @@
     ["zombie_walker", 1, 2],
     ["zombie_runner", 1, 2]
   ],
-  "warden": [["boss_warden", 1, 1]]
+  "warden": [["boss_warden", 1, 1]],
+  "t4_mixed": [
+    ["zombie_walker", 2, 3],
+    ["zombie_runner", 1, 2]
+  ],
+  "squad": [
+    ["zombie_runner", 2, 3],
+    ["zombie_tank", 1, 1]
+  ],
+  "screamers": [["zombie_screamer", 1, 2]]
 }

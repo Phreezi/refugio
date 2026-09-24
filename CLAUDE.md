@@ -269,6 +269,7 @@ npm run map:lake   # gera maps/lake.json (idem)
 npm run map:t2     # gera maps/road.json, village.json, deep_forest.json (idem)
 npm run map:t3     # gera maps/industrial.json, hospital.json (idem)
 npm run map:bunker # gera maps/bunker_1..4.json (idem)
+npm run map:t4     # gera maps/military.json, city.json (idem)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -840,7 +841,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [x] Inimigos: tank (aviso mais longo, `windupSec`), screamer (grita e alerta os outros, `scream`).
 - [x] Armas à distância (besta, pistola) e munição craftável (virotes, pólvora, balas) na **bancada de trabalho** (nova estação, nível 12).
 - [x] **Bunker**: 4 pisos (`npm run map:bunker`), checkpoint por piso, chefe final (Guarda do Bunker, dá o cartão de acesso militar), chave num cofre da Zona Industrial (pista no mapa-mundo).
-- [ ] Zona T4: **Base Militar** (cartão de acesso), depois **Cidade em Ruínas**.
+- [x] Zona T4: **Base Militar** (cartão de acesso do chefe do bunker; arsenal com pistolas, capacetes e coletes militares), depois **Cidade em Ruínas** (16 prédios com lojas; nível 25). Mapas: `npm run map:t4`. Mochila grande como loot.
 - [ ] Zonas-evento: queda de avião, comboio, acampamento com comerciante (troca).
 - [ ] Veículo (moto): craft em várias peças, reduz custo de viagem.
 - [x] Medicina: ligaduras (craft nas mãos), kits médicos, estado "sangrar" (`bleedPct` dos inimigos; uma ligadura estanca). *(Infeção fica de fora: era opcional.)* Casaco e calças de couro.

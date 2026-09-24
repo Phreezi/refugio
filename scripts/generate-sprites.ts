@@ -2083,6 +2083,70 @@ const PHASE10C_ICONS: Sprite[] = [
   },
 ];
 
+/** Mochila (ícone): `big` = a grande, com bolsos dos lados. */
+function backpack(img: Bitmap, big: boolean): void {
+  const [x, w] = big ? [2, 12] : [4, 8];
+  img.fill(x, 4, w, 10, c(big ? 'forest' : 'wood'));
+  img.fill(x, 4, w, 2, c(big ? 'grass' : 'wood_light'));
+  img.fill(x + 2, 8, w - 4, 4, c(big ? 'forest_dark' : 'bark'));
+  img.fill(6, 2, 4, 2, c('bark_dark')); // pega
+  if (big) {
+    img.fill(0, 7, 2, 5, c('forest_dark'));
+    img.fill(14, 7, 2, 5, c('forest_dark'));
+  }
+  img.set(8, 10, c('gold'));
+}
+
+/** Fase 10 (parte D): equipamento militar e mochilas. */
+const PHASE10D_ICONS: Sprite[] = [
+  {
+    file: 'small_backpack',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      backpack(img, false);
+    },
+  },
+  {
+    file: 'large_backpack',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      backpack(img, true);
+    },
+  },
+  {
+    file: 'military_helmet',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 9, 6.5, 5, c('forest'));
+      img.ellipse(7, 7, 3.5, 2, c('grass'));
+      img.fill(1, 11, 14, 2, c('forest_dark'));
+      img.fill(4, 13, 1, 2, c('bark_dark'));
+      img.fill(11, 13, 1, 2, c('bark_dark'));
+    },
+  },
+  {
+    file: 'military_vest',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(3, 3, 10, 11, c('forest'));
+      img.fill(6, 3, 4, 3, c('ink')); // gola aberta
+      img.fill(4, 7, 3, 3, c('forest_dark'));
+      img.fill(9, 7, 3, 3, c('forest_dark'));
+      img.fill(3, 12, 10, 1, c('bark_dark'));
+      img.set(5, 8, c('stone_light'));
+      img.set(10, 8, c('stone_light'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -2107,6 +2171,7 @@ for (const [dir, list] of [
   [iconDir, PHASE10A_ICONS],
   [iconDir, PHASE10B_ICONS],
   [iconDir, PHASE10C_ICONS],
+  [iconDir, PHASE10D_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -2117,7 +2182,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length + PHASE10D_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).
