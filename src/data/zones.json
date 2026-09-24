@@ -61,7 +61,7 @@
     "name": "zone.village",
     "map": "maps/village.json",
     "danger": 2,
-    "worldMapPos": [62, 88],
+    "worldMapPos": [62, 82],
     "travelCost": {
       "hunger": 6,
       "thirst": 6
@@ -100,7 +100,7 @@
     "name": "zone.hospital",
     "map": "maps/hospital.json",
     "danger": 3,
-    "worldMapPos": [14, 86],
+    "worldMapPos": [18, 78],
     "travelCost": {
       "hunger": 8,
       "thirst": 9
@@ -185,5 +185,33 @@
       "id": "bunker",
       "floor": 4
     }
+  },
+  "zone_military": {
+    "name": "zone.military",
+    "map": "maps/military.json",
+    "danger": 4,
+    "worldMapPos": [95, 45],
+    "travelCost": {
+      "hunger": 10,
+      "thirst": 10
+    },
+    "respawnDays": 4,
+    "unlockLevel": 20,
+    "nightEnemyMultiplier": 1.5,
+    "requiresItem": "military_keycard",
+    "hint": "map.military_hint"
+  },
+  "zone_city": {
+    "name": "zone.city",
+    "map": "maps/city.json",
+    "danger": 4,
+    "worldMapPos": [8, 14],
+    "travelCost": {
+      "hunger": 10,
+      "thirst": 12
+    },
+    "respawnDays": 4,
+    "unlockLevel": 25,
+    "nightEnemyMultiplier": 1.5
   }
 }

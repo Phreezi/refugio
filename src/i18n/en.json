@@ -245,5 +245,11 @@
   "map.checkpoint": "You'll enter floor {floor} (checkpoint).",
   "msg.checkpoint": "Floor {floor}: checkpoint saved.",
   "msg.boss_defeated": "Boss defeated! It returns in a week.",
-  "map.bunker_hint": "They say the key is in a safe in the Industrial Zone."
+  "map.bunker_hint": "They say the key is in a safe in the Industrial Zone.",
+  "item.military_helmet": "Military helmet",
+  "item.military_vest": "Military vest",
+  "item.large_backpack": "Large backpack",
+  "zone.military": "Military Base",
+  "zone.city": "Ruined City",
+  "map.military_hint": "The Bunker Warden carried an access card."
 }
