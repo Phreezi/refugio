@@ -204,5 +204,16 @@
   "farm.nothing_yet": "Nothing to collect yet.",
   "msg.needs_item": "You need: {item}.",
   "craft.filter": "Can make",
-  "craft.nothing_to_make": "You don't have what's needed for anything in this category."
+  "craft.nothing_to_make": "You don't have what's needed for anything in this category.",
+  "structure.spike_trap": "Spike trap",
+  "horde.menu_on": "Hordes: on",
+  "horde.menu_off": "Hordes: off",
+  "horde.soon": "Horde in {hours} h",
+  "horde.waiting": "Horde waiting at the base",
+  "horde.active": "Horde! {n} left",
+  "horde.started": "A horde is coming! ({n} zombies)",
+  "horde.won": "Horde defeated! They left a bag with rewards.",
+  "horde.lost": "The horde has left.",
+  "horde.destroyed": "A piece was destroyed!",
+  "horde.repaired": "Repaired."
 }

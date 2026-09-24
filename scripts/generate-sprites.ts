@@ -1633,6 +1633,29 @@ const PHASE9: Sprite[] = [
     },
   },
   {
+    file: 'spike_trap',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(1, 6, 14, 8, c('bark'));
+      img.fill(1, 6, 14, 1, c('wood'));
+      img.fill(1, 10, 14, 1, c('bark_dark'));
+      for (const [x, y] of [
+        [3, 8],
+        [7, 8],
+        [11, 8],
+        [5, 12],
+        [9, 12],
+        [13, 12],
+      ] as const) {
+        img.fill(x, y - 4, 1, 4, c('stone_light'));
+        img.set(x, y - 5, c('cream'));
+        img.set(x + 1, y - 1, c('stone_dark'));
+      }
+    },
+  },
+  {
     file: 'seed_sack',
     width: 16,
     height: 16,

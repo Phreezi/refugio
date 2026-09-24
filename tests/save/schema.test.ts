@@ -98,6 +98,7 @@ describe('save: migrações', () => {
       nextStructureId: 3,
       crops: {},
       produce: {},
+      damage: {},
     });
     expect(parsed.state.zones).toEqual({});
     expect(parsed.state.stations).toEqual({});
@@ -176,6 +177,21 @@ describe('save: migrações', () => {
     const { state } = parseSave(text);
     expect(state.base.crops).toEqual({});
     expect(state.base.produce).toEqual({});
+  });
+
+  it('v8 → v9 (Fase 9): hordas desligadas e peças sem dano', () => {
+    const v8 = structuredClone(STATE) as unknown as Record<string, unknown> & {
+      base: Record<string, unknown>;
+    };
+    delete v8.base.damage;
+    delete v8.settings;
+    delete v8.horde;
+    const stateJson = JSON.stringify(v8);
+    const text = `{"version":8,"timestamp":6,"checksum":"${checksum(`8|6|${stateJson}`)}","state":${stateJson}}`;
+    const { state } = parseSave(text);
+    expect(state.base.damage).toEqual({});
+    expect(state.settings).toEqual({ hordes: false });
+    expect(state.horde).toEqual({ at: 0, count: 0, active: false });
   });
 
   it('valida a horta', () => {

@@ -1011,6 +1011,17 @@
         "border": "ink",
         "letter": "T"
       }
+    },
+    "spike_trap": {
+      "type": "image",
+      "file": "sprites/spike_trap.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark",
+        "border": "ink",
+        "letter": "E"
+      }
     }
   }
 }

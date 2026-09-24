@@ -51,6 +51,7 @@ export type TargetData =
   | { type: 'loot'; placement: ResourcePlacement }
   | { type: 'plot'; placement: ResourcePlacement; uid: number }
   | { type: 'producer'; placement: ResourcePlacement; uid: number }
+  | { type: 'repair'; placement: ResourcePlacement; uid: number }
   | { type: 'fish'; placement: ResourcePlacement };
 /** Os recursos que reaparecem verificam-se uma vez por segundo de jogo. */
 const RESPAWN_CHECK_TICKS = 20;
@@ -222,12 +223,15 @@ export class Interaction {
     const tileSize = this.building.tileSize;
     for (const [uid, id, tx, ty] of this.building.structures()) {
       const def = this.building.def(id);
-      if (!def || !(def.door || def.station || def.chest || def.farm || def.produce)) continue;
+      const damaged = this.building.damageOf(uid) > 0;
+      if (!def || !(damaged || def.door || def.station || def.chest || def.farm || def.produce)) continue;
       const feet = structureFeet(def, tx, ty, tileSize);
       const placement = { id, objectId: -uid, ...feet };
       const area = def.footprint ? footprintRect(feet, def.footprint) : structureArea(def, tx, ty, tileSize);
       let data: TargetData;
-      if (def.station) data = { type: 'station', placement, key: structureStationKey(def.station, uid) };
+      // Uma peça danificada pela horda (ou armadilha gasta) repara-se com a ação.
+      if (damaged) data = { type: 'repair', placement, uid };
+      else if (def.station) data = { type: 'station', placement, key: structureStationKey(def.station, uid) };
       else if (def.chest) data = { type: 'chest', placement, chestId: structureChestId(uid) };
       else if (def.farm) data = { type: 'plot', placement, uid };
       else if (def.produce) data = { type: 'producer', placement, uid };
@@ -270,6 +274,10 @@ export class Interaction {
       this.openLoot(data.placement);
     } else if (data.type === 'fish') {
       this.fishing.start();
+    } else if (data.type === 'repair') {
+      this.bus.emit('player:action', { kind: 'gather' });
+      const missing = this.building.repair(data.uid);
+      if (missing) this.bus.emit('action:blocked', { reason: 'needs_item', item: missing });
     } else if (data.type === 'plot') {
       this.homestead.usePlot(data.uid);
     } else if (data.type === 'producer') {

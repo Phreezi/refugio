@@ -291,6 +291,19 @@ export class ZoneScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setDepth(depth);
     this.structureSprites.set(uid, sprite);
+    this.applyDamageTint(uid);
+  }
+
+  /** Peças danificadas pela horda ficam avermelhadas (mais, quanto pior estiverem). */
+  private applyDamageTint(uid: number): void {
+    const sprite = this.structureSprites.get(uid);
+    const record = simulation.building.get(uid);
+    const def = record ? content.structures[record[1]] : undefined;
+    if (!sprite || !def) return;
+    const max = simulation.building.maxHp(def);
+    const ratio = max > 0 ? simulation.building.damageOf(uid) / max : 0;
+    if (ratio === 0) sprite.clearTint();
+    else sprite.setTint(ratio < 0.5 ? 0xffd8c8 : 0xff9a88);
   }
 
   /** Textura de uma peça no estado atual (porta aberta, canteiro regado, algo para recolher). */
@@ -471,6 +484,37 @@ export class ZoneScene extends Phaser.Scene {
         const record = simulation.building.get(uid);
         const def = record ? content.structures[record[1]] : undefined;
         if (record && def) this.structureSprites.get(uid)?.setTexture(this.structureTexture(record, def));
+        this.applyDamageTint(uid);
+      }),
+      eventBus.on('structure:damaged', ({ uid, amount, x, y }) => {
+        const record = simulation.building.get(uid);
+        const def = record ? content.structures[record[1]] : undefined;
+        // As armadilhas gastam-se sem números (seria ruído); as paredes mostram o dano.
+        if (!def?.trap) this.floatText(`-${String(amount)}`, Math.round(x), Math.round(y) - 14, 'red');
+        const sprite = this.structureSprites.get(uid);
+        if (sprite && !def?.trap) {
+          const sx = sprite.x;
+          [1, -1, 0].forEach((dx, i) => this.time.delayedCall(40 * i, () => sprite.setX(sx + dx)));
+        }
+      }),
+      eventBus.on('structure:destroyed', ({ x, y }) => {
+        // Pó a saltar do sítio da peça.
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const dust = this.add
+            .rectangle(Math.round(x), Math.round(y) - 6, 2, 2, paletteNumber(i % 2 ? 'stone' : 'wood'))
+            .setDepth(LAYER_DEPTH.decor_high + 1);
+          this.tweens.add({
+            targets: dust,
+            x: Math.round(x + Math.cos(angle) * 12),
+            y: Math.round(y - 6 + Math.sin(angle) * 8),
+            alpha: 0,
+            duration: 400,
+            onComplete: () => {
+              dust.destroy();
+            },
+          });
+        }
       }),
       eventBus.on('enemy:hit', ({ uid, damage, x, y }) => {
         this.floatText(`-${String(damage)}`, Math.round(x), Math.round(y) - 2, 'gold');
@@ -611,6 +655,17 @@ export class ZoneScene extends Phaser.Scene {
         .setSize(Math.max(1, Math.round((ENEMY_BAR * enemy.hp) / def.hp)), 2)
         .setDepth(y)
         .setVisible(hurt);
+    }
+    // Inimigos que desapareceram sem morrer (a horda foi-se embora): tirar do ecrã.
+    if (this.enemyViews.size > simulation.combat.list.length) {
+      const alive = new Set(simulation.combat.list.map((e) => e.uid));
+      for (const [uid, view] of this.enemyViews) {
+        if (alive.has(uid)) continue;
+        view.sprite.destroy();
+        view.barBack.destroy();
+        view.bar.destroy();
+        this.enemyViews.delete(uid);
+      }
     }
     // Jogador: vermelho quando leva um golpe; pisca enquanto está invulnerável.
     if (this.player) {

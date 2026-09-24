@@ -6,6 +6,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { ManifestError, parseManifest } from '../src/assets/manifest.ts';
 import {
   DataError,
+  HORDE_GROUP,
+  HORDE_REWARD_TABLE,
   parseEnemies,
   parseEnemyGroups,
   parseItems,
@@ -259,6 +261,7 @@ function checkEnemies(): string[] {
   const groups = loadEnemyGroups();
   if (Array.isArray(groups)) return groups.map((p) => `enemies: ${p}`);
   const problems: string[] = [];
+  if (!(HORDE_GROUP in groups)) problems.push(`enemyGroups.json: falta o grupo "${HORDE_GROUP}" (hordas)`);
   const ids = Object.keys(readJson('src/data/enemies.json') as object).filter((id) => id !== '$comment');
   for (const lang of ['pt-PT', 'en']) {
     const dict = readJson(`src/i18n/${lang}.json`);
@@ -295,8 +298,10 @@ function checkLoot(): string[] {
   const items = loadItems();
   if (Array.isArray(items)) return ['items.json inválido (ver acima)'];
   try {
-    parseLootTables(readJson('src/data/lootTables.json'), manifestKeys(), Object.keys(items));
-    return [];
+    const tables = parseLootTables(readJson('src/data/lootTables.json'), manifestKeys(), Object.keys(items));
+    return HORDE_REWARD_TABLE in tables
+      ? []
+      : [`lootTables.json: falta "${HORDE_REWARD_TABLE}" (prémio das hordas)`];
   } catch (error) {
     if (error instanceof DataError) return error.problems.map((p) => `lootTables.json: ${p}`);
     throw error;

@@ -12,6 +12,7 @@ import { Building } from './Building';
 import { Combat, type CombatContent } from './Combat';
 import { Fishing } from './Fishing';
 import { Homestead } from './Homestead';
+import { Horde, type HordeContent } from './Horde';
 import { Progression, type ProgressionContent } from './Progression';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
@@ -38,6 +39,7 @@ export class Simulation {
   readonly combat: Combat;
   readonly fishing: Fishing;
   readonly homestead: Homestead;
+  readonly horde: Horde;
   readonly progression: Progression;
   /** Zona para onde o jogador está a sair (a cena faz a transição). */
   private leavingTo: string | null = null;
@@ -77,6 +79,11 @@ export class Simulation {
       resources: content.resources,
       enemies: content.enemies,
     }),
+    horde: () => HordeContent = () => ({
+      items: content.items,
+      enemyGroups: content.enemyGroups,
+      lootTables: content.lootTables,
+    }),
   ) {
     this.state = state;
     this.bus = bus;
@@ -86,6 +93,8 @@ export class Simulation {
     this.building = new Building(state, bus, this.actions);
     this.building.isUnlocked = (id) => this.progression.isStructureUnlocked(id);
     this.combat = new Combat(state, bus, this.actions, combat);
+    this.combat.building = this.building;
+    this.horde = new Horde(state, bus, this.combat, horde);
     this.fishing = new Fishing(state, bus, this.actions, items);
     this.homestead = new Homestead(state, bus, this.actions, this.building, items);
     this.interaction = new Interaction(
@@ -109,6 +118,7 @@ export class Simulation {
     this.fishing.cancel();
     this.building.setZone(zone);
     this.combat.setZone(zone);
+    this.horde.setZone(zone);
     this.interaction.setZone(zone);
   }
 
@@ -221,6 +231,7 @@ export class Simulation {
     this.runAction(world.tick);
     this.interaction.tick(world.tick);
     this.combat.tick(this.sneaking);
+    this.horde.tick();
     this.crafting.advance(1);
     tickSurvival(this.state.data.player, world.tick, this.survival);
     if (this.state.data.player.hp <= 0) this.respawn();
@@ -264,6 +275,7 @@ export class Simulation {
   private respawn(): void {
     const player = this.state.data.player;
     const zoneId = player.zoneId;
+    this.horde.playerDied();
     const bag = this.combat.dropBag(zoneId, player.x, player.y, player.inventory, true);
     if (bag) player.inventory.fill(null);
     respawnVitals(player, this.survival);

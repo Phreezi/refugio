@@ -254,13 +254,96 @@ export class Building {
     this.zone?.collision.removeKeyed(collisionKey(uid));
     if (def.station) Reflect.deleteProperty(data.stations, structureStationKey(def.station, uid));
     if (def.chest) Reflect.deleteProperty(data.base.chests, structureChestId(uid));
-    Reflect.deleteProperty(data.base.produce, String(uid));
-    Reflect.deleteProperty(data.base.crops, String(uid));
+    this.forget(uid);
     this.recent = this.recent.filter((r) => r.uid !== uid);
     this.changed();
     this.bus.emit('structure:removed', { uid });
     const feet = structureFeet(def, tx, ty, this.tileSize);
     for (const { item, qty } of gains) this.bus.emit('item:gained', { item, qty, x: feet.x, y: feet.y });
+    return null;
+  }
+
+  /** Apaga o estado de uma peça que desapareceu (produção, horta, dano). */
+  private forget(uid: number): void {
+    const base = this.state.data.base;
+    Reflect.deleteProperty(base.produce, String(uid));
+    Reflect.deleteProperty(base.crops, String(uid));
+    Reflect.deleteProperty(base.damage, String(uid));
+  }
+
+  /** Peça sólida (fechada) no tile: o que uma horda tem de partir para passar. */
+  solidAt(tx: number, ty: number): number | null {
+    const top = this.grid?.at(tx, ty).top;
+    const def = top ? this.def(top[1]) : undefined;
+    if (!top || !def?.solid || def.hp === undefined || (def.door && top[5] === 1)) return null;
+    return top[0];
+  }
+
+  /** Dano acumulado de uma peça (hordas) ou golpes dados (armadilhas). */
+  damageOf(uid: number): number {
+    return this.state.data.base.damage[String(uid)] ?? 0;
+  }
+
+  /** Vida máxima de uma peça contra hordas (armadilhas: golpes que aguentam). */
+  maxHp(def: StructureDef): number {
+    return def.hp ?? def.trap?.uses ?? 0;
+  }
+
+  /** Dano de uma horda numa peça; a 0 de vida desaparece (sem reembolso). */
+  damageStructure(uid: number, amount: number): void {
+    const record = this.grid?.get(uid);
+    const def = record ? this.def(record[1]) : undefined;
+    if (!record || !def || this.maxHp(def) === 0 || amount <= 0) return;
+    const damage = this.damageOf(uid) + amount;
+    this.state.data.base.damage[String(uid)] = damage;
+    this.state.markDirty();
+    const feet = structureFeet(def, record[2], record[3], this.tileSize);
+    this.bus.emit('structure:damaged', { uid, amount, x: feet.x, y: feet.y });
+    if (damage >= this.maxHp(def)) this.destroy(uid);
+    else this.bus.emit('structure:changed', { uid });
+  }
+
+  /** Tira uma peça destruída pela horda (ou uma armadilha gasta): sem reembolso nem verificações. */
+  destroy(uid: number): void {
+    const record = this.grid?.get(uid);
+    const def = record ? this.def(record[1]) : undefined;
+    if (!record || !def || !this.grid) return;
+    const data = this.state.data;
+    const index = data.base.structures.indexOf(record);
+    if (index >= 0) data.base.structures.splice(index, 1);
+    this.grid.remove(uid);
+    this.zone?.collision.removeKeyed(collisionKey(uid));
+    this.forget(uid);
+    this.recent = this.recent.filter((r) => r.uid !== uid);
+    this.state.markDirty();
+    const feet = structureFeet(def, record[2], record[3], this.tileSize);
+    this.bus.emit('structure:removed', { uid });
+    this.bus.emit('structure:destroyed', { uid, x: feet.x, y: feet.y });
+  }
+
+  /** Materiais para reparar uma peça danificada: `structureRepairPct`% do custo (mín. 1 de cada). */
+  repairCost(id: string): { item: string; qty: number }[] {
+    const def = this.def(id);
+    if (!def) return [];
+    return def.cost.map(({ item, qty }) => ({
+      item,
+      qty: Math.max(1, Math.ceil((qty * BALANCE.structureRepairPct) / 100)),
+    }));
+  }
+
+  /** Repara uma peça danificada (fica como nova). @returns o item que falta, ou null se reparou. */
+  repair(uid: number): string | null {
+    const record = this.grid?.get(uid);
+    if (!record || this.damageOf(uid) === 0) return null;
+    const containers = this.actions.pickupContainers();
+    const cost = this.repairCost(record[1]);
+    const missing = cost.find(({ item, qty }) => countItem(containers, item) < qty);
+    if (missing) return missing.item;
+    for (const { item, qty } of cost) removeItem(containers, item, qty);
+    Reflect.deleteProperty(this.state.data.base.damage, String(uid));
+    this.changed();
+    this.bus.emit('structure:repaired', { uid });
+    this.bus.emit('structure:changed', { uid });
     return null;
   }
 

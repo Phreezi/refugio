@@ -156,6 +156,7 @@ refugio/
 │   │   ├── Combat.ts         # inimigos da zona, golpes, dano/armadura, mochilas no chão (§7.8–§7.12)
 │   │   ├── Fishing.ts        # pesca (mini-jogo de 1 botão) e encher garrafas no lago
 │   │   ├── Homestead.ts      # horta (plantar/regar/colher) e peças que produzem (coletor, armadilha)
+│   │   ├── Horde.ts          # hordas opcionais: calendário, chegada, prémio (§7.13)
 │   │   ├── Progression.ts    # XP (ouve os eventos), níveis, desbloqueios, notas de receitas
 │   │   ├── DayNight.ts       # hora do dia, escuridão, é noite?
 │   │   ├── offline.ts        # tempo offline (§7.6)
@@ -394,7 +395,7 @@ Os nós de recurso reaparecem (ver zonas).
 - Colocação: pré-visualização verde/vermelha (com o motivo), rodar (portas, janelas, vedações: horizontal/vertical), desfazer nos últimos 10 s (de jogo) com reembolso total. A peça vai para o tile à frente do jogador, ou para o tile do rato/toque.
 - Demolir devolve 50% dos materiais (arredondado para baixo); só demole se o reembolso couber na mochila. Não se demole uma fundação com estação/baú por cima, uma estação com trabalhos/itens nem um baú com itens.
 - Portas abrem/fecham com a ação contextual (não fecham com o jogador lá dentro).
-- Estruturas **não decaem**.
+- Estruturas **não decaem** (só as hordas as danificam, §7.13).
 - Estações e baús só podem ser colocados sobre fundação (o chão da casa em ruínas do mapa também conta).
 - Save: `base.structures = [[uid, id, tx, ty, rot, estado]]` (estado 1 = porta aberta) e `base.nextStructureId`. Estações construídas: `stations["<tipo>_s<uid>"]`; baús: `base.chests["s<uid>"]`.
 
@@ -449,9 +450,14 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 
 ### 7.13 Hordas (raids opcionais, Fase 9)
 
-- Desligado por defeito. Se ligado: a cada 3 dias de jogo, uma horda ataca a base.
-- Aviso com 1 dia de antecedência.
-- Recompensa: caixa de horda com loot raro. Paredes danificadas reparam-se com 25% do custo.
+- Desligado por defeito; liga-se no menu inicial ("Hordas: ligadas"), gravado no save (`settings.hordes`). Se ligado: a cada `hordeEveryDays` (3) dias de jogo, às `hordeHour` (22 h), uma horda (grupo `horde` de `enemyGroups.json`: 6 walkers + 2 runners; cada horda vencida +25%, até ×2) chega pelas saídas da base (`core/Horde.ts`).
+- Só ataca com o jogador na base: se estiver fora, espera por ele ("Horda à espera na base").
+- Aviso no HUD nas últimas 24 h ("Horda em N h") e, durante a horda, quantos faltam.
+- Os zombies da horda veem sempre o jogador e não desistem; quando ficam presos (`hordeStuckSec`) contra uma peça sólida construída, atacam-na (com o aviso normal). Peças sólidas têm `hp` (`structures.json`); a 0 desaparecem sem reembolso. Portas abertas deixam passar.
+- **Armadilha de estacas** (`spike_trap`, `trap`): fere quem a pisa (`damage` a cada `everySec`) e gasta-se ao fim de `uses` golpes.
+- Peças danificadas (e armadilhas gastas) ficam avermelhadas e reparam-se com a ação contextual por `structureRepairPct`% (25%) do custo.
+- Vencer: mochila no chão com o prémio (`horde_reward` de `lootTables.json`). Morrer: a horda vai-se embora sem prémio (a seguinte não cresce).
+- Save: `horde = { at, count, active }` (a meio de uma horda, recarregar fá-la voltar inteira) e `base.damage[uid]`.
 
 ### 7.14 Horta e produção na base (Fase 9)
 
@@ -812,11 +818,11 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [x] Horta: plantar sementes da Quinta (sacos de sementes no celeiro), regar com água, colher (ver §7.14).
 - [x] Coletor de água da chuva.
 - [x] Armadilhas de caça simples.
-- [ ] Hordas opcionais (desligadas por defeito) com aviso e recompensa.
-- [ ] Durabilidade de estruturas **apenas** em hordas; reparação barata.
+- [x] Hordas opcionais (desligadas por defeito; botão no menu inicial) com aviso e recompensa (ver §7.13).
+- [x] Durabilidade de estruturas **apenas** em hordas; reparação barata (ação contextual, 25% do custo). Armadilha de estacas.
 - [x] Qualidade de vida: filtro "Posso fazer" no fabrico. *("Guardar semelhantes" e "Ordenar" já existem desde a Fase 3/4.)*
 
-**Aceitação:** com hordas ligadas, uma base de pedra com 2 armadilhas aguenta uma horda de 8 zombies sem intervenção perfeita do jogador.
+**Aceitação:** com hordas ligadas, uma base de pedra com 2 armadilhas aguenta uma horda de 8 zombies sem intervenção perfeita do jogador. *(Simulado em `tests/core/Horde.test.ts`: um jogador que nunca recua, com machete, vence em ~35 s; caem 2 das 16 paredes.)*
 
 ---
 
@@ -1012,3 +1018,8 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Horta: 1 rega por plantação (não todos os dias) | Simples e sem castigo por não aparecer; a água continua a ser um custo |
 | 2026-09-24 | Save v8: `base.crops` e `base.produce` (pelo uid da peça) | Migração v7 → v8 com teste; o início da produção pode ser negativo (o tempo offline recua-o) |
 | 2026-09-24 | Sementes vêm de sacos na Quinta (e raramente do armário da aldeia) | Dá razão para voltar à Quinta; a colheita devolve sementes, por isso a horta sustenta-se |
+| 2026-09-24 | Hordas só atacam com o jogador na base (esperam por ele) | "Justo, não punitivo": nunca se volta para uma base destruída sem ter tido hipótese de a defender |
+| 2026-09-24 | Morrer durante a horda faz a horda ir-se embora (sem prémio) | Evita um ciclo de mortes ao reaparecer na base cercada |
+| 2026-09-24 | Sem pathfinding: a horda vai a direito para o jogador e parte o que a bloqueia | Simples, previsível e dá sentido às paredes e às armadilhas no caminho |
+| 2026-09-24 | Reparar com a ação contextual (a peça danificada passa a ser alvo) | Sem modo novo nem botões; custo de 25% como pede §7.13 |
+| 2026-09-24 | Save v9: `settings.hordes`, `horde`, `base.damage`; interruptor das hordas no menu inicial | A definição vive no save (vai com o Exportar/Importar); ainda não há menu de pausa (Fase 11) |

@@ -38,6 +38,8 @@ export class MainMenuScene extends Phaser.Scene {
   private busy = false;
   private status: Label | null = null;
   private primaryAction: (() => void) | null = null;
+  /** Hordas ligadas (§7.13): vem do save e aplica-se ao continuar ou ao começar um jogo novo. */
+  private hordes = false;
 
   constructor() {
     super(SceneKey.MainMenu);
@@ -123,8 +125,11 @@ export class MainMenuScene extends Phaser.Scene {
   private buildButtons(result: LoadResult, keepMessage: boolean): void {
     const { width, height } = getView();
     const cx = Math.round(width / 2);
-    const y = Math.round(height * 0.5);
+    // Coluna de botões (Continuar, Novo jogo, Hordas): cabe até na altura mínima (216 px).
+    const y = Math.round(height * 0.42);
+    const spacing = 26;
     const save = result.save;
+    this.hordes = save?.state.settings.hordes ?? false;
 
     if (save) {
       const time = clockAt(save.state.world.tick, BALANCE.dayLengthSec, BALANCE.dayStartHour);
@@ -134,7 +139,7 @@ export class MainMenuScene extends Phaser.Scene {
       new Button(this, cx, y, t('menu.continue', { day: time.day }), MAIN_BUTTON, this.primaryAction);
       this.confirmButton(
         cx,
-        y + 30,
+        y + spacing,
         'menu.new_game',
         'menu.confirm_new',
         { ...MAIN_BUTTON, style: 'secondary' },
@@ -148,6 +153,20 @@ export class MainMenuScene extends Phaser.Scene {
       };
       new Button(this, cx, y, t('menu.new_game'), MAIN_BUTTON, this.primaryAction);
     }
+
+    // Hordas (desligadas por defeito): definição do jogo, gravada no save.
+    const hordeY = y + (save ? spacing * 2 : spacing);
+    const hordeButton = new Button(
+      this,
+      cx,
+      hordeY,
+      t(this.hordes ? 'horde.menu_on' : 'horde.menu_off'),
+      { ...SMALL_BUTTON, width: MAIN_BUTTON.width },
+      () => {
+        this.hordes = !this.hordes;
+        hordeButton.setText(t(this.hordes ? 'horde.menu_on' : 'horde.menu_off'));
+      },
+    );
 
     // Gestão do save: linha de botões pequenos.
     const rowY = height - 50;
@@ -179,10 +198,10 @@ export class MainMenuScene extends Phaser.Scene {
         },
       ]);
     }
-    const spacing = SMALL_BUTTON.width + 8;
-    const firstX = cx - Math.round(((actions.length - 1) * spacing) / 2);
+    const rowSpacing = SMALL_BUTTON.width + 8;
+    const firstX = cx - Math.round(((actions.length - 1) * rowSpacing) / 2);
     actions.forEach(([, make], i) => {
-      make(firstX + i * spacing);
+      make(firstX + i * rowSpacing);
     });
 
     if (result.corrupted && !keepMessage) this.setStatus(save ? 'save.recovered' : 'save.corrupt_lost');
@@ -212,6 +231,15 @@ export class MainMenuScene extends Phaser.Scene {
     });
   }
 
+  /** Grava a escolha das hordas no jogo; ao ligá-las, a primeira vem daqui a uns dias. */
+  private applyHordes(): void {
+    const data = gameState.data;
+    if (data.settings.hordes === this.hordes) return;
+    data.settings.hordes = this.hordes;
+    if (this.hordes && !data.horde.active) data.horde.at = 0; // marca-se de novo a partir de agora
+    gameState.markDirty();
+  }
+
   private setStatus(key: MessageKey): void {
     this.status?.setText(t(key));
   }
@@ -220,6 +248,7 @@ export class MainMenuScene extends Phaser.Scene {
     if (this.busy) return; // Enter com a tecla presa repete o evento
     this.busy = true;
     const state = gameState.load(save.state);
+    this.applyHordes();
     // Tempo em que o jogo esteve fechado: crafts e reaparecimento de recursos avançam (§7.6).
     const ticks = offlineTicks(save.timestamp, Date.now(), BALANCE.offlineCapHours, FIXED_STEP_MS);
     if (ticks > 0) {
@@ -235,6 +264,7 @@ export class MainMenuScene extends Phaser.Scene {
     if (this.busy) return;
     this.busy = true;
     const state = gameState.newGame(content.zoneMap(BASE_ZONE_ID).playerSpawn);
+    this.applyHordes();
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
     void autosave.flush(); // o jogo novo substitui já o antigo
     this.scene.start(SceneKey.Zone, { zoneId: BASE_ZONE_ID } satisfies ZoneSceneData);

@@ -1,5 +1,5 @@
 {
-  "$comment": "Peças de construção da base (CLAUDE.md §7.7), pela ordem da paleta do modo construção. layer: floor (fundação) ou top. size: [largura, altura] em tiles. solid: bloqueia os tiles inteiros; footprint: caixa sólida nos pés. rotatable: sprites <sprite> e <sprite>_v; door: também <sprite>_open. needsFoundation: só sobre fundação (ou chão da casa em ruínas). farm: canteiro da horta (sprite _wet regado). produce: produz sozinha a cada everyHours horas de jogo, até max; drops por unidade; needs = item gasto por unidade (sprite _full com algo para recolher).",
+  "$comment": "Peças de construção da base (CLAUDE.md §7.7), pela ordem da paleta do modo construção. layer: floor (fundação) ou top. size: [largura, altura] em tiles. solid: bloqueia os tiles inteiros; footprint: caixa sólida nos pés. rotatable: sprites <sprite> e <sprite>_v; door: também <sprite>_open. needsFoundation: só sobre fundação (ou chão da casa em ruínas). farm: canteiro da horta (sprite _wet regado). produce: produz sozinha a cada everyHours horas de jogo, até max; drops por unidade; needs = item gasto por unidade (sprite _full com algo para recolher). hp: vida contra as hordas (só peças sólidas). trap: armadilha de estacas { damage, everySec, uses }.",
   "foundation_wood": {
     "sprite": "foundation_wood",
     "layer": "floor",
@@ -15,14 +15,16 @@
     "sprite": "wall_wood",
     "layer": "top",
     "solid": true,
-    "cost": [["wood", 2]]
+    "cost": [["wood", 2]],
+    "hp": 60
   },
   "wall_stone": {
     "sprite": "wall_stone",
     "layer": "top",
     "solid": true,
     "cost": [["stone", 3]],
-    "unlockLevel": 5
+    "unlockLevel": 5,
+    "hp": 200
   },
   "door_wood": {
     "sprite": "door_wood",
@@ -34,7 +36,8 @@
       ["wood_plank", 2],
       ["rope", 1]
     ],
-    "unlockLevel": 2
+    "unlockLevel": 2,
+    "hp": 80
   },
   "window_wood": {
     "sprite": "window_wood",
@@ -45,14 +48,16 @@
       ["wood_plank", 2],
       ["wood", 1]
     ],
-    "unlockLevel": 3
+    "unlockLevel": 3,
+    "hp": 50
   },
   "fence_wood": {
     "sprite": "fence_wood",
     "layer": "top",
     "solid": true,
     "rotatable": true,
-    "cost": [["wood", 1]]
+    "cost": [["wood", 1]],
+    "hp": 30
   },
   "torch": {
     "sprite": "torch",
@@ -174,6 +179,20 @@
     "cost": [
       ["wood", 2],
       ["rope", 2]
+    ]
+  },
+  "spike_trap": {
+    "sprite": "spike_trap",
+    "layer": "top",
+    "unlockLevel": 6,
+    "trap": {
+      "damage": 12,
+      "everySec": 0.8,
+      "uses": 25
+    },
+    "cost": [
+      ["wood", 4],
+      ["nails", 4]
     ]
   }
 }

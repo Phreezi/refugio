@@ -38,6 +38,12 @@ export interface Enemy {
   dir: Vec2;
   /** Derrotado, a rebentar (inchado): ticks até explodir (0 = vivo). */
   dying: number;
+  /** Da horda (§7.13): vê sempre o jogador e não desiste (sem leash). */
+  horde: boolean;
+  /** Ticks seguidos sem se aproximar do jogador (preso numa parede). */
+  stuck: number;
+  /** Peça construída que está a atacar (uid), quando o aviso é contra ela. */
+  siege: number | null;
 }
 
 export interface AiContext {
@@ -50,6 +56,10 @@ export interface AiContext {
   ticksPerSec: number;
   windupTicks: number;
   sneakDetectMultiplier: number;
+  /** Hordas: ticks presos até atacarem o que os bloqueia. */
+  stuckTicks?: number;
+  /** Hordas: peça construída que bloqueia o caminho até ao jogador (uid) ou null. */
+  obstacle?: (enemy: Enemy) => number | null;
 }
 
 /** Distância a mais que o ataque ainda alcança no fim do aviso (o jogador tem de recuar). */
@@ -76,6 +86,9 @@ export function createEnemy(uid: number, id: string, def: EnemyDef, at: Vec2): E
     charging: false,
     dir: { x: 0, y: 0 },
     dying: 0,
+    horde: false,
+    stuck: 0,
+    siege: null,
   };
 }
 
@@ -103,9 +116,10 @@ function startIdle(enemy: Enemy, ctx: AiContext): void {
 
 /**
  * Um tick de IA.
- * @returns 'attack' quando um ataque acaba o aviso com o jogador ao alcance (quem chama aplica o dano).
+ * @returns 'attack' quando um ataque acaba o aviso com o jogador ao alcance, 'siege' quando acaba
+ * o aviso contra a peça `enemy.siege` (quem chama aplica o dano).
  */
-export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack' | null {
+export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack' | 'siege' | null {
   enemy.px = enemy.x;
   enemy.py = enemy.y;
   if (enemy.dying > 0) return null; // a rebentar: quem trata é o Combat
@@ -118,8 +132,9 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
   }
   const toPlayer = distance(enemy, ctx.player);
   const detect = def.detectRadius * (ctx.sneaking ? ctx.sneakDetectMultiplier : 1);
-  const sees = toPlayer <= detect;
-  const playerFarFromHome = distance(ctx.player, enemy.home) > def.leashRadius;
+  // A horda vem à procura do jogador e não desiste.
+  const sees = enemy.horde || toPlayer <= detect;
+  const playerFarFromHome = !enemy.horde && distance(ctx.player, enemy.home) > def.leashRadius;
 
   if (def.behavior === 'flee') {
     if (sees) {
@@ -148,6 +163,7 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
       }
       enemy.state = 'recover';
       enemy.timer = Math.round(def.attackSec * ctx.ticksPerSec);
+      if (enemy.siege !== null) return 'siege';
       return toPlayer <= def.attackRange + ATTACK_SLACK_PX ? 'attack' : null;
     case 'charge': {
       const speed = (def.charge?.speed ?? def.speed) / ctx.ticksPerSec;
@@ -186,12 +202,13 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
       }
       return null;
     case 'chase':
-      if (distance(enemy, enemy.home) > def.leashRadius || playerFarFromHome) {
+      if ((!enemy.horde && distance(enemy, enemy.home) > def.leashRadius) || playerFarFromHome) {
         enemy.state = 'return';
         return null;
       }
       if (toPlayer <= def.attackRange && def.damage > 0) {
         enemy.state = 'windup';
+        enemy.siege = null;
         enemy.charging = false;
         enemy.timer = ctx.windupTicks;
         return null;
@@ -199,11 +216,13 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
       // Javali: de longe, avisa e carrega (um aviso mais longo, para dar tempo de sair da frente).
       if (def.charge && toPlayer <= def.charge.range) {
         enemy.state = 'windup';
+        enemy.siege = null;
         enemy.charging = true;
         enemy.timer = ctx.windupTicks * 2;
         return null;
       }
       walk(enemy, def, ctx.player, def.speed, ctx, def.attackRange - 2);
+      if (enemy.horde) besiege(enemy, def, ctx, toPlayer);
       return null;
     default:
       if (sees && !playerFarFromHome) {
@@ -213,6 +232,23 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
       wander(enemy, def, ctx);
       return null;
   }
+}
+
+/**
+ * Hordas: quem não se consegue aproximar do jogador (preso contra uma parede construída) ataca a
+ * peça que o bloqueia, com o mesmo aviso de um ataque normal.
+ */
+function besiege(enemy: Enemy, def: EnemyDef, ctx: AiContext, before: number): void {
+  const progress = before - distance(enemy, ctx.player);
+  enemy.stuck = progress < (def.speed / ctx.ticksPerSec) * 0.3 ? enemy.stuck + 1 : 0;
+  if (enemy.stuck < (ctx.stuckTicks ?? Infinity) || !ctx.obstacle || def.damage <= 0) return;
+  const uid = ctx.obstacle(enemy);
+  if (uid === null) return;
+  enemy.stuck = 0;
+  enemy.siege = uid;
+  enemy.state = 'windup';
+  enemy.charging = false;
+  enemy.timer = ctx.windupTicks;
 }
 
 /** Parado um bocado, depois anda devagar para um ponto perto de casa. */
