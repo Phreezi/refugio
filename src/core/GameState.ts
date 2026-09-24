@@ -1,4 +1,5 @@
 import { BALANCE } from '../data/balance';
+import { EQUIP_SLOTS } from '../data/types';
 import type { StructureRecord } from '../systems/building/building';
 import { createStationState, type StationState } from '../systems/crafting/crafting';
 import { createContainer, type Container } from '../systems/inventory/inventory';
@@ -21,6 +22,8 @@ export interface PlayerState {
   inventory: Container;
   /** Hotbar de acesso rápido (teclas 1–4); mantém-se ao morrer (§7.12). */
   hotbar: Container;
+  /** Equipamento, pela ordem de EQUIP_SLOTS (arma, cabeça, corpo, pernas, pés, mochila). */
+  equipment: Container;
 }
 
 export interface WorldState {
@@ -39,9 +42,21 @@ export interface BaseState {
   nextStructureId: number;
 }
 
+/** Mochila no chão: a da morte (§7.12) ou o que não coube ao matar um inimigo. */
+export interface GroundBag {
+  x: number;
+  y: number;
+  items: Container;
+  /** Desaparece a esta hora (ms reais, Date.now). */
+  expiresAt: number;
+  /** A mochila deixada ao morrer (marcada no mapa-mundo, Fase 7). */
+  death: boolean;
+}
+
 export interface ZoneState {
   /** Recursos apanhados: id do objeto no Tiled → tick em que reaparece. */
   depleted: Record<string, number>;
+  bags: GroundBag[];
 }
 
 /**
@@ -80,6 +95,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       thirst: BALANCE.statMax,
       inventory: createContainer(BALANCE.inventorySlots),
       hotbar,
+      equipment: createContainer(EQUIP_SLOTS.length),
     },
     world: { tick: 0, rng: seed >>> 0 },
     base: { chests: { [STARTING_CHEST_ID]: startingChest() }, structures: [], nextStructureId: 1 },
@@ -104,7 +120,7 @@ export function stationState(data: GameStateData, key: string): StationState {
 
 /** Estado de uma zona (criado se ainda não existir). */
 export function zoneState(data: GameStateData, zoneId: string): ZoneState {
-  data.zones[zoneId] ??= { depleted: {} };
+  data.zones[zoneId] ??= { depleted: {}, bags: [] };
   return data.zones[zoneId];
 }
 

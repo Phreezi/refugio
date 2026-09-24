@@ -7,7 +7,8 @@ import { simulation } from '../core/Simulation';
 import { BALANCE } from '../data/balance';
 import { getView, setupFixedCamera } from '../display/view';
 import { pinchStep, stepWorldZoom } from '../display/worldZoom';
-import { itemName, t, type MessageKey } from '../i18n';
+import { itemName, t, tKey, type MessageKey } from '../i18n';
+import { content } from '../world/content';
 import { readJoystick } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
 import { Button } from '../ui/Button';
@@ -181,8 +182,12 @@ export class UIScene extends Phaser.Scene {
 
   private listenForMessages(): () => void {
     const offs = [
-      eventBus.on('player:died', () => {
-        this.showNotice(t('hud.died'));
+      eventBus.on('player:died', ({ zoneId, bag }) => {
+        const zone = tKey(content.zones[zoneId]?.name ?? zoneId);
+        // A cena de jogo pode mudar (morreu noutra zona): a mensagem fica para o HUD novo.
+        uiState.pendingNotice = bag ? `${t('hud.died')}\n${t('msg.bag_dropped', { zone })}` : t('hud.died');
+        this.showNotice(uiState.pendingNotice);
+        if (zoneId === gameState.data.player.zoneId) uiState.pendingNotice = null;
       }),
       eventBus.on('action:blocked', ({ reason, tool }) => {
         if (reason === 'inventory_full') this.showNotice(t('msg.inventory_full'));
@@ -389,8 +394,8 @@ export class UIScene extends Phaser.Scene {
 
   /** Tile do mundo por baixo do ponteiro (a câmara da cena de jogo tem outro zoom e posição). */
   private worldTile(pointer: Phaser.Input.Pointer): Tile | null {
-    const game = this.scene.get(SceneKey.Base);
-    if (!this.scene.isActive(SceneKey.Base)) return null;
+    const game = this.scene.get(SceneKey.Zone);
+    if (!this.scene.isActive(SceneKey.Zone)) return null;
     const point = game.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const size = simulation.building.tileSize;
     return { tx: Math.floor(point.x / size), ty: Math.floor(point.y / size) };

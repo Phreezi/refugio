@@ -131,6 +131,20 @@ describe('save: migrações', () => {
     });
   });
 
+  it('v4 → v5 (Fase 6): equipamento vazio e mochilas no chão por zona', () => {
+    const v4 = structuredClone(STATE) as unknown as {
+      player: Record<string, unknown>;
+      zones: Record<string, unknown>;
+    };
+    delete v4.player.equipment;
+    v4.zones = { zone_base: { depleted: { '7': 90 } } };
+    const stateJson = JSON.stringify(v4);
+    const text = `{"version":4,"timestamp":9,"checksum":"${checksum(`4|9|${stateJson}`)}","state":${stateJson}}`;
+    const { state } = parseSave(text);
+    expect(state.player.equipment).toEqual([null, null, null, null, null, null]);
+    expect(state.zones).toEqual({ zone_base: { depleted: { '7': 90 }, bags: [] } });
+  });
+
   it('valida as peças construídas', () => {
     const bad = structuredClone(STATE);
     bad.base.structures.push([1, 'wall_wood', 3, 4, 2, 0]);

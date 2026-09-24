@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
-import { PALETTE } from '../assets/palette';
+import { PALETTE, paletteNumber, type PaletteColor } from '../assets/palette';
 import { PLAYER_FOOTPRINT } from '../config';
 import { eventBus } from '../core/EventBus';
-import { itemName, t } from '../i18n';
+import { itemName, t, tKey } from '../i18n';
 import { Label } from '../ui/text';
 import { gameSpeed } from '../ui/gameSpeed';
 import { uiState } from '../ui/uiState';
 import { CHARACTER_COLUMNS, CHARACTER_ROWS, characterFrame } from '../assets/characterSheet';
-import { BASE_MAP_KEY } from '../config';
+import { zoneMapKey } from '../config';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
 import { simulation } from '../core/Simulation';
 import { getView } from '../display/view';
@@ -55,14 +55,39 @@ const GHOST_AREA_DEPTH = FOUNDATION_DEPTH + 0.2;
 const GHOST_OK = 0x78ae48;
 const GHOST_BAD = 0xb33a3a;
 
+/** Transição entre zonas (fade). */
+const FADE_MS = 250;
+/** Largura da barra de vida dos inimigos (px, par). */
+const ENEMY_BAR = 12;
+
+export interface ZoneSceneData {
+  /** Zona a mostrar (omisso = a zona onde o jogador está no GameState). */
+  zoneId?: string;
+}
+
+interface EnemyView {
+  sprite: Phaser.GameObjects.Image;
+  barBack: Phaser.GameObjects.Rectangle;
+  bar: Phaser.GameObjects.Rectangle;
+}
+
 const walkAnimationKey = (facing: Facing): string => `${PLAYER_TEXTURE}_walk_${facing}`;
 const sneakAnimationKey = (facing: Facing): string => `${PLAYER_TEXTURE}_sneak_${facing}`;
 const SNEAK_FRAME_RATE = 4;
 
 type MoveKeys = Record<'up' | 'down' | 'left' | 'right' | 'action' | 'sneak', Phaser.Input.Keyboard.Key[]>;
 
-/** A base do jogador: mapa Tiled, recursos, obstáculos, baú e o jogador (andar e recolher). */
-export class BaseScene extends Phaser.Scene {
+/**
+ * Uma zona jogável (a base ou uma zona explorável): mapa Tiled, recursos, obstáculos, peças
+ * construídas, inimigos, mochilas no chão e o jogador. As saídas levam a outras zonas.
+ */
+export class ZoneScene extends Phaser.Scene {
+  private zoneId: string = BASE_ZONE_ID;
+  private enemyViews = new Map<number, EnemyView>();
+  private bagSprites: Phaser.GameObjects.Image[] = [];
+  /** A sair da zona (fade em curso): o jogador fica parado. */
+  private leaving = false;
+  private hurtUntil = 0;
   private player: Phaser.GameObjects.Sprite | null = null;
   private keys: MoveKeys | null = null;
   /** Sprites dos recursos, pelo id do objeto no Tiled (para golpes, esconder e reaparecer). */
@@ -77,11 +102,15 @@ export class BaseScene extends Phaser.Scene {
   private attackUntil = 0;
 
   constructor() {
-    super(SceneKey.Base);
+    super(SceneKey.Zone);
   }
 
-  create(): void {
-    const zone = content.zoneMap(BASE_ZONE_ID);
+  create(data: ZoneSceneData): void {
+    const zoneId = data.zoneId ?? gameState.data.player.zoneId;
+    this.zoneId = content.zones[zoneId] ? zoneId : BASE_ZONE_ID;
+    this.leaving = false;
+    this.hurtUntil = 0;
+    const zone = content.zoneMap(this.zoneId);
     this.createMap();
 
     // Recursos, obstáculos e baús: pés no ponto do mapa (arredondado: posições inteiras), Y-sort.
@@ -129,7 +158,7 @@ export class BaseScene extends Phaser.Scene {
 
     this.keys = this.createMoveKeys();
     simulation.setZone({
-      zoneId: BASE_ZONE_ID,
+      zoneId: this.zoneId,
       map: zone,
       collision: CollisionWorld.fromZone(zone, content.resources, content.props, content.stations),
       items: content.items,
@@ -138,7 +167,7 @@ export class BaseScene extends Phaser.Scene {
       stations: content.stations,
       structures: content.structures,
     });
-    simulation.setRespawnPoint(zone.playerSpawn);
+    simulation.setRespawnPoint(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     simulation.reset();
     for (const [objectId, sprite] of this.resourceSprites) {
       sprite.setVisible(!simulation.interaction.isDepleted(objectId));
@@ -149,7 +178,10 @@ export class BaseScene extends Phaser.Scene {
     this.ghost = this.add.image(0, 0, '__DEFAULT').setOrigin(0.5, 1).setAlpha(0.75).setVisible(false);
     this.ghostArea = this.add.rectangle(0, 0, 16, 16, GHOST_OK, 0.3).setOrigin(0).setVisible(false);
     this.ghostArea.setDepth(GHOST_AREA_DEPTH);
+    this.enemyViews = new Map();
+    this.renderBags();
     const offFeedback = this.listenForFeedback();
+    camera.fadeIn(FADE_MS);
     autosave.start();
     this.scene.launch(SceneKey.UI, {});
 
@@ -166,6 +198,8 @@ export class BaseScene extends Phaser.Scene {
       simulation.setRespawnPoint(null);
       this.resourceSprites.clear();
       this.structureSprites.clear();
+      this.enemyViews.clear();
+      this.bagSprites = [];
       this.marker = null;
       this.ghost = null;
       this.ghostArea = null;
@@ -180,8 +214,8 @@ export class BaseScene extends Phaser.Scene {
   override update(): void {
     moveInput.keyboard = this.readKeyboard();
     moveInput.keyboardSneak = this.keys?.sneak.some((key) => key.isDown) ?? false;
-    // Com a mochila/baú aberto o jogador fica parado.
-    const blocked = uiState.modalOpen;
+    // Com a mochila/baú aberto (ou a sair da zona) o jogador fica parado.
+    const blocked = uiState.modalOpen || this.leaving;
     simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction, moveInput.sneak);
     // No modo construção, Espaço/clique colocam peças (UIScene) em vez da ação contextual.
     const actionKey = !buildMode.active && (this.keys?.action.some((key) => key.isDown) ?? false);
@@ -193,6 +227,7 @@ export class BaseScene extends Phaser.Scene {
     simulation.update(this.game.loop.rawDelta * speed);
     if (this.player) this.player.anims.timeScale = speed;
     this.renderPlayer();
+    this.renderEnemies();
     // Com toque, andar volta a pôr a peça à frente do jogador.
     if (simulation.playerMoved && buildMode.pickedBy === 'touch') {
       buildMode.picked = null;
@@ -352,6 +387,46 @@ export class BaseScene extends Phaser.Scene {
         if (record && def)
           this.structureSprites.get(uid)?.setTexture(structureSprite(def, record[4], record[5] === 1));
       }),
+      eventBus.on('enemy:hit', ({ uid, damage, x, y }) => {
+        this.floatText(`-${String(damage)}`, Math.round(x), Math.round(y) - 2, 'gold');
+        const sprite = this.enemyViews.get(uid)?.sprite;
+        sprite?.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+        this.time.delayedCall(80, () => sprite?.clearTint());
+      }),
+      eventBus.on('enemy:killed', ({ uid }) => {
+        const view = this.enemyViews.get(uid);
+        this.enemyViews.delete(uid);
+        if (!view) return;
+        view.bar.destroy();
+        view.barBack.destroy();
+        this.tweens.add({
+          targets: view.sprite,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => {
+            view.sprite.destroy();
+          },
+        });
+      }),
+      eventBus.on('player:damaged', ({ amount, x, y }) => {
+        this.floatText(`-${String(amount)}`, Math.round(x), Math.round(y) - 34, 'red');
+        this.hurtUntil = this.time.now + 150;
+        this.cameras.main.shake(100, 0.004);
+      }),
+      eventBus.on('bag:changed', ({ zoneId }) => {
+        if (zoneId === this.zoneId) this.renderBags();
+      }),
+      eventBus.on('zone:change', ({ to }) => {
+        this.leave(() => {
+          simulation.enterZone(to, content.zoneMap(to));
+          uiState.pendingNotice = tKey(content.zones[to]?.name ?? to);
+          return to;
+        });
+      }),
+      eventBus.on('player:died', () => {
+        // O jogador já está na base (GameState): se morreu noutra zona, muda de cena.
+        if (this.zoneId !== BASE_ZONE_ID) this.leave(() => BASE_ZONE_ID);
+      }),
       eventBus.on('item:gained', ({ item, qty, x, y }) => {
         this.floatText(t('msg.gained', { qty, item: itemName(item) }), Math.round(x), Math.round(y) - 20);
       }),
@@ -361,16 +436,80 @@ export class BaseScene extends Phaser.Scene {
     };
   }
 
-  /** Texto que sobe e desaparece (ex.: "+2 Madeira"). */
-  private floatText(text: string, x: number, y: number): void {
-    const label = new Label(
-      this,
-      x,
-      y,
-      text,
-      { size: 7, bold: true, color: 'cream', stroke: true },
-      [0.5, 1],
-    );
+  /** Sai da zona com um fade; `next` diz para que zona vai (e atualiza o estado). */
+  private leave(next: () => string): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    const camera = this.cameras.main;
+    camera.fadeOut(FADE_MS, 0, 0, 0);
+    camera.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      const zoneId = next();
+      this.scene.restart({ zoneId } satisfies ZoneSceneData);
+    });
+  }
+
+  /** Inimigos: posição interpolada, andar aos saltinhos, aviso de ataque a piscar, vida. */
+  private renderEnemies(): void {
+    const alpha = simulation.alpha;
+    const now = this.time.now;
+    for (const enemy of simulation.combat.list) {
+      const def = content.enemies[enemy.id];
+      if (!def) continue;
+      let view = this.enemyViews.get(enemy.uid);
+      if (!view) {
+        view = {
+          sprite: this.add.image(0, 0, def.sprite).setOrigin(0.5, 1),
+          barBack: this.add.rectangle(0, 0, ENEMY_BAR + 2, 4, paletteNumber('ink')).setOrigin(0),
+          bar: this.add.rectangle(0, 0, ENEMY_BAR, 2, paletteNumber('red')).setOrigin(0),
+        };
+        this.enemyViews.set(enemy.uid, view);
+      }
+      const x = Math.round(enemy.px + (enemy.x - enemy.px) * alpha);
+      const y = Math.round(enemy.py + (enemy.y - enemy.py) * alpha);
+      const moving = enemy.px !== enemy.x || enemy.py !== enemy.y;
+      const bob = moving && Math.floor(now / 160) % 2 === 1 ? 1 : 0;
+      view.sprite
+        .setPosition(x, y - bob)
+        .setDepth(y)
+        .setFlipX(enemy.flip);
+      // Aviso de ataque (§7.8): pisca a branco durante o windup.
+      if (enemy.state === 'windup') {
+        if (Math.floor(now / 70) % 2 === 0) view.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+        else view.sprite.clearTint();
+      } else if (view.sprite.tintMode === Phaser.TintModes.FILL && enemy.stun === 0) {
+        view.sprite.clearTint();
+      }
+      const hurt = enemy.hp < def.hp;
+      const top = y - view.sprite.height - 4;
+      view.barBack
+        .setPosition(x - ENEMY_BAR / 2 - 1, top)
+        .setDepth(y)
+        .setVisible(hurt);
+      view.bar
+        .setPosition(x - ENEMY_BAR / 2, top + 1)
+        .setSize(Math.max(1, Math.round((ENEMY_BAR * enemy.hp) / def.hp)), 2)
+        .setDepth(y)
+        .setVisible(hurt);
+    }
+    // Jogador: vermelho quando leva um golpe; pisca enquanto está invulnerável.
+    if (this.player) {
+      if (now < this.hurtUntil) this.player.setTint(0xb33a3a).setTintMode(Phaser.TintModes.FILL);
+      else this.player.clearTint();
+      this.player.setAlpha(simulation.combat.playerInvulnerable && Math.floor(now / 80) % 2 === 0 ? 0.4 : 1);
+    }
+  }
+
+  /** Mochilas no chão da zona (redesenhadas quando mudam). */
+  private renderBags(): void {
+    for (const sprite of this.bagSprites) sprite.destroy();
+    this.bagSprites = simulation.combat
+      .bags()
+      .map((bag) => this.add.image(bag.x, bag.y, 'bag_dropped').setOrigin(0.5, 1).setDepth(bag.y));
+  }
+
+  /** Texto que sobe e desaparece (ex.: "+2 Madeira", "-10"). */
+  private floatText(text: string, x: number, y: number, color: PaletteColor = 'cream'): void {
+    const label = new Label(this, x, y, text, { size: 7, bold: true, color, stroke: true }, [0.5, 1]);
     label.setDepth(LAYER_DEPTH.decor_high + 2);
     const start = this.time.now;
     const timer = this.time.addEvent({
@@ -439,9 +578,9 @@ export class BaseScene extends Phaser.Scene {
   }
 
   private createMap(): void {
-    const map = this.make.tilemap({ key: BASE_MAP_KEY });
+    const map = this.make.tilemap({ key: zoneMapKey(this.zoneId) });
     const tileset = map.addTilesetImage(BASE_TILESET_NAME, TILESET_TEXTURE);
-    if (!tileset) throw new Error(`O mapa da base não tem o tileset "${BASE_TILESET_NAME}".`);
+    if (!tileset) throw new Error(`O mapa de ${this.zoneId} não tem o tileset "${BASE_TILESET_NAME}".`);
     for (const name of TILE_LAYERS) {
       map.createLayer(name, tileset, 0, 0).setDepth(LAYER_DEPTH[name]);
     }

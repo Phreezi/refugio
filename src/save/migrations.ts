@@ -40,6 +40,15 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     }
     return { ...s, base: { ...base, structures, nextStructureId: structures.length + 1 }, stations };
   },
+  // v4 → v5 (Fase 6): equipamento (6 slots) e mochilas no chão por zona.
+  4: (s) => {
+    const player = s.player as Record<string, unknown>;
+    const zones: Record<string, unknown> = {};
+    for (const [id, zone] of Object.entries(s.zones as Record<string, Record<string, unknown>>)) {
+      zones[id] = { ...zone, bags: [] };
+    }
+    return { ...s, player: { ...player, equipment: emptySlots(6) }, zones };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

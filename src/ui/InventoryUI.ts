@@ -4,6 +4,7 @@ import { eventBus } from '../core/EventBus';
 import { gameState } from '../core/GameState';
 import type { ContainerRef, PlayerActions, SlotRef } from '../core/PlayerActions';
 import { BALANCE } from '../data/balance';
+import { equipSlotOf } from '../data/types';
 import { getView } from '../display/view';
 import { itemName, t } from '../i18n';
 import { content } from '../world/content';
@@ -28,6 +29,18 @@ interface Rect {
   y: number;
   w: number;
   h: number;
+}
+
+/** Slots de equipamento mostrados (arma, cabeça, corpo), ao lado da mochila. */
+const EQUIP_SHOWN = 3;
+const EQUIP_LABELS = ['inv.slot.weapon_short', 'inv.slot.head_short', 'inv.slot.body_short'] as const;
+
+/** Grelha da mochila + coluna do equipamento à direita. */
+function bagSize(scale: number): { w: number; h: number } {
+  const grid = gridSize(BALANCE.inventorySlots, INVENTORY_COLS, scale);
+  const size = slotSize(scale);
+  const equip = EQUIP_SHOWN * size + (EQUIP_SHOWN - 1) * SLOT_GAP;
+  return { w: grid.w + PAD + size, h: Math.max(grid.h, equip) };
 }
 
 function gridSize(slots: number, cols: number, scale: number): { w: number; h: number } {
@@ -176,7 +189,8 @@ export class InventoryUI {
       this.ghost = null;
       const target = this.slotAt(x, y);
       if (target && target !== press.view) {
-        this.actions.move(press.view.ref, target.ref);
+        if (!this.actions.move(press.view.ref, target.ref) && target.ref.container === 'equipment')
+          this.scene.events.emit('ui:message', t('msg.equip_wrong'));
         this.selected = null;
         if (this.isOpen) this.buildPanel();
       }
@@ -229,7 +243,7 @@ export class InventoryUI {
    */
   private layout(scale: number): PanelLayout | null {
     const { width } = getView();
-    const bag = gridSize(BALANCE.inventorySlots, INVENTORY_COLS, scale);
+    const bag = bagSize(scale);
     const chest = this.chestId ? gridSize(BALANCE.chestSlots, CHEST_COLS, scale) : null;
     const sideBySide = chest !== null && bag.w + chest.w + PAD * 3 <= width - 8;
     const block = (g: { w: number; h: number }): { w: number; h: number } => ({ w: g.w, h: TITLE_H + g.h });
@@ -313,6 +327,19 @@ export class InventoryUI {
     const gx = x + PAD;
     const gy = y + PAD;
     grid('inventory', BALANCE.inventorySlots, INVENTORY_COLS, gx, gy, t('hud.bag'));
+    // Equipamento: coluna à direita da mochila (arma, cabeça, corpo).
+    for (let i = 0; i < EQUIP_SHOWN; i++) {
+      this.panelSlots.push(
+        new SlotView(
+          scene,
+          gx + bag.w - size,
+          gy + TITLE_H + i * (size + SLOT_GAP),
+          { container: 'equipment', index: i },
+          t(EQUIP_LABELS[i] ?? 'inv.slot.weapon_short'),
+          scale,
+        ).setDepth(DEPTH.slots),
+      );
+    }
     if (chest && this.chestId) {
       const cx = sideBySide ? gx + bag.w + PAD : gx;
       const cy = sideBySide ? gy : gy + TITLE_H + bag.h + PAD;
@@ -341,7 +368,7 @@ export class InventoryUI {
 
   /** Ecrã demasiado pequeno para qualquer escala: usa ×1 mesmo que fique cortado. */
   private layoutFallback(): PanelLayout {
-    const bag = gridSize(BALANCE.inventorySlots, INVENTORY_COLS, 1);
+    const bag = bagSize(1);
     const chest = this.chestId ? gridSize(BALANCE.chestSlots, CHEST_COLS, 1) : null;
     const h = TITLE_H + bag.h + (chest ? TITLE_H + chest.h + PAD : 0) + INFO_H + PAD * 2;
     return { scale: 1, bag, chest, sideBySide: false, w: Math.max(bag.w, chest?.w ?? 0) + PAD * 2, h };
@@ -380,6 +407,26 @@ export class InventoryUI {
         add(
           new Button(scene, bx, by, t('inv.use'), small, () => {
             this.actions.use(selected);
+            this.rebuildSoon();
+          }),
+        ).setDepth(DEPTH.slots);
+        bx += small.width + 4;
+      }
+      if (selected.container === 'equipment') {
+        add(
+          new Button(scene, bx, by, t('inv.unequip'), small, () => {
+            if (!this.actions.unequip(selected.index))
+              scene.events.emit('ui:message', t('msg.inventory_full'));
+            this.selected = null;
+            this.rebuildSoon();
+          }),
+        ).setDepth(DEPTH.slots);
+        bx += small.width + 4;
+      } else if (equipSlotOf(def)) {
+        add(
+          new Button(scene, bx, by, t('inv.equip'), small, () => {
+            this.actions.equip(selected);
+            this.selected = null;
             this.rebuildSoon();
           }),
         ).setDepth(DEPTH.slots);

@@ -29,6 +29,11 @@ export interface ResourcePlacement extends Point {
   objectId: number;
 }
 
+/** Saída do mapa (`exit` ou `exit:<zona>`): `to` = zona para onde leva (null = mapa-mundo). */
+export interface ExitPoint extends Point {
+  to: string | null;
+}
+
 /** Objetos das fases seguintes (`container:<lootTableId>`, `enemy_spawn:<groupId>`). */
 export interface TaggedPoint extends Point {
   id: string;
@@ -44,7 +49,7 @@ export interface ZoneMap {
   /** Um booleano por tile: chão construído no mapa (conta como fundação, §7.7). */
   floor: readonly boolean[];
   playerSpawn: Point;
-  exits: readonly Point[];
+  exits: readonly ExitPoint[];
   resources: readonly ResourcePlacement[];
   /** Obstáculos/decoração `prop:<id>` (posição livre; ponto = pés). */
   props: readonly ResourcePlacement[];
@@ -68,6 +73,10 @@ export interface ZoneMapRules {
   stationIds: Iterable<string>;
   /** Tiles da camada `ground` que contam como fundação: tileset → ids locais. */
   floorTiles?: Readonly<Record<string, readonly number[]>>;
+  /** Zonas válidas em `exit:<zona>` (omisso = não se verifica). */
+  zoneIds?: Iterable<string>;
+  /** Grupos válidos em `enemy_spawn:<grupo>` (omisso = não se verifica). */
+  enemyGroupIds?: Iterable<string>;
 }
 
 export class ZoneMapError extends Error {
@@ -230,7 +239,9 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
   const stationIds = new Set(rules.stationIds);
   const objectIds = new Set<number>();
   const spawns: Point[] = [];
-  const exits: Point[] = [];
+  const exits: ExitPoint[] = [];
+  const zoneIds = rules.zoneIds ? new Set(rules.zoneIds) : null;
+  const groupIds = rules.enemyGroupIds ? new Set(rules.enemyGroupIds) : null;
   const resources: ResourcePlacement[] = [];
   const containers: TaggedPoint[] = [];
   const enemySpawns: TaggedPoint[] = [];
@@ -260,8 +271,10 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
       objectIds.add(objectId);
       const [kind, id] = splitName(name);
       if (kind === 'player_spawn' && id === null) spawns.push(point);
-      else if (kind === 'exit' && id === null) exits.push(point);
-      else if (kind === 'resource' && id !== null) {
+      else if (kind === 'exit') {
+        if (id !== null && zoneIds && !zoneIds.has(id)) problems.push(`${label}: zona desconhecida "${id}"`);
+        exits.push({ ...point, to: id });
+      } else if (kind === 'resource' && id !== null) {
         if (resourceIds.has(id)) resources.push({ id, objectId, ...point });
         else problems.push(`${label}: recurso desconhecido "${id}"`);
       } else if (kind === 'prop' && id !== null) {
@@ -274,10 +287,12 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
         if (chests.some((c) => c.id === id)) problems.push(`${label}: baú "${id}" repetido`);
         else chests.push({ id, objectId, ...point });
       } else if (kind === 'container' && id) containers.push({ id, ...point });
-      else if (kind === 'enemy_spawn' && id) enemySpawns.push({ id, ...point });
-      else {
+      else if (kind === 'enemy_spawn' && id) {
+        if (groupIds && !groupIds.has(id)) problems.push(`${label}: grupo de inimigos desconhecido "${id}"`);
+        enemySpawns.push({ id, ...point });
+      } else {
         problems.push(
-          `${label}: nome inválido (player_spawn, exit, resource:<id>, prop:<id>, chest:<id>, station:<tipo>, container:<id>, enemy_spawn:<id>)`,
+          `${label}: nome inválido (player_spawn, exit[:<zona>], resource:<id>, prop:<id>, chest:<id>, station:<tipo>, container:<id>, enemy_spawn:<id>)`,
         );
       }
     }

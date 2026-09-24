@@ -6,13 +6,18 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { ManifestError, parseManifest } from '../src/assets/manifest.ts';
 import {
   DataError,
+  parseEnemies,
+  parseEnemyGroups,
   parseItems,
   parseProps,
   parseRecipes,
   parseResources,
   parseStations,
   parseStructures,
+  parseZones,
+  type EnemyGroups,
   type ItemDefs,
+  type ZoneDefs,
   type PropDefs,
   type StationDefs,
   type ResourceDefs,
@@ -24,8 +29,6 @@ const ROOT = new URL('../', import.meta.url);
 const PALETTE_SIZE = 32;
 /** Igual a TILE_SIZE em src/config.ts (os scripts não importam módulos com dependências). */
 const TILE_SIZE = 16;
-/** Mapas Tiled validados (relativos a public/assets/). */
-const MAP_FILES = ['maps/base.json'];
 
 function readJson(relativePath: string): unknown {
   return JSON.parse(readFileSync(new URL(relativePath, ROOT), 'utf8'));
@@ -232,6 +235,57 @@ function checkProps(): string[] {
   return Array.isArray(props) ? props : [];
 }
 
+function loadEnemyGroups(): EnemyGroups | string[] {
+  const items = loadItems();
+  if (Array.isArray(items)) return ['items.json inválido (ver acima)'];
+  try {
+    const enemies = parseEnemies(readJson('src/data/enemies.json'), manifestKeys(), Object.keys(items));
+    return parseEnemyGroups(readJson('src/data/enemyGroups.json'), Object.keys(enemies));
+  } catch (error) {
+    if (error instanceof DataError) return [...error.problems];
+    throw error;
+  }
+}
+
+/** Inimigos (sprites, drops) e grupos, com nome traduzido em todas as línguas. */
+function checkEnemies(): string[] {
+  const groups = loadEnemyGroups();
+  if (Array.isArray(groups)) return groups.map((p) => `enemies: ${p}`);
+  const problems: string[] = [];
+  const ids = Object.keys(readJson('src/data/enemies.json') as object).filter((id) => id !== '$comment');
+  for (const lang of ['pt-PT', 'en']) {
+    const dict = readJson(`src/i18n/${lang}.json`);
+    if (!isStringRecord(dict)) continue;
+    for (const id of ids) {
+      if (!(`enemy.${id}` in dict)) problems.push(`enemies.json: "${id}" sem nome em i18n/${lang}.json`);
+    }
+  }
+  return problems;
+}
+
+function loadZones(): ZoneDefs | string[] {
+  try {
+    return parseZones(readJson('src/data/zones.json'));
+  } catch (error) {
+    if (error instanceof DataError) return error.problems.map((p) => `zones.json: ${p}`);
+    throw error;
+  }
+}
+
+function checkZones(): string[] {
+  const zones = loadZones();
+  if (Array.isArray(zones)) return zones;
+  const problems: string[] = [];
+  for (const lang of ['pt-PT', 'en']) {
+    const dict = readJson(`src/i18n/${lang}.json`);
+    if (!isStringRecord(dict)) continue;
+    for (const [id, zone] of Object.entries(zones)) {
+      if (!(zone.name in dict)) problems.push(`zones.json: "${id}" sem nome em i18n/${lang}.json`);
+    }
+  }
+  return problems;
+}
+
 function checkMaps(): string[] {
   const resources = loadResources();
   if (Array.isArray(resources)) return ['resources.json inválido (ver acima)'];
@@ -239,8 +293,12 @@ function checkMaps(): string[] {
   if (Array.isArray(props)) return ['props.json inválido (ver acima)'];
   const stations = loadStations();
   if (Array.isArray(stations)) return ['stations.json inválido (ver acima)'];
+  const zones = loadZones();
+  if (Array.isArray(zones)) return ['zones.json inválido (ver acima)'];
+  const groups = loadEnemyGroups();
+  if (Array.isArray(groups)) return ['enemies.json/enemyGroups.json inválidos (ver acima)'];
   const problems: string[] = [];
-  for (const file of MAP_FILES) {
+  for (const file of Object.values(zones).map((z) => z.map)) {
     if (!existsExactCase(file, 'public/assets/')) {
       problems.push(`${file} não existe em public/assets/`);
       continue;
@@ -255,6 +313,8 @@ function checkMaps(): string[] {
           propIds: Object.keys(props),
           stationIds: Object.keys(stations),
           floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
+          zoneIds: Object.keys(zones),
+          enemyGroupIds: Object.keys(groups),
         },
         file,
       );
@@ -310,6 +370,8 @@ const checks: [string, () => string[]][] = [
   ['obstáculos', checkProps],
   ['crafting', checkCrafting],
   ['construção', checkStructures],
+  ['inimigos', checkEnemies],
+  ['zonas', checkZones],
   ['mapas', checkMaps],
   ['i18n', checkI18n],
 ];

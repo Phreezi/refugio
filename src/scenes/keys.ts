@@ -3,7 +3,7 @@ export const SceneKey = {
   Boot: 'Boot',
   Preload: 'Preload',
   MainMenu: 'MainMenu',
-  Base: 'Base',
+  Zone: 'Zone',
   UI: 'UI',
 } as const;
 

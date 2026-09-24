@@ -86,6 +86,8 @@ export class SlotView {
   update(slot: Slot | null, items: ItemDefs, selected: boolean): void {
     this.frame.setFillStyle(paletteNumber(selected ? 'gold' : 'bark_dark'));
     const def = slot ? items[slot[0]] : undefined;
+    // Os slots de equipamento dizem o que levam só quando estão vazios.
+    if (this.ref.container === 'equipment') this.key?.setVisible(!slot);
     if (!slot || !def) {
       this.icon.setVisible(false);
       this.qty.setText('');

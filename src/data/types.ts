@@ -85,12 +85,31 @@ export interface ItemDef {
   damage?: number;
   /** Durabilidade máxima (só itens com stack 1). */
   durability?: number;
+  /** Armadura: % de dano que evita (somado entre peças, até `maxArmorReductionPct`). */
   armor?: number;
+  /** Onde se equipa a armadura. */
+  equip?: EquipSlot;
+  /** Armas: segundos entre golpes (omisso = `weaponAttackSec`). */
+  attackSec?: number;
+  /** Armas: alcance do golpe em px (omisso = `weaponReachPx`). */
+  reach?: number;
   /** Slots extra (mochilas). */
   slots?: number;
 }
 
 export type ItemDefs = Readonly<Record<string, ItemDef>>;
+
+/** Slots de equipamento (CLAUDE.md §7.3), pela ordem em que ficam no save. */
+export const EQUIP_SLOTS = ['weapon', 'head', 'body', 'legs', 'feet', 'backpack'] as const;
+export type EquipSlot = (typeof EQUIP_SLOTS)[number];
+
+/** Slot onde um item se equipa (null = não se equipa). Tudo o que tem dano serve de arma. */
+export function equipSlotOf(def: ItemDef | undefined): EquipSlot | null {
+  if (!def) return null;
+  if (def.type === 'armor') return def.equip ?? null;
+  if (def.damage !== undefined) return 'weapon';
+  return null;
+}
 
 export class DataError extends Error {
   readonly problems: readonly string[];
@@ -247,9 +266,12 @@ const ITEM_KEYS = new Set([
   'durability',
   'armor',
   'slots',
+  'equip',
+  'attackSec',
+  'reach',
 ]);
 const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
-const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots'] as const;
+const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach'] as const;
 
 /**
  * Valida `items.json`.
@@ -314,6 +336,18 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
       else problems.push(`"${id}": toolKind inválido ${describe(raw.toolKind)}`);
       if (raw.gatherPower === undefined) problems.push(`"${id}": ferramenta sem gatherPower`);
     }
+    if (raw.equip !== undefined) {
+      const slot = EQUIP_SLOTS.find((e) => e === raw.equip && e !== 'weapon' && e !== 'backpack');
+      if (slot) def.equip = slot;
+      else problems.push(`"${id}": equip inválido ${describe(raw.equip)} (head, body, legs, feet)`);
+    }
+    if (def.type === 'armor' && raw.equip === undefined) problems.push(`"${id}": armadura sem equip`);
+    if (raw.equip !== undefined && def.type !== 'armor') problems.push(`"${id}": só armaduras têm equip`);
+    if (raw.attackSec !== undefined) {
+      if (typeof raw.attackSec === 'number' && raw.attackSec > 0 && raw.attackSec <= 5)
+        def.attackSec = raw.attackSec;
+      else problems.push(`"${id}": attackSec tem de ser um número entre 0 e 5`);
+    }
     for (const key of OPTIONAL_NUMBERS) {
       const value = raw[key];
       if (value === undefined) continue;
@@ -341,8 +375,14 @@ export type StationDefs = Readonly<Record<string, StationDef>>;
 /** Estação especial: craft instantâneo no próprio inventário. */
 export const HANDS = 'hands';
 
-export type RecipeCategory = 'tools' | 'materials' | 'weapons' | 'food';
-export const RECIPE_CATEGORIES: readonly RecipeCategory[] = ['tools', 'materials', 'weapons', 'food'];
+export type RecipeCategory = 'tools' | 'materials' | 'weapons' | 'armor' | 'food';
+export const RECIPE_CATEGORIES: readonly RecipeCategory[] = [
+  'tools',
+  'materials',
+  'weapons',
+  'armor',
+  'food',
+];
 
 export interface Recipe {
   id: string;
@@ -604,5 +644,190 @@ export function parseStructures(
     defs[id] = def;
   }
   if (problems.length > 0) throw new DataError('structures.json', problems);
+  return defs;
+}
+
+/** Comportamento: `hostile` persegue e ataca; `flee` foge do jogador (presas). */
+export type EnemyBehavior = 'hostile' | 'flee';
+const ENEMY_BEHAVIORS: readonly EnemyBehavior[] = ['hostile', 'flee'];
+
+/** Inimigo ou animal (CLAUDE.md §7.9). Distâncias em px, tempos em segundos de jogo. */
+export interface EnemyDef {
+  sprite: string;
+  footprint: Footprint;
+  behavior: EnemyBehavior;
+  hp: number;
+  /** Dano por ataque (0 = não ataca). */
+  damage: number;
+  /** Velocidade a perseguir/fugir (px/s); a passear anda a metade. */
+  speed: number;
+  /** Vê o jogador a esta distância (metade se ele andar agachado). */
+  detectRadius: number;
+  /** Não se afasta mais do que isto do sítio onde nasceu (depois volta). */
+  leashRadius: number;
+  /** Ataca quando o jogador está a esta distância. */
+  attackRange: number;
+  /** Segundos entre ataques. */
+  attackSec: number;
+  /** Drops ao morrer: quantidade entre min e max (min pode ser 0). */
+  drops: readonly Drop[];
+}
+
+export type EnemyDefs = Readonly<Record<string, EnemyDef>>;
+
+const ENEMY_KEYS = new Set([
+  'sprite',
+  'footprint',
+  'behavior',
+  'hp',
+  'damage',
+  'speed',
+  'detectRadius',
+  'leashRadius',
+  'attackRange',
+  'attackSec',
+  'drops',
+]);
+
+function isNonNegativeInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+/** Valida `enemies.json`. */
+export function parseEnemies(
+  input: unknown,
+  spriteKeys: Iterable<string>,
+  itemIds: Iterable<string>,
+): EnemyDefs {
+  if (!isObject(input)) throw new DataError('enemies.json', ['tem de ser um objeto id → inimigo']);
+  const sprites = new Set(spriteKeys);
+  const items = new Set(itemIds);
+  const problems: string[] = [];
+  const defs: Record<string, EnemyDef> = {};
+  for (const [id, raw] of Object.entries(input)) {
+    if (id === '$comment') continue;
+    if (!ID_PATTERN.test(id)) problems.push(`"${id}": o id tem de estar em snake_case`);
+    if (!isObject(raw)) {
+      problems.push(`"${id}": tem de ser um objeto`);
+      continue;
+    }
+    for (const key of Object.keys(raw)) {
+      if (!ENEMY_KEYS.has(key)) problems.push(`"${id}": campo desconhecido "${key}"`);
+    }
+    const sprite = typeof raw.sprite === 'string' ? raw.sprite : '';
+    if (!sprites.has(sprite)) problems.push(`"${id}": sprite "${sprite}" não existe no manifest`);
+    const fp = raw.footprint;
+    const footprint =
+      isObject(fp) && isSize(fp.width) && isSize(fp.height) ? { width: fp.width, height: fp.height } : null;
+    if (!footprint) problems.push(`"${id}": footprint tem de ser { width, height } inteiros`);
+    const behavior = ENEMY_BEHAVIORS.find((b) => b === raw.behavior);
+    if (!behavior) problems.push(`"${id}": behavior tem de ser ${ENEMY_BEHAVIORS.join(' ou ')}`);
+    const num = (key: string, check: (v: unknown) => v is number, what: string): number => {
+      const value = raw[key];
+      if (check(value)) return value;
+      problems.push(`"${id}": ${key} tem de ser ${what}`);
+      return 1;
+    };
+    const positive = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
+    const drops: Drop[] = [];
+    if (!Array.isArray(raw.drops)) problems.push(`"${id}": drops tem de ser uma lista [[item, min, max], …]`);
+    else {
+      for (const entry of raw.drops as unknown[]) {
+        const [item, min, max] = Array.isArray(entry) ? (entry as unknown[]) : [];
+        if (typeof item !== 'string' || !items.has(item))
+          problems.push(`"${id}": drop com item desconhecido ${describe(item)}`);
+        else if (!isNonNegativeInt(min) || !isPositiveInt(max) || max < min)
+          problems.push(`"${id}": drop ${item} com min/max inválidos`);
+        else drops.push({ item, min, max });
+      }
+    }
+    defs[id] = {
+      sprite,
+      footprint: footprint ?? { width: 8, height: 4 },
+      behavior: behavior ?? 'hostile',
+      hp: num('hp', isPositiveInt, 'um inteiro > 0'),
+      damage: num('damage', isNonNegativeInt, 'um inteiro ≥ 0'),
+      speed: num('speed', positive, 'um número > 0'),
+      detectRadius: num('detectRadius', positive, 'um número > 0'),
+      leashRadius: num('leashRadius', positive, 'um número > 0'),
+      attackRange: num('attackRange', positive, 'um número > 0'),
+      attackSec: num('attackSec', positive, 'um número > 0'),
+      drops,
+    };
+    const def = defs[id];
+    if (def.leashRadius < def.detectRadius) problems.push(`"${id}": leashRadius tem de ser ≥ detectRadius`);
+  }
+  if (problems.length > 0) throw new DataError('enemies.json', problems);
+  return defs;
+}
+
+/** Grupo de inimigos de um ponto `enemy_spawn:<grupo>`: [inimigo, mín, máx] de cada tipo. */
+export type EnemyGroups = Readonly<Record<string, readonly { enemy: string; min: number; max: number }[]>>;
+
+/** Valida `enemyGroups.json`. */
+export function parseEnemyGroups(input: unknown, enemyIds: Iterable<string>): EnemyGroups {
+  if (!isObject(input))
+    throw new DataError('enemyGroups.json', ['tem de ser um objeto id → [[inimigo, mín, máx]]']);
+  const enemies = new Set(enemyIds);
+  const problems: string[] = [];
+  const groups: Record<string, { enemy: string; min: number; max: number }[]> = {};
+  for (const [id, raw] of Object.entries(input)) {
+    if (id === '$comment') continue;
+    if (!ID_PATTERN.test(id)) problems.push(`"${id}": o id tem de estar em snake_case`);
+    if (!Array.isArray(raw) || raw.length === 0) {
+      problems.push(`"${id}": tem de ser uma lista [[inimigo, mín, máx], …]`);
+      continue;
+    }
+    groups[id] = [];
+    for (const entry of raw as unknown[]) {
+      const [enemy, min, max] = Array.isArray(entry) ? (entry as unknown[]) : [];
+      if (typeof enemy !== 'string' || !enemies.has(enemy))
+        problems.push(`"${id}": inimigo desconhecido ${describe(enemy)}`);
+      else if (!isPositiveInt(min) || !isPositiveInt(max) || max < min)
+        problems.push(`"${id}": ${enemy} com mín/máx inválidos`);
+      else groups[id].push({ enemy, min, max });
+    }
+  }
+  if (problems.length > 0) throw new DataError('enemyGroups.json', problems);
+  return groups;
+}
+
+/** Zona (CLAUDE.md §8.2, §9.4). */
+export interface ZoneDef {
+  /** Chave i18n do nome. */
+  name: string;
+  /** Mapa Tiled, relativo a `public/assets/`. */
+  map: string;
+  /** Nível de perigo: 0 = segura (base), 1–4 = T1–T4. */
+  danger: number;
+}
+
+export type ZoneDefs = Readonly<Record<string, ZoneDef>>;
+
+/** Valida `zones.json` (os ficheiros dos mapas são verificados pelo validate-data). */
+export function parseZones(input: unknown): ZoneDefs {
+  if (!isObject(input)) throw new DataError('zones.json', ['tem de ser um objeto id → zona']);
+  const problems: string[] = [];
+  const defs: Record<string, ZoneDef> = {};
+  for (const [id, raw] of Object.entries(input)) {
+    if (id === '$comment') continue;
+    if (!/^zone_[a-z0-9_]+$/.test(id)) problems.push(`"${id}": o id tem de começar por zone_`);
+    if (!isObject(raw)) {
+      problems.push(`"${id}": tem de ser um objeto`);
+      continue;
+    }
+    for (const key of Object.keys(raw)) {
+      if (!['name', 'map', 'danger'].includes(key)) problems.push(`"${id}": campo desconhecido "${key}"`);
+    }
+    const name = typeof raw.name === 'string' ? raw.name : '';
+    if (name !== `zone.${id.slice('zone_'.length)}`)
+      problems.push(`"${id}": name tem de ser "zone.${id.slice(5)}"`);
+    const map = typeof raw.map === 'string' ? raw.map : '';
+    if (!/^maps\/[a-z0-9_]+\.json$/.test(map)) problems.push(`"${id}": map tem de ser "maps/<nome>.json"`);
+    const danger = raw.danger;
+    if (!isNonNegativeInt(danger) || danger > 4) problems.push(`"${id}": danger tem de ser 0–4`);
+    defs[id] = { name, map, danger: isNonNegativeInt(danger) ? danger : 0 };
+  }
+  if (problems.length > 0) throw new DataError('zones.json', problems);
   return defs;
 }

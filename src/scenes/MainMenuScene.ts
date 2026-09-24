@@ -18,6 +18,7 @@ import { Label } from '../ui/text';
 import { uiState } from '../ui/uiState';
 import { content } from '../world/content';
 import { SceneKey } from './keys';
+import type { ZoneSceneData } from './ZoneScene';
 
 export interface MainMenuData {
   /** Mensagem a mostrar ao abrir (ex.: depois de importar ou apagar um save). */
@@ -227,7 +228,7 @@ export class MainMenuScene extends Phaser.Scene {
       if (finished > 0) uiState.pendingNotice = t('craft.offline', { n: finished });
     }
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
-    this.scene.start(SceneKey.Base, {});
+    this.scene.start(SceneKey.Zone, { zoneId: state.player.zoneId } satisfies ZoneSceneData);
   }
 
   private startNewGame(): void {
@@ -236,7 +237,7 @@ export class MainMenuScene extends Phaser.Scene {
     const state = gameState.newGame(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
     void autosave.flush(); // o jogo novo substitui já o antigo
-    this.scene.start(SceneKey.Base, {});
+    this.scene.start(SceneKey.Zone, { zoneId: BASE_ZONE_ID } satisfies ZoneSceneData);
   }
 
   private async importSave(): Promise<void> {

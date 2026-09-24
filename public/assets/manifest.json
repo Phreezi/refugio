@@ -33,7 +33,8 @@
         "color": "lime",
         "border": "ink",
         "letter": "Z"
-      }
+      },
+      "file": "sprites/zombie_walker.png"
     },
     "zombie_runner": {
       "type": "image",
@@ -43,7 +44,8 @@
         "color": "orange",
         "border": "ink",
         "letter": "Z"
-      }
+      },
+      "file": "sprites/zombie_runner.png"
     },
     "zombie_tank": {
       "type": "image",
@@ -303,7 +305,8 @@
         "color": "stone_light",
         "border": "ink",
         "letter": "S"
-      }
+      },
+      "file": "sprites/icons/scrap_metal.png"
     },
     "icon_nails": {
       "type": "image",
@@ -313,7 +316,8 @@
         "color": "stone_light",
         "border": "ink",
         "letter": "P"
-      }
+      },
+      "file": "sprites/icons/nails.png"
     },
     "icon_cloth": {
       "type": "image",
@@ -323,7 +327,8 @@
         "color": "parchment",
         "border": "ink",
         "letter": "T"
-      }
+      },
+      "file": "sprites/icons/cloth.png"
     },
     "icon_leather": {
       "type": "image",
@@ -333,7 +338,8 @@
         "color": "bark",
         "border": "ink",
         "letter": "C"
-      }
+      },
+      "file": "sprites/icons/leather.png"
     },
     "icon_wood_plank": {
       "type": "image",
@@ -484,7 +490,8 @@
         "color": "wood",
         "border": "ink",
         "letter": "M"
-      }
+      },
+      "file": "sprites/icons/wooden_club.png"
     },
     "icon_cloth_shirt": {
       "type": "image",
@@ -494,7 +501,8 @@
         "color": "parchment",
         "border": "ink",
         "letter": "C"
-      }
+      },
+      "file": "sprites/icons/cloth_shirt.png"
     },
     "icon_small_backpack": {
       "type": "image",
@@ -636,6 +644,72 @@
         "color": "wood",
         "border": "bark_dark",
         "letter": "V"
+      }
+    },
+    "deer": {
+      "type": "image",
+      "file": "sprites/deer.png",
+      "placeholder": {
+        "width": 24,
+        "height": 24,
+        "color": "wood",
+        "border": "ink",
+        "letter": "V"
+      }
+    },
+    "wolf": {
+      "type": "image",
+      "file": "sprites/wolf.png",
+      "placeholder": {
+        "width": 24,
+        "height": 20,
+        "color": "stone",
+        "border": "ink",
+        "letter": "L"
+      }
+    },
+    "bag_dropped": {
+      "type": "image",
+      "file": "sprites/bag_dropped.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "teal",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_spiked_club": {
+      "type": "image",
+      "file": "sprites/icons/spiked_club.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "M"
+      }
+    },
+    "icon_machete": {
+      "type": "image",
+      "file": "sprites/icons/machete.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone_light",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
+    "icon_cloth_hat": {
+      "type": "image",
+      "file": "sprites/icons/cloth_hat.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "parchment",
+        "border": "ink",
+        "letter": "C"
       }
     }
   }
