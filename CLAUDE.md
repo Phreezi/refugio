@@ -408,7 +408,7 @@ Os nós de recurso reaparecem (ver zonas).
 
 - **Corpo a corpo**: cada arma tem dano, velocidade (`attackSec`), alcance (`reach`), durabilidade (gasta 1 por golpe). Sem arma, punhos (`fistDamage`). Qualquer item com `damage` se equipa como arma (um machado equipado também serve para cortar).
 - Golpe: dano, número a subir, empurrão e 0,3 s de atordoamento — exceto durante o aviso de ataque (o ataque do inimigo já está comprometido). Mantendo a ação premida repete ao ritmo da arma.
-- Ao levar dano: 0,6 s de invulnerabilidade (o boneco pisca) e um pequeno empurrão.
+- Ao levar dano: 0,6 s de invulnerabilidade (o boneco pisca), um pequeno empurrão e as bordas do ecrã ficam vermelhas por um instante (sem abanar a câmara).
 - **Distância** (Fase 10): armas com `ranged: { ammo, range, speed }` (besta, pistola). Com a ação, se houver um inimigo a menos de `range` px, a mira vai sozinha ao mais perto (a seta de alvo mostra-o), gasta 1 de munição (`type: "ammo"`) e dispara um projétil que voa a `speed` px/s; pára na primeira parede/obstáculo ou no primeiro inimigo em que toca. Sem inimigos ao alcance, a ação faz o resto (recolher, abrir…); sem munição, avisa. Os projéteis não se gravam.
 - Inimigos **telegrafam** ataques (0,4 s de aviso com piscar) — dá para recuar.
 - **Sangrar** (Fase 10): alguns inimigos (`bleedPct` em `enemies.json`: corredor, lobo, brutamontes) podem pôr o jogador a sangrar — perde 1 de vida a cada `bleedEverySec` durante `bleedSec` (nunca instantâneo); itens com `stopsBleeding` (ligadura, kit médico) estancam. Morrer também. Save: `player.bleed` (ticks).
@@ -1065,3 +1065,4 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Tamanho da UI = alvo do lado curto (320/270/230 px de jogo) | Mantém a escala inteira (pixel art exata); menos píxeis de jogo = tudo maior |
 | 2026-09-24 | Save v12: `stats` | Estatísticas no menu de pausa; contam a partir da migração |
 | 2026-09-24 | Save v13: `tutorial`; saves antigos ficam com as dicas desligadas | Quem já jogava não precisa do tutorial; jogos novos veem-no |
+| 2026-09-24 | Levar dano não abana o ecrã: moldura vermelha nas 4 bordas que se apaga em 0,45 s; a explosão do inchado abana só um pouco | Pedido do jogador: o abanão incomodava |
