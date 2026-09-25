@@ -129,6 +129,28 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // v19 → v20: os corpos dos inimigos ficam gravados como pilhas no chão (`corpse` = id do
   // inimigo). Os saves antigos não os têm.
   19: (s) => s,
+  // v20 → v21: as moedas deixam de ser um item (§7.16) — as da mochila, hotbar e baús da base
+  // passam para o contador `player.coins`; efeitos temporários da comida (`player.buffs`,
+  // §7.17) e postes de teletransporte ativados (`waystones`, Etapa E).
+  20: (s) => {
+    const player = s.player as Record<string, unknown>;
+    let coins = 0;
+    const takeCoins = (container: unknown): void => {
+      if (!Array.isArray(container)) return;
+      container.forEach((slot, i) => {
+        if (Array.isArray(slot) && slot[0] === 'coin' && typeof slot[1] === 'number') {
+          coins += slot[1];
+          container[i] = null;
+        }
+      });
+    };
+    takeCoins(player.inventory);
+    takeCoins(player.hotbar);
+    const base = s.base as Record<string, unknown> | undefined;
+    const chests = base?.chests;
+    if (chests && typeof chests === 'object') for (const chest of Object.values(chests)) takeCoins(chest);
+    return { ...s, player: { ...player, coins, buffs: [] }, waystones: [] };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

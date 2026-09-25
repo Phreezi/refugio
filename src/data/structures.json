@@ -278,5 +278,44 @@
     ],
     "unlockLevel": 3,
     "category": "crafting"
+  },
+  "fridge": {
+    "sprite": "fridge",
+    "layer": "top",
+    "chest": true,
+    "chestSlots": 60,
+    "foodOnly": true,
+    "orders": "takeaway",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "needsFoundation": true,
+    "cost": [
+      ["iron_ingot", 12],
+      ["scrap_metal", 20],
+      ["electronics", 6],
+      ["chemicals", 3],
+      ["wood_plank", 10],
+      ["nails", 12]
+    ],
+    "unlockLevel": 15,
+    "category": "other"
+  },
+  "waystone_post": {
+    "sprite": "waystone",
+    "layer": "top",
+    "teleport": true,
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "cost": [
+      ["stone", 20],
+      ["wood_plank", 8],
+      ["scrap_metal", 6]
+    ],
+    "unlockLevel": 5,
+    "category": "other"
   }
 }

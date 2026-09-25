@@ -4,6 +4,7 @@ import { gameState, type PlayerState } from '../core/GameState';
 import { skillOf, type ItemDef } from '../data/types';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
 import { missPct, skillLevel } from '../systems/combat/skills';
+import { COIN } from '../systems/inventory/inventory';
 
 /**
  * O que um item faz, em linhas curtas (tocar no desenho ou no nome, no fabrico e na mochila):
@@ -51,6 +52,13 @@ export function describeItem(id: string, def: ItemDef | undefined, enchant = 0):
   if (effects?.hunger) add('info.hunger', { n: effects.hunger });
   if (effects?.thirst) add('info.thirst', { n: effects.thirst });
   if (def.stopsBleeding) add('info.bleed');
+  if (def.buff)
+    lines.push(
+      t('info.buff', {
+        effect: tKey(`talent_effect.${def.buff.effect}`, { v: def.buff.value }),
+        h: def.buff.hours,
+      }),
+    );
   if (def.plant) add('info.plant', { item: itemName(def.plant.crop), h: def.plant.growHours });
   if (def.waters) add('info.waters');
   if (def.teaches) add('info.note');
@@ -64,8 +72,9 @@ export function describeItem(id: string, def: ItemDef | undefined, enchant = 0):
   return lines;
 }
 
-/** Quantos `item` o jogador tem (mochila, hotbar e aljava). */
+/** Quantos `item` o jogador tem (mochila, hotbar e aljava; as moedas no contador). */
 export function ownedCount(player: PlayerState, item: string): number {
+  if (item === COIN) return player.coins;
   let total = 0;
   for (const container of [player.inventory, player.hotbar])
     for (const slot of container) if (slot?.[0] === item) total += slot[1];

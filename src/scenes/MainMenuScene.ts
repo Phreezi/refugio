@@ -52,6 +52,7 @@ const CONFIRM_MS = 3000;
  */
 export class MainMenuScene extends Phaser.Scene {
   private busy = false;
+  private resizePending = false;
   private status: Label | null = null;
   private primaryAction: (() => void) | null = null;
   /** Hordas ligadas (§7.13): vem do save e aplica-se ao continuar ou ao começar um jogo novo. */
@@ -68,6 +69,7 @@ export class MainMenuScene extends Phaser.Scene {
   create(data: MainMenuData): void {
     this.busy = false;
     this.overlayOpen = false;
+    this.resizePending = false;
     this.primaryAction = null;
     const { width, height } = getView();
     const cx = Math.round(width / 2);
@@ -77,14 +79,16 @@ export class MainMenuScene extends Phaser.Scene {
     // Posições proporcionais à altura: a resolução do jogo depende do ecrã.
     // Em ecrãs baixos (ex.: o browser de um carro) o título fica mais pequeno e mais acima.
     const short = height < SHORT_MENU;
+    // Centrado pelas maiúsculas, por cima do primeiro botão (que fica em `menuTop`).
+    const menuTop = short ? 46 : Math.round(height * 0.4);
     new Label(
       this,
       cx,
-      short ? 6 : Math.round(height * 0.2),
+      Math.max(short ? 14 : 20, menuTop - (short ? 26 : 34)),
       // Em maiúsculas: na fonte pixel, as minúsculas em ponto grande perdem a forma.
       t('game.title').toUpperCase(),
-      { size: short ? 24 : 32, color: 'wheat', bold: true },
-      [0.5, 0],
+      { size: short ? 20 : 28, color: 'wheat', bold: true },
+      [0.5, 0.5],
     );
     this.status = new Label(
       this,
@@ -130,6 +134,12 @@ export class MainMenuScene extends Phaser.Scene {
 
     // Mudou a resolução (janela redimensionada, telemóvel rodado): refazer o menu.
     const onResize = (): void => {
+      // Com uma janela aberta (nome, código) o teclado do telemóvel muda o tamanho: refazer o
+      // menu fechava-a. Refaz-se quando fechar.
+      if (this.overlayOpen) {
+        this.resizePending = true;
+        return;
+      }
       this.scene.restart({});
     };
     this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
@@ -202,12 +212,19 @@ export class MainMenuScene extends Phaser.Scene {
       },
     );
 
+    // Co-op (Fase 15): entrar no jogo de um amigo com o código dele (na coluna dos botões
+    // principais: no canto sobrepunha-se à lista de jogos).
+    const joinY = hordeY + (short ? 20 : 22);
+    new Button(this, cx, joinY, t('coop.join'), { ...SMALL_BUTTON, width: MAIN_BUTTON.width }, () => {
+      this.openJoin(save);
+    });
+
     // Os meus jogos: à direita (lista) ou, sem espaço, numa linha de 3 por baixo. Tocar escolhe.
     const rowY = height - 50;
     const inRow = !wide;
     const rowSlotW = Math.min(SLOT_BUTTON_WIDTH, Math.floor((width - 16 - 2 * 4) / 3)) & ~1;
     const listX = wide ? listSide : cx;
-    let listY = wide ? y - 14 : Math.max(hordeY + 30, rowY - 26);
+    let listY = wide ? y - 14 : Math.max(joinY + 30, rowY - 26);
     new Label(this, listX, listY - 16, t('menu.games'), { size: 8, bold: true, color: 'wheat' }, [0.5, 0.5]);
     slots.forEach((slot, i) => {
       const summary = slot?.save;
@@ -239,18 +256,6 @@ export class MainMenuScene extends Phaser.Scene {
       );
       if (!inRow) listY += 21;
     });
-
-    // Co-op (Fase 15): entrar no jogo de um amigo com o código dele. No canto (cabe sempre).
-    new Button(
-      this,
-      width - 4 - SMALL_BUTTON.width / 2 - 8,
-      4 + SMALL_BUTTON.height / 2,
-      t('coop.join'),
-      { ...SMALL_BUTTON, width: SMALL_BUTTON.width + 16 },
-      () => {
-        this.openJoin(save);
-      },
-    );
 
     // Gestão do save: linha de botões pequenos (por baixo da lista, se estiver numa linha).
     const actionsY = inRow ? Math.max(rowY, listY + 20) : rowY;
@@ -333,6 +338,12 @@ export class MainMenuScene extends Phaser.Scene {
         this.inputs = [];
         this.overlayOpen = false;
         this.primaryAction = previous;
+        if (this.resizePending) {
+          this.resizePending = false;
+          this.time.delayedCall(50, () => {
+            if (!this.busy) this.scene.restart({});
+          });
+        }
       },
     };
   }
@@ -351,7 +362,7 @@ export class MainMenuScene extends Phaser.Scene {
       return object;
     };
     add(
-      new Label(this, x + 10, y + 26, t('menu.name'), { size: 8, color: 'cream' }).setDepth(
+      new Label(this, x + 10, y + 28, t('menu.name'), { size: 8, color: 'cream' }, [0, 0.5]).setDepth(
         OVERLAY_DEPTH + 1,
       ),
     );
@@ -422,7 +433,7 @@ export class MainMenuScene extends Phaser.Scene {
       panel.close();
     };
     objects.push(
-      new Label(this, x + 10, y + 26, t('coop.enter_code'), { size: 8, color: 'cream' }).setDepth(
+      new Label(this, x + 10, y + 28, t('coop.enter_code'), { size: 8, color: 'cream' }, [0, 0.5]).setDepth(
         OVERLAY_DEPTH + 1,
       ),
     );

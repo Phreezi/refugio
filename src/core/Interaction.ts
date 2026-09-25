@@ -3,7 +3,7 @@ import { BALANCE } from '../data/balance';
 import type { ItemDefs, LootTables, PropDefs, ResourceDefs, StationDefs, StructureDefs } from '../data/types';
 import { structureArea, structureFeet } from '../systems/building/building';
 import { bestTool, hitPower, maxDrops, rollDrops, wearTool } from '../systems/gathering/gathering';
-import { addItem, createContainer, spaceFor } from '../systems/inventory/inventory';
+import { COIN, createContainer, spaceFor } from '../systems/inventory/inventory';
 import { gatherExtraPct, gatherPowerBonus, skillLevel, trainSkill } from '../systems/combat/skills';
 import { talentOf } from '../data/talents';
 import { nextRandom } from './Rng';
@@ -13,7 +13,7 @@ import { footprintRect, type Rect } from '../systems/movement/geometry';
 import type { ResourcePlacement, ZoneMap } from '../world/zoneMap';
 import { secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
-import { zoneState, type GameState } from './GameState';
+import { BASE_ZONE_ID, zoneState, type GameState } from './GameState';
 import { structureChestId, structureStationKey, type Building } from './Building';
 import type { Combat } from './Combat';
 import type { Fishing } from './Fishing';
@@ -58,7 +58,8 @@ export type TargetData =
   | { type: 'plot'; placement: ResourcePlacement; uid: number }
   | { type: 'producer'; placement: ResourcePlacement; uid: number }
   | { type: 'repair'; placement: ResourcePlacement; uid: number }
-  | { type: 'fish'; placement: ResourcePlacement };
+  | { type: 'fish'; placement: ResourcePlacement }
+  | { type: 'teleport'; placement: ResourcePlacement };
 /** Os recursos que reaparecem verificam-se uma vez por segundo de jogo. */
 const RESPAWN_CHECK_TICKS = 20;
 
@@ -235,7 +236,11 @@ export class Interaction {
     for (const [uid, id, tx, ty] of this.building.structures()) {
       const def = this.building.def(id);
       const damaged = this.building.damageOf(uid) > 0;
-      if (!def || !(damaged || def.door || def.station || def.chest || def.farm || def.produce)) continue;
+      if (
+        !def ||
+        !(damaged || def.door || def.station || def.chest || def.farm || def.produce || def.teleport)
+      )
+        continue;
       const feet = structureFeet(def, tx, ty, tileSize);
       const placement = { id, objectId: -uid, ...feet };
       const area = def.footprint ? footprintRect(feet, def.footprint) : structureArea(def, tx, ty, tileSize);
@@ -246,6 +251,7 @@ export class Interaction {
       else if (def.chest) data = { type: 'chest', placement, chestId: structureChestId(uid) };
       else if (def.farm) data = { type: 'plot', placement, uid };
       else if (def.produce) data = { type: 'producer', placement, uid };
+      else if (def.teleport) data = { type: 'teleport', placement };
       else data = { type: 'door', placement, uid };
       list.push({ kind: 'container', area, data });
     }
@@ -306,6 +312,8 @@ export class Interaction {
       this.openLoot(data.placement);
     } else if (data.type === 'fish') {
       this.fishing.start();
+    } else if (data.type === 'teleport') {
+      this.useWaystone();
     } else if (data.type === 'repair') {
       this.bus.emit('player:action', { kind: 'gather' });
       const missing = this.building.repair(data.uid);
@@ -330,6 +338,23 @@ export class Interaction {
       this.actions.drink();
     }
     return data.type;
+  }
+
+  /**
+   * Poste de teletransporte (Etapa E): a primeira vez ativa-o (fica como destino); depois abre
+   * a escolha do destino (mapa-mundo sem custo de viagem).
+   */
+  private useWaystone(): void {
+    const zoneId = this.zone?.zoneId;
+    if (!zoneId) return;
+    this.bus.emit('player:action', { kind: 'use' });
+    const waystones = this.state.data.waystones;
+    if (zoneId !== BASE_ZONE_ID && !waystones.includes(zoneId)) {
+      waystones.push(zoneId);
+      this.state.markDirty();
+      this.bus.emit('waystone:activated', { zoneId });
+    }
+    this.bus.emit('waystone:use', { zoneId });
   }
 
   /** Recursos que já devem ter reaparecido (chamar a cada tick). */
@@ -376,7 +401,12 @@ export class Interaction {
     const hp = this.nodeHp.get(placement.objectId) ?? def.hp;
     const finalHit = hp - power <= 0;
     // Antes do último golpe, confirmar que os drops cabem (nada se perde).
-    if (finalHit && !maxDrops(def).every((drop) => spaceFor(containers, drop.item, zone.items) >= drop.qty)) {
+    if (
+      finalHit &&
+      !maxDrops(def).every(
+        (drop) => drop.item === COIN || spaceFor(containers, drop.item, zone.items) >= drop.qty,
+      )
+    ) {
       this.bus.emit('action:blocked', { reason: 'inventory_full' });
       return;
     }
@@ -418,7 +448,7 @@ export class Interaction {
         drops.push({ item: bonus.item, qty: 1 });
     const overflow = createContainer(0);
     for (const drop of drops) {
-      const left = addItem(containers, drop.item, drop.qty, zone.items);
+      const left = this.actions.give(drop.item, drop.qty);
       if (left > 0) overflow.push([drop.item, left]);
       this.bus.emit('item:gained', { item: drop.item, qty: drop.qty, x: placement.x, y: placement.y });
     }

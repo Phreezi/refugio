@@ -95,5 +95,8 @@
   "enchantArmor": 2,
   "talentResetCostPerPoint": 10,
   "corpseDays": 1,
-  "groundThingsMax": 300
+  "groundThingsMax": 300,
+  "orderHours": 1,
+  "deliveryOffsetPx": 16,
+  "teleportArrivalPx": 20
 }

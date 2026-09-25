@@ -51,5 +51,14 @@
     },
     "queue": 1,
     "trade": true
+  },
+  "takeaway": {
+    "sprite": "fridge",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "queue": 3,
+    "deliver": true
   }
 }

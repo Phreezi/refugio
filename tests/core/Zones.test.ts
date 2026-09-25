@@ -85,7 +85,7 @@ function setup(seed = 7) {
   const faceFromSouth = (p: { x: number; y: number }) => {
     Object.assign(state.data.player, { x: p.x, y: p.y + 9, facing: 'up' });
   };
-  return { state, sim, events, enter, press, faceFromSouth };
+  return { state, sim, bus, events, enter, press, faceFromSouth };
 }
 
 describe('Loot', () => {
@@ -198,6 +198,48 @@ describe('Mapa-mundo e viagens', () => {
     const had = countItem(sim.actions.pickupContainers(), output);
     expect(sim.crafting.craft(recipe, null)).toBe('ok');
     expect(countItem(sim.actions.pickupContainers(), output)).toBe(had + 1);
+  });
+});
+
+describe('Teletransporte (Etapa E)', () => {
+  it('todas as zonas normais têm um poste perto da entrada, fora das colisões', () => {
+    for (const [zoneId, zone] of Object.entries(zones)) {
+      if (zoneId === BASE_ZONE_ID || zone.dungeon || zone.event) continue;
+      const map = realMap(zoneId);
+      const post = map.props.find((p) => p.id === 'waystone');
+      expect(post, zoneId).toBeDefined();
+      if (!post) continue;
+      expect(Math.hypot(post.x - map.playerSpawn.x, post.y - map.playerSpawn.y)).toBeLessThan(120);
+    }
+  });
+
+  it('o poste ativa-se com a ação e depois leva lá de graça (e a base está sempre)', () => {
+    const { state, sim, bus, enter, press, faceFromSouth } = setup();
+    const uses: string[] = [];
+    bus.on('waystone:use', ({ zoneId }) => uses.push(zoneId));
+    const pine = realMap('zone_pine_forest');
+    const post = pine.props.find((p) => p.id === 'waystone');
+    if (!post) throw new Error('sem poste');
+    // Ainda não ativado: não se vai lá por teletransporte.
+    expect(sim.teleport('zone_pine_forest', pine)).toBe(false);
+    state.data.player.zoneId = 'zone_pine_forest';
+    enter('zone_pine_forest', pine);
+    faceFromSouth(post);
+    press();
+    expect(state.data.waystones).toEqual(['zone_pine_forest']);
+    expect(uses).toEqual(['zone_pine_forest']);
+    // Para casa (sempre) e de volta ao poste, sem gastar fome nem sede.
+    const { hunger, thirst } = state.data.player;
+    expect(sim.teleport(BASE_ZONE_ID, realMap(BASE_ZONE_ID))).toBe(true);
+    expect(state.data.player.zoneId).toBe(BASE_ZONE_ID);
+    expect(sim.teleport('zone_pine_forest', pine)).toBe(true);
+    expect(state.data.player).toMatchObject({
+      zoneId: 'zone_pine_forest',
+      x: post.x,
+      y: post.y + BALANCE.teleportArrivalPx,
+      hunger,
+      thirst,
+    });
   });
 });
 

@@ -1,11 +1,11 @@
 import { versioned } from '../config';
 
 /**
- * Fonte pixel da interface: **Tiny5** (OFL, `public/assets/fonts/`, ver LICENSES.md), com
- * minúsculas e acentos. Desenha-se sempre com cada píxel da letra = um número inteiro de píxeis
+ * Fonte pixel da interface: **Jersey 10** (OFL, `public/assets/fonts/`, ver LICENSES.md):
+ * pixelizada mas de formas arredondadas, com minúsculas e acentos. Desenha-se sempre com cada píxel da letra = um número inteiro de píxeis
  * do ecrã (ver `pixelFontSize` em ui/text.ts), por isso as letras e os números ficam nítidos.
  */
-export const PIXEL_FONT_FAMILY = 'Tiny5';
+export const PIXEL_FONT_FAMILY = 'Jersey 10';
 
 /** Os ficheiros da fonte (latin-ext tem os restantes acentos). */
 const FONT_FILES = ['latin', 'latin-ext'] as const;
@@ -21,7 +21,10 @@ export async function loadPixelFont(): Promise<void> {
   if (typeof FontFace === 'undefined') return;
   const faces = FONT_FILES.map(
     (subset) =>
-      new FontFace(PIXEL_FONT_FAMILY, `url(${versioned(`assets/fonts/tiny5-${subset}-400-normal.woff2`)})`),
+      new FontFace(
+        PIXEL_FONT_FAMILY,
+        `url(${versioned(`assets/fonts/jersey-10-${subset}-400-normal.woff2`)})`,
+      ),
   );
   const timeout = new Promise<void>((resolve) => setTimeout(resolve, FONT_TIMEOUT_MS));
   try {

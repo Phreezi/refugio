@@ -1601,6 +1601,116 @@
         "border": "bark",
         "letter": "L"
       }
+    },
+    "icon_pizza": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "gold",
+        "border": "ink",
+        "letter": "P"
+      },
+      "file": "sprites/icons/pizza.png"
+    },
+    "icon_burger": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood_light",
+        "border": "ink",
+        "letter": "H"
+      },
+      "file": "sprites/icons/burger.png"
+    },
+    "icon_roast_chicken": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "orange",
+        "border": "ink",
+        "letter": "F"
+      },
+      "file": "sprites/icons/roast_chicken.png"
+    },
+    "icon_bifana": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "B"
+      },
+      "file": "sprites/icons/bifana.png"
+    },
+    "icon_soup": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "grass",
+        "border": "ink",
+        "letter": "S"
+      },
+      "file": "sprites/icons/soup.png"
+    },
+    "icon_coffee": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark_dark",
+        "border": "ink",
+        "letter": "C"
+      },
+      "file": "sprites/icons/coffee.png"
+    },
+    "icon_smoothie": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "rose",
+        "border": "ink",
+        "letter": "B"
+      },
+      "file": "sprites/icons/smoothie.png"
+    },
+    "icon_lemonade": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "gold",
+        "border": "ink",
+        "letter": "L"
+      },
+      "file": "sprites/icons/lemonade.png"
+    },
+    "fridge": {
+      "type": "image",
+      "file": "sprites/fridge.png",
+      "placeholder": {
+        "width": 16,
+        "height": 30,
+        "color": "parchment",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
+    "waystone": {
+      "type": "image",
+      "file": "sprites/waystone.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "stone",
+        "border": "ink",
+        "letter": "T"
+      }
     }
   }
 }

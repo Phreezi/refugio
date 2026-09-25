@@ -59,7 +59,7 @@ export class Button {
       x,
       y,
       isClose ? '' : text,
-      { size: options.fontSize ?? 11, color: colors.text, bold: true },
+      { size: options.fontSize ?? 11, color: colors.text, bold: true, fit: width - 2 },
       [0.5, 0.5],
     );
     if (isClose) {

@@ -715,5 +715,117 @@
     },
     "stack": 10,
     "rarity": "uncommon"
+  },
+  "pizza": {
+    "name": "item.pizza",
+    "icon": "icon_pizza",
+    "type": "consumable",
+    "effects": {
+      "hunger": 55
+    },
+    "buff": {
+      "effect": "meleeDamagePct",
+      "value": 15,
+      "hours": 6
+    },
+    "stack": 10,
+    "rarity": "uncommon"
+  },
+  "burger": {
+    "name": "item.burger",
+    "icon": "icon_burger",
+    "type": "consumable",
+    "effects": {
+      "hunger": 50
+    },
+    "buff": {
+      "effect": "armorPct",
+      "value": 10,
+      "hours": 6
+    },
+    "stack": 10,
+    "rarity": "uncommon"
+  },
+  "roast_chicken": {
+    "name": "item.roast_chicken",
+    "icon": "icon_roast_chicken",
+    "type": "consumable",
+    "effects": {
+      "hunger": 60
+    },
+    "buff": {
+      "effect": "regenPct",
+      "value": 50,
+      "hours": 6
+    },
+    "stack": 10,
+    "rarity": "uncommon"
+  },
+  "bifana": {
+    "name": "item.bifana",
+    "icon": "icon_bifana",
+    "type": "consumable",
+    "effects": {
+      "hunger": 40
+    },
+    "buff": {
+      "effect": "extraDropPct",
+      "value": 20,
+      "hours": 6
+    },
+    "stack": 10,
+    "rarity": "uncommon"
+  },
+  "soup": {
+    "name": "item.soup",
+    "icon": "icon_soup",
+    "type": "consumable",
+    "effects": {
+      "hunger": 30,
+      "thirst": 30
+    },
+    "stack": 10,
+    "rarity": "common"
+  },
+  "coffee": {
+    "name": "item.coffee",
+    "icon": "icon_coffee",
+    "type": "consumable",
+    "effects": {
+      "thirst": 15
+    },
+    "buff": {
+      "effect": "xpPct",
+      "value": 20,
+      "hours": 4
+    },
+    "stack": 10,
+    "rarity": "uncommon"
+  },
+  "smoothie": {
+    "name": "item.smoothie",
+    "icon": "icon_smoothie",
+    "type": "consumable",
+    "effects": {
+      "hunger": 10,
+      "thirst": 40
+    },
+    "buff": {
+      "effect": "sprintCostPct",
+      "value": 50,
+      "hours": 4
+    },
+    "stack": 10,
+    "rarity": "uncommon"
+  },
+  "lemonade": {
+    "name": "item.lemonade",
+    "icon": "icon_lemonade",
+    "type": "consumable",
+    "effects": {
+      "thirst": 45
+    },
+    "stack": 10,
+    "rarity": "common"
   }
 }

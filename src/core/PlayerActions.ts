@@ -1,14 +1,11 @@
 import { EQUIP_SLOTS, equipSlotOf, type ItemDefs } from '../data/types';
 import { BALANCE } from '../data/balance';
 
-/** Moeda (§7.16): paga encantamentos, trocas e repor talentos. */
-export const COIN = 'coin';
 import {
+  COIN,
   addItem,
-  countItem,
   enchantOf,
   moveSlot,
-  removeItem,
   sortContainer,
   splitSlot,
   storeSimilar,
@@ -16,6 +13,10 @@ import {
 } from '../systems/inventory/inventory';
 import type { EventBus, GameEvents, OtherContainerRef } from './EventBus';
 import { chestContents, zoneState, type GameState } from './GameState';
+import { gameHoursToTicks } from './Clock';
+
+/** Moeda (§7.16): paga encantamentos, trocas e repor talentos; é um contador, não um item. */
+export { COIN };
 
 /** Onde está um slot: mochila, hotbar ou um baú (`chest:<id>`). */
 export type ContainerRef = 'inventory' | 'hotbar' | 'equipment' | OtherContainerRef;
@@ -37,6 +38,8 @@ export class PlayerActions {
   dropItems: (items: Container) => boolean = () => false;
   /** Ler uma nota: aprende a receita (ligado à progressão pela Simulation). */
   readNote: (recipe: string) => 'learned' | 'known' | 'unknown' = () => 'unknown';
+  /** Regras de um baú construído (frigorífico: mais espaços, só comida). null = baú normal. */
+  chestRules: (chestId: string) => { slots?: number; foodOnly: boolean; orders?: string } | null = () => null;
 
   constructor(state: GameState, bus: EventBus<GameEvents>, items: () => ItemDefs) {
     this.state = state;
@@ -59,7 +62,16 @@ export class PlayerActions {
       const [, zoneId = '', objectId = ''] = ref.split(':');
       return zoneState(data, zoneId).loot[objectId]?.[1] ?? [];
     }
-    return chestContents(data, ref.slice('chest:'.length));
+    const chestId = ref.slice('chest:'.length);
+    return chestContents(data, chestId, this.chestRules(chestId)?.slots);
+  }
+
+  /** O contentor aceita este item? (o frigorífico só guarda comida e bebida, §7.17) */
+  accepts(ref: ContainerRef, item: string | undefined): boolean {
+    if (item === undefined || !ref.startsWith('chest:')) return true;
+    if (!this.chestRules(ref.slice('chest:'.length))?.foodOnly) return true;
+    const effects = this.items()[item]?.effects;
+    return (effects?.hunger ?? 0) > 0 || (effects?.thirst ?? 0) > 0;
   }
 
   /** Espaços da mochila: os de base mais os da mochila equipada (§7.3). */
@@ -99,6 +111,44 @@ export class PlayerActions {
     this.changed();
   }
 
+  /**
+   * Dá um item ao jogador (apanhar, loot, drops): as moedas vão para o contador; o resto para a
+   * mochila/hotbar. @returns o que não coube.
+   */
+  give(item: string, qty: number): number {
+    if (item === COIN) {
+      this.state.data.player.coins += qty;
+      return 0;
+    }
+    return addItem(this.pickupContainers(), item, qty, this.items());
+  }
+
+  /** Moedas que tenham ido parar aos slots (arrastadas de um contentor) passam para o contador. */
+  sweepCoins(): void {
+    const player = this.state.data.player;
+    let found = 0;
+    for (const container of [player.inventory, player.hotbar]) {
+      container.forEach((slot, i) => {
+        if (slot?.[0] !== COIN) return;
+        found += slot[1];
+        container[i] = null;
+      });
+    }
+    if (found === 0) return;
+    player.coins += found;
+    this.changed();
+  }
+
+  /** Tira os efeitos da comida que já acabaram (§7.17). */
+  tickBuffs(tick: number): void {
+    const player = this.state.data.player;
+    if (player.buffs.length === 0) return;
+    const active = player.buffs.filter(([, , until]) => until > tick);
+    if (active.length === player.buffs.length) return;
+    player.buffs = active;
+    this.changed();
+  }
+
   /** Onde vão parar os itens apanhados: primeiro a mochila, depois a hotbar. */
   pickupContainers(): Container[] {
     const { inventory, hotbar } = this.state.data.player;
@@ -134,6 +184,13 @@ export class PlayerActions {
     // Nunca mata: comida estragada tira vida, mas deixa pelo menos 1.
     player.hp = Math.max(Math.min(player.hp, 1), clamp(player.hp + (def.effects.hp ?? 0)));
     if (def.stopsBleeding) player.bleed = 0;
+    if (def.buff) {
+      // Comida com efeito (§7.17): o mesmo efeito renova-se (não se acumula).
+      const { effect, value, hours } = def.buff;
+      const until = this.state.data.world.tick + gameHoursToTicks(hours);
+      player.buffs = [...player.buffs.filter(([e]) => e !== effect), [effect, value, until]];
+      this.bus.emit('buff:started', { item: slot[0], effect, value, hours });
+    }
 
     slot[1] -= 1;
     if (slot[1] === 0) container[ref.index] = null;
@@ -169,6 +226,10 @@ export class PlayerActions {
     const needed = this.levelNeeded(entering?.[0]);
     if (needed !== null) {
       this.bus.emit('action:blocked', { reason: 'needs_level', level: needed });
+      return false;
+    }
+    if (!this.accepts(to.container, source?.[0]) || !this.accepts(from.container, target?.[0])) {
+      this.bus.emit('action:blocked', { reason: 'food_only' });
       return false;
     }
     const moved = moveSlot(
@@ -241,9 +302,9 @@ export class PlayerActions {
     if (!slot || !this.enchantable(slot[0])) return 'invalid';
     const cost = this.enchantCost(ref);
     if (cost === null) return 'max';
-    const containers = this.pickupContainers();
-    if (countItem(containers, COIN) < cost) return 'no_coins';
-    removeItem(containers, COIN, cost);
+    const player = this.state.data.player;
+    if (player.coins < cost) return 'no_coins';
+    player.coins -= cost;
     const durability = slot[2] ?? this.items()[slot[0]]?.durability ?? 1;
     const level = enchantOf(slot) + 1;
     container[ref.index] = [slot[0], slot[1], durability, level];
@@ -291,6 +352,12 @@ export class PlayerActions {
     let moved = false;
     for (const [i, slot] of source.entries()) {
       if (!slot) continue;
+      if (slot[0] === COIN) {
+        this.give(COIN, slot[1]);
+        source[i] = null;
+        moved = true;
+        continue;
+      }
       if (slot[2] !== undefined) {
         const target = targets.find((c) => c.includes(null));
         if (!target) continue;

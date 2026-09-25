@@ -1,11 +1,12 @@
 import type { GameStateData } from '../core/GameState';
 import { MIGRATIONS, migrate, type Migration } from './migrations';
 import { SKILLS } from '../data/types';
+import { TALENT_EFFECTS } from '../systems/progression/talents';
 
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -173,6 +174,21 @@ export function validateState(input: unknown): GameStateData {
       problems.push('player.talents inválido');
     if (typeof player.name !== 'string' || player.name.trim() === '' || player.name.length > 14)
       problems.push('player.name inválido');
+    if (!stat(player.coins)) problems.push('player.coins inválido');
+    if (
+      !Array.isArray(player.buffs) ||
+      !player.buffs.every(
+        (b) =>
+          Array.isArray(b) &&
+          b.length === 3 &&
+          typeof b[0] === 'string' &&
+          (TALENT_EFFECTS as readonly string[]).includes(b[0]) &&
+          typeof b[1] === 'number' &&
+          Number.isFinite(b[1]) &&
+          stat(b[2]),
+      )
+    )
+      problems.push('player.buffs inválido');
   }
   if (!isObject(world)) problems.push('falta world');
   else {
@@ -265,6 +281,9 @@ export function validateState(input: unknown): GameStateData {
     problems.push('dungeons inválido');
   const bosses = isObject(input) ? input.bosses : undefined;
   if (!isObject(bosses) || !Object.values(bosses).every(stat)) problems.push('bosses inválido');
+  const waystones = isObject(input) ? input.waystones : undefined;
+  if (!Array.isArray(waystones) || !waystones.every((z) => typeof z === 'string' && z !== ''))
+    problems.push('waystones inválido');
   const stats = isObject(input) ? input.stats : undefined;
   const STAT_KEYS = ['kills', 'deaths', 'crafted', 'gathered', 'looted', 'playTicks'] as const;
   if (!isObject(stats) || !STAT_KEYS.every((k) => stat(stats[k]))) problems.push('stats inválido');

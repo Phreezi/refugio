@@ -2,25 +2,26 @@ import type Phaser from 'phaser';
 import { PALETTE, type PaletteColor } from '../assets/palette';
 import { textResolution } from '../display/view';
 
-/** Fonte da interface: pixel (Tiny5, OFL; ver display/fonts.ts), com reservas. */
-export const UI_FONT = '"Tiny5", "Trebuchet MS", "Segoe UI", system-ui, sans-serif';
+/** Fonte da interface: pixel (Jersey 10, OFL; ver display/fonts.ts), com reservas. */
+export const UI_FONT = '"Jersey 10", "Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 
-/** Grelha da Tiny5: cada píxel da letra mede 1/8 do tamanho da fonte. */
-const FONT_GRID = 8;
+/** Grelha da Jersey 10: cada píxel da letra mede 3/56 do tamanho da fonte (maiúsculas: 10). */
+const FONT_PIXEL_PER_PX = 3 / 56;
 
 /**
- * Tamanho (px de jogo) com que se desenha o texto de tamanho `size`: arredondado para cada
- * píxel da letra ser um número inteiro de píxeis do ecrã (senão as letras ficam irregulares).
+ * Píxeis da letra por píxel do tamanho pedido: a fonte desenha-se ~1,5× maior do que o tamanho
+ * "natural" (maiúsculas ≈ 0,8 × tamanho), mais legível; a largura fica parecida com a da antiga.
  */
-export function pixelFontSize(size: number): number {
-  const resolution = textResolution();
-  const device = Math.max(FONT_GRID, Math.round((size * resolution) / FONT_GRID) * FONT_GRID);
-  return device / resolution;
+const FONT_SCALE = 0.08;
+
+/** Um píxel da letra, em píxeis do ecrã (inteiro: senão as letras ficam irregulares). */
+function fontPixel(size: number): number {
+  return Math.max(1, Math.round(size * textResolution() * FONT_SCALE));
 }
 
-/** Um píxel da letra, em píxeis do ecrã (as sombras do canvas não seguem a escala do texto). */
-function fontPixel(size: number): number {
-  return (pixelFontSize(size) * textResolution()) / FONT_GRID;
+/** Tamanho (px de jogo) com que se desenha o texto de tamanho `size`, na grelha da fonte. */
+export function pixelFontSize(size: number): number {
+  return fontPixel(size) / FONT_PIXEL_PER_PX / textResolution();
 }
 
 let measureContext: CanvasRenderingContext2D | null = null;
@@ -56,6 +57,8 @@ export interface LabelStyle {
   align?: 'left' | 'center' | 'right';
   /** Contorno escuro (legível por cima do mundo, ex.: quantidades nos slots). */
   stroke?: boolean;
+  /** Largura máxima (px de jogo) numa linha: se o texto não couber, a letra encolhe. */
+  fit?: number;
 }
 
 /**
@@ -69,6 +72,8 @@ export class Label {
   private readonly originX: number;
   private readonly originY: number;
   private color: PaletteColor;
+  private readonly size: number;
+  private readonly fit: number | undefined;
 
   constructor(
     scene: Phaser.Scene,
@@ -81,6 +86,8 @@ export class Label {
     this.anchor = { x, y };
     [this.originX, this.originY] = origin;
     this.color = style.color ?? 'cream';
+    this.size = style.size;
+    this.fit = style.fit;
     this.text = scene.add
       .text(0, 0, noLigatures(content), {
         fontFamily: UI_FONT,
@@ -107,6 +114,7 @@ export class Label {
         ...(style.wrap === undefined ? {} : { wordWrap: { width: style.wrap } }),
       })
       .setOrigin(0, 0);
+    this.shrinkToFit();
     this.align();
   }
 
@@ -115,6 +123,7 @@ export class Label {
     content = noLigatures(content);
     if (this.text.text === content) return this;
     this.text.setText(content);
+    this.shrinkToFit();
     this.align();
     return this;
   }
@@ -144,6 +153,22 @@ export class Label {
 
   destroy(): void {
     this.text.destroy();
+  }
+
+  /** Com `fit`: letra no tamanho pedido ou, se não couber, píxel a píxel mais pequena. */
+  private shrinkToFit(): void {
+    if (this.fit === undefined) return;
+    const resolution = textResolution();
+    let pixel = fontPixel(this.size);
+    const apply = (): void => {
+      const size = `${String(pixel / FONT_PIXEL_PER_PX / resolution)}px`;
+      if (this.text.style.fontSize !== size) this.text.setFontSize(size);
+    };
+    apply();
+    while (this.text.width > this.fit && pixel > 1) {
+      pixel--;
+      apply();
+    }
   }
 
   private align(): void {

@@ -26,7 +26,7 @@ import { SkillsUI, skillEffectText } from '../ui/SkillsUI';
 import { preferences, setPreference } from '../ui/preferences';
 import { autosave } from '../save';
 import { InventoryUI } from '../ui/InventoryUI';
-import { Label } from '../ui/text';
+import { Label, measureTextWidth } from '../ui/text';
 import { SLOT_SIZE } from '../ui/SlotView';
 import { uiState } from '../ui/uiState';
 import { xpToNext } from '../systems/progression/progression';
@@ -342,7 +342,7 @@ export class UIScene extends Phaser.Scene {
     }
     // Nível e XP (barra fina por baixo das outras).
     this.levelLabel?.setText(t('level.short', { level: player.level }));
-    this.coinLabel?.setText(String(countItem([player.inventory, player.hotbar], 'coin')));
+    this.coinLabel?.setText(String(player.coins));
     if (this.xpFill) {
       const need = xpToNext(player.level, BALANCE.xpCurve);
       const full = player.level >= BALANCE.maxLevel;
@@ -565,6 +565,16 @@ export class UIScene extends Phaser.Scene {
       eventBus.on('talents:reset', () => {
         this.showNotice(t('skills.reset_done'));
       }),
+      eventBus.on('waystone:activated', () => {
+        this.showNotice(t('msg.waystone_on'));
+      }),
+      // Take-away (§7.17): a encomenda chegou à porta; comida com efeito temporário.
+      eventBus.on('order:arrived', ({ item, qty }) => {
+        this.showNotice(t('msg.order_arrived', { qty, item: itemName(item) }));
+      }),
+      eventBus.on('buff:started', ({ effect, value, hours }) => {
+        this.showNotice(t('msg.buff', { effect: tKey(`talent_effect.${effect}`, { v: value }), h: hours }));
+      }),
       eventBus.on('action:blocked', ({ reason, tool, item, hours, level }) => {
         if (reason === 'inventory_full') this.showNotice(t('msg.inventory_full'));
         else if (reason === 'door_blocked') this.showNotice(t('build.problem.door_blocked'));
@@ -575,6 +585,7 @@ export class UIScene extends Phaser.Scene {
           this.showNotice(t('farm.growing', { hours: Math.max(1, hours ?? 1) }));
         else if (reason === 'nothing_yet') this.showNotice(t('farm.nothing_yet'));
         else if (reason === 'needs_level') this.showNotice(t('msg.needs_level', { level: level ?? 1 }));
+        else if (reason === 'food_only') this.showNotice(t('msg.food_only'));
         else if (reason === 'no_ammo') this.showNotice(t('msg.no_ammo', { item: itemName(item ?? '') }));
         else if (reason === 'needs_item')
           this.showNotice(t('msg.needs_item', { item: itemName(item ?? '') }));
@@ -642,11 +653,15 @@ export class UIScene extends Phaser.Scene {
   private createBars(): void {
     this.bars = STATS.map((stat, i) => {
       const y = HUD_MARGIN + i * BAR_SPACING;
-      const label = new Label(this, HUD_MARGIN, y - 1, t(stat.label), {
-        size: 7,
-        color: 'cream',
-        bold: true,
-      });
+      // Centrada na barra (a letra é mais alta do que a barra) e com sombra por cima do mundo.
+      const label = new Label(
+        this,
+        HUD_MARGIN,
+        y + BAR_HEIGHT / 2,
+        t(stat.label),
+        { size: 7, color: 'cream', bold: true, stroke: true },
+        [0, 0.5],
+      );
       // Contorno (retângulo maior por trás), fundo e enchimento; origem 0 e posições inteiras.
       this.add.rectangle(BAR_X - 1, y - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2, paletteNumber('ink')).setOrigin(0);
       this.add.rectangle(BAR_X, y, BAR_WIDTH, BAR_HEIGHT, paletteNumber('shadow')).setOrigin(0);
@@ -656,17 +671,27 @@ export class UIScene extends Phaser.Scene {
       return { key: stat.key, label, fill };
     });
     const y = HUD_MARGIN + STATS.length * BAR_SPACING;
-    this.levelLabel = new Label(this, HUD_MARGIN, y - 2, '', { size: 7, color: 'gold', bold: true });
+    this.levelLabel = new Label(
+      this,
+      HUD_MARGIN,
+      y + 2,
+      '',
+      { size: 7, color: 'gold', bold: true, stroke: true },
+      [0, 0.5],
+    );
     // Moedas (§7.16): à direita da barra de XP.
     this.add
       .image(BAR_X + BAR_WIDTH + 5, y + 2, 'icon_coin')
       .setOrigin(0, 0.5)
       .setScale(0.5);
-    this.coinLabel = new Label(this, BAR_X + BAR_WIDTH + 15, y - 2, '', {
-      size: 7,
-      color: 'gold',
-      bold: true,
-    });
+    this.coinLabel = new Label(
+      this,
+      BAR_X + BAR_WIDTH + 15,
+      y + 2,
+      '',
+      { size: 7, color: 'gold', bold: true, stroke: true },
+      [0, 0.5],
+    );
     this.add.rectangle(BAR_X - 1, y, BAR_WIDTH + 2, 4, paletteNumber('ink')).setOrigin(0);
     this.xpFill = this.add.rectangle(BAR_X, y + 1, 0, 2, paletteNumber('gold')).setOrigin(0);
     this.bleedLabel = new Label(this, HUD_MARGIN, y + 6, t('hud.bleeding'), {
@@ -755,12 +780,14 @@ export class UIScene extends Phaser.Scene {
     ).setDepth(70);
     // Construir (só na base): por cima do Fabricar.
     if (this.build?.available) {
+      // Um pouco mais largo se o texto não couber (a letra só encolhe em píxeis inteiros).
+      const buildWidth = Math.max(bagWidth, Math.ceil(measureTextWidth(t('build.button'), 8)) + 6);
       this.buildButton = new Button(
         this,
-        Math.max(bagWidth / 2 + 4, hotbar.x - 6 - bagWidth / 2),
+        Math.max(buildWidth / 2 + 4, hotbar.x - 6 - bagWidth + buildWidth / 2),
         hotbar.y - 12,
         t('build.button'),
-        { width: bagWidth, height: 14, fontSize: 8, style: 'secondary' },
+        { width: buildWidth, height: 14, fontSize: 8, style: 'secondary' },
         () => {
           this.toggleBuild();
         },

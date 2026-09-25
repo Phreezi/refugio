@@ -256,6 +256,32 @@ describe('save: migrações', () => {
     expect(() => validateState(bad)).toThrow();
   });
 
+  it('v20 → v21: moedas dos slots e dos baús passam para o contador; buffs e postes vazios', () => {
+    const v20 = structuredClone(STATE) as unknown as {
+      player: Record<string, unknown> & { inventory: unknown[]; hotbar: unknown[] };
+      base: { chests: Record<string, unknown[]> };
+      waystones?: unknown;
+    };
+    delete v20.player.coins;
+    delete v20.player.buffs;
+    delete v20.waystones;
+    v20.player.inventory[3] = ['coin', 40];
+    v20.player.hotbar[2] = ['coin', 2];
+    const chest = Object.values(v20.base.chests)[0];
+    if (chest) chest[5] = ['coin', 100];
+    const stateJson = JSON.stringify(v20);
+    const text = `{"version":20,"timestamp":9,"checksum":"${checksum(`20|9|${stateJson}`)}","state":${stateJson}}`;
+    const state = parseSave(text).state;
+    expect(state.player.coins).toBe(142);
+    expect(state.player.inventory[3]).toBeNull();
+    expect(state.player.hotbar[2]).toBeNull();
+    expect(state.player.buffs).toEqual([]);
+    expect(state.waystones).toEqual([]);
+    const bad = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    bad.player.buffs = [['flying', 5, 10]];
+    expect(() => validateState(bad)).toThrow();
+  });
+
   it('v19 → v20: pilhas no chão com corpo (id do inimigo) validam-se', () => {
     const v19 = structuredClone(STATE);
     const stateJson = JSON.stringify(v19);
