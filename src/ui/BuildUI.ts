@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { paletteNumber } from '../assets/palette';
 import type { Simulation } from '../core/Simulation';
-import { structureSprite } from '../data/types';
+import { STRUCTURE_CATEGORIES, structureSprite, type StructureCategory } from '../data/types';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
 import type { BuildProblem } from '../systems/building/building';
 import { countItem } from '../systems/inventory/inventory';
@@ -191,17 +191,30 @@ export class BuildUI {
       return obj;
     };
 
-    // Paleta: uma ou mais linhas de peças por cima da hotbar.
-    const ids = Object.keys(content.structures);
-    const cols = Math.max(1, Math.min(ids.length, Math.floor((width - 8 + CELL_GAP) / (CELL_W + CELL_GAP))));
-    const rows = Math.ceil(ids.length / cols);
-    const top = this.hotbarTop - 6 - rows * (CELL_H + CELL_GAP);
-    ids.forEach((id, i) => {
-      const row = Math.floor(i / cols);
-      const inRow = Math.min(cols, ids.length - row * cols);
-      const left = Math.round((width - inRow * (CELL_W + CELL_GAP) + CELL_GAP) / 2);
-      const x = left + (i % cols) * (CELL_W + CELL_GAP);
-      const y = top + row * (CELL_H + CELL_GAP);
+    // Paleta: separadores por tipo e uma linha de peças desse tipo (com setas/roda se não
+    // couberem todas).
+    const categories = STRUCTURE_CATEGORIES.filter((cat) =>
+      Object.values(content.structures).some((def) => def.category === cat),
+    );
+    if (!categories.includes(buildMode.category)) buildMode.category = categories[0] ?? 'floors';
+    const ids = Object.keys(content.structures).filter(
+      (id) => content.structures[id]?.category === buildMode.category,
+    );
+    const arrowW = 12;
+    const fit = Math.max(
+      1,
+      Math.floor((width - 8 - 2 * (arrowW + CELL_GAP) + CELL_GAP) / (CELL_W + CELL_GAP)),
+    );
+    const scrolls = ids.length > fit;
+    const maxScroll = Math.max(0, ids.length - fit);
+    buildMode.scroll = Math.min(Math.max(0, buildMode.scroll), maxScroll);
+    const shown = ids.slice(buildMode.scroll, buildMode.scroll + fit);
+    const top = this.hotbarTop - 6 - (CELL_H + CELL_GAP);
+    const rowW = shown.length * (CELL_W + CELL_GAP) - CELL_GAP;
+    const left = Math.round((width - rowW) / 2);
+    shown.forEach((id, i) => {
+      const x = left + i * (CELL_W + CELL_GAP);
+      const y = top;
       const border = add(scene.add.rectangle(x, y, CELL_W, CELL_H, paletteNumber('bark_dark')).setOrigin(0));
       const back = add(
         scene.add
@@ -218,6 +231,10 @@ export class BuildUI {
       back.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
         this.select(id);
       });
+      // Roda do rato por cima da paleta: passa às peças seguintes.
+      back.on(Phaser.Input.Events.GAMEOBJECT_WHEEL, (_p: unknown, _dx: number, dy: number) => {
+        this.scrollBy(dy > 0 ? 1 : -1);
+      });
       const lock = add(
         new Label(
           scene,
@@ -230,6 +247,52 @@ export class BuildUI {
       ).setDepth(DEPTH + 1);
       this.cells.push({ id, border, sprite, lock });
     });
+    if (scrolls) {
+      for (const [dir, x] of [
+        [-1, left - CELL_GAP - arrowW / 2],
+        [1, left + rowW + CELL_GAP + arrowW / 2],
+      ] as const) {
+        const enabled = dir < 0 ? buildMode.scroll > 0 : buildMode.scroll < maxScroll;
+        add(
+          new Button(
+            scene,
+            Math.round(x),
+            top + CELL_H / 2,
+            dir < 0 ? '<' : '>',
+            { width: arrowW, height: CELL_H, fontSize: 9, style: enabled ? 'primary' : 'secondary' },
+            () => {
+              this.scrollBy(dir * Math.max(1, fit - 1));
+            },
+          ),
+        ).setDepth(DEPTH);
+      }
+    }
+    // Separadores (tipos de peça), por cima das peças.
+    const tabGap = 2;
+    const tabW =
+      Math.min(52, Math.floor((width - 8 - (categories.length - 1) * tabGap) / categories.length)) & ~1;
+    const tabsW = categories.length * tabW + (categories.length - 1) * tabGap;
+    const tabY = top - 4 - BUTTON_H / 2;
+    categories.forEach((cat, i) => {
+      add(
+        new Button(
+          scene,
+          Math.round((width - tabsW) / 2) + i * (tabW + tabGap) + tabW / 2,
+          tabY,
+          t(`build.cat.${cat}`),
+          {
+            width: tabW,
+            height: BUTTON_H,
+            fontSize: 7,
+            style: cat === buildMode.category ? 'primary' : 'secondary',
+          },
+          () => {
+            this.showCategory(cat);
+          },
+        ),
+      ).setDepth(DEPTH);
+    });
+    const actionsTop = tabY - BUTTON_H / 2 - 2;
 
     // Botões por cima da paleta.
     const actions: [MessageKey, () => void, ButtonStyle][] = [
@@ -273,10 +336,10 @@ export class BuildUI {
     ];
     const gap = 4;
     const buttonW = Math.min(46, Math.floor((width - 8 - gap * (actions.length - 1)) / actions.length)) & ~1;
-    const rowW = actions.length * buttonW + (actions.length - 1) * gap;
-    const buttonY = top - 4 - BUTTON_H / 2;
+    const actionsW = actions.length * buttonW + (actions.length - 1) * gap;
+    const buttonY = actionsTop - 4 - BUTTON_H / 2;
     actions.forEach(([key, onClick, style], i) => {
-      const x = Math.round((width - rowW) / 2) + i * (buttonW + gap) + buttonW / 2;
+      const x = Math.round((width - actionsW) / 2) + i * (buttonW + gap) + buttonW / 2;
       const button = add(
         new Button(
           scene,
@@ -314,6 +377,28 @@ export class BuildUI {
       ).setDepth(DEPTH);
     }
     this.update();
+  }
+
+  /** Mostra outro tipo de peças (escolhe a primeira, se a escolhida não for desse tipo). */
+  private showCategory(category: StructureCategory): void {
+    this.scene.time.delayedCall(0, () => {
+      buildMode.category = category;
+      buildMode.scroll = 0;
+      if (content.structures[buildMode.selected]?.category !== category) {
+        const first = Object.keys(content.structures).find(
+          (id) => content.structures[id]?.category === category,
+        );
+        if (first) this.select(first);
+      }
+      if (this.isOpen) this.build();
+    });
+  }
+
+  private scrollBy(delta: number): void {
+    this.scene.time.delayedCall(0, () => {
+      buildMode.scroll += delta;
+      if (this.isOpen) this.build();
+    });
   }
 
   private clear(): void {

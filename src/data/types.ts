@@ -747,6 +747,8 @@ export interface StructureDef {
   trap?: TrapDef;
   /** Veículo (moto): construído na base, baixa o custo das viagens nesta %. */
   travelDiscountPct?: number;
+  /** Separador da paleta de construção. */
+  category: StructureCategory;
 }
 
 export interface TrapDef {
@@ -804,7 +806,12 @@ const STRUCTURE_KEYS = new Set([
   'hp',
   'trap',
   'travelDiscountPct',
+  'category',
 ]);
+
+/** Separadores da paleta de construção. */
+export const STRUCTURE_CATEGORIES = ['floors', 'walls', 'crafting', 'farm', 'defense', 'other'] as const;
+export type StructureCategory = (typeof STRUCTURE_CATEGORIES)[number];
 const MAX_STRUCTURE_TILES = 4;
 
 /**
@@ -877,11 +884,14 @@ export function parseStructures(
       needsFoundation: flag(id, raw, 'needsFoundation'),
       unlockLevel: isPositiveInt(raw.unlockLevel) ? raw.unlockLevel : 1,
       farm: flag(id, raw, 'farm'),
+      category: STRUCTURE_CATEGORIES.find((c) => c === raw.category) ?? 'other',
     };
     if (raw.hp !== undefined) {
       if (isPositiveInt(raw.hp)) def.hp = raw.hp;
       else problems.push(`"${id}": hp tem de ser um inteiro > 0`);
     }
+    if (!STRUCTURE_CATEGORIES.some((c) => c === raw.category))
+      problems.push(`"${id}": category tem de ser ${STRUCTURE_CATEGORIES.join(', ')}`);
     if (raw.travelDiscountPct !== undefined) {
       if (isPositiveInt(raw.travelDiscountPct) && raw.travelDiscountPct <= 90)
         def.travelDiscountPct = raw.travelDiscountPct;

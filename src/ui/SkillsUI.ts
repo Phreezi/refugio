@@ -26,6 +26,7 @@ const MAX_W = 300;
 const HEADER_H = 40;
 const ROW_H = 30;
 const PAD = 8;
+const FOOTER_H = 26;
 
 type Tab = 'use' | TalentBranch;
 const TABS: readonly Tab[] = ['use', ...TALENT_BRANCHES];
@@ -39,7 +40,7 @@ export function skillEffectText(skill: SkillId, level: number): string {
   if (skill === 'gathering')
     return t('skills.gather_value', {
       level,
-      extra: gatherExtraPct(level, BALANCE.gatherExtraPctPerLevel),
+      extra: gatherExtraPct(level, BALANCE.gatherExtraPctPerLevel, BALANCE.gatherExtraMaxPct),
       power: gatherPowerBonus(level, BALANCE.gatherPowerEveryLevels),
     });
   const ranged = skill === 'archery' || skill === 'firearms';
@@ -52,8 +53,6 @@ export function skillEffectText(skill: SkillId, level: number): string {
 function talentEffectText(def: TalentDef): string {
   const text = tKey(`talent_effect.${def.effect}`, {
     v: def.perRank,
-    s: BALANCE.sprintSec,
-    c: BALANCE.sprintCooldownSec,
   });
   return def.maxRank > 1 ? `${text} ${t('skills.per_point')}` : text;
 }
@@ -67,6 +66,8 @@ export class SkillsUI {
   private readonly scene: Phaser.Scene;
   private objects: Destroyable[] = [];
   private tab: Tab = 'use';
+  /** Página do separador (quando os talentos não cabem todos). */
+  private page = 0;
   private open_ = false;
   /** Mensagem de baixo (porque não se pode aprender, ou o que se aprendeu). */
   private message = '';
@@ -131,8 +132,13 @@ export class SkillsUI {
     const player = gameState.data.player;
     const w = Math.min(MAX_W, width - 8);
     // Altura igual em todos os separadores (o painel não salta ao mudar), fixo perto do topo.
-    const rows = Math.max(SKILLS.length, ...TALENT_BRANCHES.map((b) => this.branchTalents(b).length));
-    const h = Math.min(height - 8, HEADER_H + rows * ROW_H + 26);
+    // Linhas por página: todas se couberem, senão páginas (setas no rodapé).
+    const most = Math.max(SKILLS.length, ...TALENT_BRANCHES.map((b) => this.branchTalents(b).length));
+    const rows = Math.max(1, Math.min(most, Math.floor((height - 8 - HEADER_H - FOOTER_H) / ROW_H)));
+    const h = HEADER_H + rows * ROW_H + FOOTER_H;
+    const total = this.tab === 'use' ? SKILLS.length : this.branchTalents(this.tab).length;
+    const pages = Math.ceil(total / rows);
+    this.page = Math.min(this.page, pages - 1);
     const x = Math.round((width - w) / 2);
     const y = Math.max(4, Math.min(panelTop(height), height - 4 - h));
     this.add(
@@ -186,6 +192,7 @@ export class SkillsUI {
           { width: tabW, height: 12, fontSize: 7, style: tab === this.tab ? 'primary' : 'secondary' },
           () => {
             this.tab = tab;
+            this.page = 0;
             this.message = '';
             this.rebuildSoon();
           },
@@ -194,21 +201,52 @@ export class SkillsUI {
     });
 
     const top = y + HEADER_H;
-    if (this.tab === 'use') this.buildUse(x, top, w);
-    else this.buildBranch(this.tab, x, top, w);
+    const from = this.page * rows;
+    if (this.tab === 'use') this.buildUse(x, top, w, from, rows);
+    else this.buildBranch(this.tab, x, top, w, from, rows);
+    if (pages > 1) {
+      const py = y + h - 10;
+      this.label(
+        x + w - 34,
+        py - 4,
+        `${String(this.page + 1)}/${String(pages)}`,
+        { size: 7, color: 'wheat' },
+        [0.5, 0],
+      );
+      for (const [dir, bx] of [
+        [-1, x + w - 54],
+        [1, x + w - 14],
+      ] as const) {
+        const enabled = dir < 0 ? this.page > 0 : this.page < pages - 1;
+        this.add(
+          new Button(
+            scene,
+            bx,
+            py,
+            dir < 0 ? '<' : '>',
+            { width: 16, height: 12, fontSize: 8, style: enabled ? 'primary' : 'secondary' },
+            () => {
+              if (!enabled) return;
+              this.page += dir;
+              this.rebuildSoon();
+            },
+          ),
+        ).setDepth(DEPTH.content);
+      }
+    }
 
     const footer = this.message || t(this.tab === 'use' ? 'skills.use_hint' : 'skills.talent_hint');
-    this.label(x + PAD, y + h - 14, footer, {
+    this.label(x + PAD, y + h - 20, footer, {
       size: 7,
       color: this.message ? 'amber' : 'stone_light',
-      wrap: w - PAD * 2,
+      wrap: w - PAD * 2 - (pages > 1 ? 66 : 0),
     });
   }
 
   /** Perícias que sobem com o uso: nível, barra até ao próximo e o que dão. */
-  private buildUse(x: number, top: number, w: number): void {
+  private buildUse(x: number, top: number, w: number, from: number, rows: number): void {
     const skills = gameState.data.player.skills;
-    SKILLS.forEach((skill, i) => {
+    SKILLS.slice(from, from + rows).forEach((skill, i) => {
       const y = top + i * ROW_H;
       const xp = skills[skill] ?? 0;
       const level = skillLevel(xp, BALANCE);
@@ -241,14 +279,22 @@ export class SkillsUI {
   }
 
   /** Um ramo da árvore: cada talento com os pontos, o efeito, o requisito e "Aprender". */
-  private buildBranch(branch: TalentBranch, x: number, top: number, w: number): void {
+  private buildBranch(
+    branch: TalentBranch,
+    x: number,
+    top: number,
+    w: number,
+    from: number,
+    rows: number,
+  ): void {
     const player = gameState.data.player;
-    this.branchTalents(branch).forEach(([id, def], i) => {
+    const shown = this.branchTalents(branch).slice(from, from + rows);
+    shown.forEach(([id, def], i) => {
       const y = top + i * ROW_H;
       const rank = player.talents[id] ?? 0;
       const check = canLearn(id, player.level, player.talents, TALENTS);
-      // Ligação ao talento de cima (é uma árvore: cada um pede o anterior).
-      if (def.requires)
+      // Ligação ao talento de cima, quando é o que este pede (é uma árvore).
+      if (def.requires && shown[i - 1]?.[0] === def.requires[0])
         this.add(
           this.scene.add
             .rectangle(

@@ -22,7 +22,7 @@ export function secondsToTicks(seconds: number): number {
  * Um jogo novo começa às `startHour` do dia 1; o dia muda à meia-noite.
  */
 /**
- * Proteção de principiante: até às 00:00 do dia `beginnerUntilDay` as armas não gastam usos
+ * Proteção de principiante: até às 00:00 do dia `beginnerUntilDay` armas, ferramentas e armadura não gastam usos
  * (as primeiras ~72 h de jogo de uma conta nova).
  */
 export function beginnerProtected(

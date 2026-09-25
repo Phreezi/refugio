@@ -1,7 +1,7 @@
 import { BALANCE } from '../data/balance';
 import type { ItemDefs } from '../data/types';
 import { addItem, removeItem, type Container } from '../systems/inventory/inventory';
-import { secondsToTicks } from './Clock';
+import { beginnerProtected, secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
 import type { GameState } from './GameState';
 import type { PlayerActions } from './PlayerActions';
@@ -110,7 +110,13 @@ export class Fishing {
     const rod = this.rod(containers);
     if (rod) {
       const slot = rod.container[rod.index];
-      if (slot?.[2] !== undefined) {
+      const protectedWear = beginnerProtected(
+        this.state.data.world.tick,
+        BALANCE.dayLengthSec,
+        BALANCE.dayStartHour,
+        BALANCE.beginnerUntilDay,
+      );
+      if (slot?.[2] !== undefined && !protectedWear) {
         slot[2] -= 1;
         if (slot[2] <= 0) {
           rod.container[rod.index] = null;

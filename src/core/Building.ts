@@ -182,6 +182,11 @@ export class Building {
     const def = this.def(id);
     if (!grid || !def) return 'unknown';
     if (!this.isUnlocked(id)) return 'locked';
+    // Uma porta ou janela por cima de uma parede troca-a (a parede volta toda para a mochila).
+    if (this.swapTarget(id, tx, ty)) {
+      const containers = this.actions.pickupContainers();
+      return def.cost.some(({ item, qty }) => countItem(containers, item) < qty) ? 'no_materials' : null;
+    }
     const depleted = zoneState(this.state.data, BASE_ZONE_ID).depleted;
     const resourceHere = (tile: number): boolean =>
       this.resourceTiles.get(tile)?.some((objectId) => depleted[String(objectId)] === undefined) ?? false;
@@ -193,6 +198,11 @@ export class Building {
   }
 
   place(id: string, tx: number, ty: number, rot: number): BuildProblem | null {
+    const swap = this.swapTarget(id, tx, ty);
+    if (swap) {
+      const swapProblem = this.check(id, tx, ty) ?? this.remove(swap, 100);
+      if (swapProblem) return swapProblem;
+    }
     const problem = this.check(id, tx, ty);
     const def = this.def(id);
     if (problem || !def || !this.grid) return problem ?? 'unknown';
@@ -298,6 +308,21 @@ export class Building {
     const record = this.demolishTarget(tx, ty);
     if (!record) return 'unknown';
     return this.remove(record, this.isRecent(record[0]) ? 100 : BALANCE.demolishRefundPct);
+  }
+
+  /**
+   * Parede que uma porta ou janela (`id`) pode substituir no tile: uma peça sólida simples
+   * (sem porta, estação, baú, sem rodar nem ligar), sem dano de hordas.
+   */
+  private swapTarget(id: string, tx: number, ty: number): StructureRecord | null {
+    const def = this.def(id);
+    if (!def?.solid || !def.rotatable || def.connects || !this.grid) return null;
+    const top = this.grid.at(tx, ty).top;
+    const old = top ? this.def(top[1]) : undefined;
+    if (!top || !old?.solid || old.door || old.rotatable || old.connects || old.station || old.chest)
+      return null;
+    if (this.state.data.base.damage[String(top[0])] !== undefined) return null;
+    return top;
   }
 
   /** Abre ou fecha uma porta (não fecha em cima do jogador). */

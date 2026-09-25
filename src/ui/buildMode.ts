@@ -1,5 +1,6 @@
 import { gameState } from '../core/GameState';
 import { simulation } from '../core/Simulation';
+import type { StructureCategory } from '../data/types';
 import { tileInFront } from '../systems/building/building';
 
 export interface Tile {
@@ -15,6 +16,9 @@ export const buildMode = {
   active: false,
   /** Peça escolhida na paleta (id de structures.json). */
   selected: 'foundation_wood',
+  /** Separador da paleta e primeira peça visível (scroll). */
+  category: 'floors' as StructureCategory,
+  scroll: 0,
   /** Rotação (0 = horizontal, 1 = vertical) das peças rodáveis. */
   rot: 0,
   /** A demolir em vez de construir. */

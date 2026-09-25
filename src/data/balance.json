@@ -43,9 +43,11 @@
   "enemyKnockbackPx": 8,
   "skillCurve": {
     "base": 15,
-    "growth": 1.25
+    "growth": 1.25,
+    "softCapLevel": 15,
+    "lateGrowthPct": 10
   },
-  "skillMaxLevel": 20,
+  "skillMaxLevel": 50,
   "missPctMelee": 12,
   "missPctRanged": 60,
   "missPctPerLevelRanged": 3,
@@ -64,9 +66,11 @@
   "exitReachPx": 14,
   "xpCurve": {
     "base": 50,
-    "growth": 1.25
+    "growth": 1.25,
+    "softCapLevel": 25,
+    "lateGrowthPct": 8
   },
-  "maxLevel": 30,
+  "maxLevel": 999,
   "xpGather": 2,
   "xpCraftMin": 1,
   "xpBuild": 1,
@@ -81,7 +85,9 @@
   "coopEnemyMultiplier": 1.5,
   "gatherPowerEveryLevels": 10,
   "gatherExtraPctPerLevel": 2,
-  "sprintSec": 4,
-  "sprintCooldownSec": 30,
-  "sprintMultiplier": 1.6
+  "sprintMultiplier": 1.6,
+  "noAmmoWarnSec": 3,
+  "sprintDrainMultiplier": 5,
+  "gatherExtraMaxPct": 60,
+  "talentCapPct": 75
 }

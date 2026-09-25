@@ -6,7 +6,6 @@ import { BASE_ZONE_ID, gameState, type PlayerState } from '../core/GameState';
 import { hoursToTicks } from '../core/Homestead';
 import { simulation } from '../core/Simulation';
 import { BALANCE } from '../data/balance';
-import { talentOf } from '../data/talents';
 import type { SkillId } from '../data/types';
 import { getView, setupFixedCamera } from '../display/view';
 import { pinchStep, stepWorldZoom } from '../display/worldZoom';
@@ -64,7 +63,7 @@ const HURT_FADE_MS = 450;
 const BOSS_BAR = 120;
 /** Piscar das barras abaixo de BALANCE.lowStatPct (CLAUDE.md §2: aviso aos 30%). */
 const BLINK_MS = 400;
-const NOTICE_MS = 2500;
+const NOTICE_MS = 5000;
 /** Um toque curto e quase parado no mundo, no modo construção, escolhe o tile. */
 const TAP_MS = 300;
 const TAP_SLOP = 6;
@@ -131,7 +130,8 @@ export class UIScene extends Phaser.Scene {
   private autoButton: Button | null = null;
   /** Talento ativo "Correr" (só aparece depois de o aprender). */
   private sprintButton: Button | null = null;
-  private sprintVisible = false;
+  private sprintVisible = true;
+  /** O botão "Correr" está aceso (a correr). */
   private sprintReady = false;
   private skills: SkillsUI | null = null;
   /** Arma equipada e munição (junto à hotbar): ícone e contagem (até `quiverDisplayMax`). */
@@ -281,7 +281,7 @@ export class UIScene extends Phaser.Scene {
       this.skills?.destroy();
       this.skills = null;
       this.sprintButton = null;
-      this.sprintVisible = false;
+      this.sprintVisible = true;
       this.sprintReady = false;
       this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
       moveInput.joystick = { x: 0, y: 0 };
@@ -344,16 +344,15 @@ export class UIScene extends Phaser.Scene {
     this.clock?.setText(t('hud.clock', { day: clock.day, time: `${pad(clock.hour)}:${pad(clock.minute)}` }));
     this.hordeLabel?.setText(this.hordeStatus());
     if (this.sprintButton) {
-      const learned = talentOf(player, 'sprint') > 0;
-      const visible = learned && !uiState.modalOpen && !buildMode.active;
-      const ready = simulation.sprintState.cooldown === 0;
+      const visible = !uiState.modalOpen && !buildMode.active;
+      const running = moveInput.run;
       if (visible !== this.sprintVisible) {
         this.sprintVisible = visible;
         this.sprintButton.setVisible(visible);
       }
-      if (ready !== this.sprintReady) {
-        this.sprintReady = ready;
-        this.sprintButton.setStyle(ready ? 'primary' : 'secondary');
+      if (running !== this.sprintReady) {
+        this.sprintReady = running;
+        this.sprintButton.setStyle(running ? 'primary' : 'secondary');
       }
     }
     this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
@@ -513,6 +512,7 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'crop_growing')
           this.showNotice(t('farm.growing', { hours: Math.max(1, hours ?? 1) }));
         else if (reason === 'nothing_yet') this.showNotice(t('farm.nothing_yet'));
+        else if (reason === 'no_ammo') this.showNotice(t('msg.no_ammo', { item: itemName(item ?? '') }));
         else if (reason === 'needs_item')
           this.showNotice(t('msg.needs_item', { item: itemName(item ?? '') }));
         else this.showNotice(t(tool === 'pickaxe' ? 'msg.needs_pickaxe' : 'msg.needs_axe'));
@@ -754,7 +754,7 @@ export class UIScene extends Phaser.Scene {
         this.toggleAutoAttack();
       },
     ).setDepth(70);
-    // Correr (talento ativo): por cima do "Auto"; só aparece depois de aprendido.
+    // Correr (por cima do "Auto"): um toque liga/desliga; segurar corre enquanto se segura.
     const autoY = fitsRow ? hotbar.y + hotbar.h / 2 : touch ? cy - ACTION_RADIUS - 16 : hotbar.y - 12;
     const autoH = fitsRow ? hotbar.h : 16;
     this.sprintButton = new Button(
@@ -763,11 +763,17 @@ export class UIScene extends Phaser.Scene {
       Math.round(autoY - autoH / 2 - 11),
       t('hud.sprint'),
       { width: autoW, height: 16, fontSize: 8, style: 'secondary' },
-      () => {
-        this.sprint();
-      },
-    ).setDepth(70);
-    this.sprintButton.setVisible(false);
+      () => undefined,
+    )
+      .onPress(
+        () => {
+          moveInput.runDown(performance.now());
+        },
+        () => {
+          moveInput.runUp(performance.now());
+        },
+      )
+      .setDepth(70);
 
     if (!touch) return;
     const ring = this.add.circle(cx, cy, ACTION_RADIUS + 1, paletteNumber('ink'), 0.5).setDepth(5);
@@ -823,8 +829,12 @@ export class UIScene extends Phaser.Scene {
       if (!this.skills?.isOpen) this.closePanels();
       this.skills?.toggle();
     });
-    keyboard.on('keydown-Q', () => {
-      if (!uiState.modalOpen) this.sprint();
+    // Shift: correr (toque liga/desliga; segurar corre enquanto se segura).
+    keyboard.on('keydown-SHIFT', (event: KeyboardEvent) => {
+      if (!event.repeat) moveInput.runDown(performance.now());
+    });
+    keyboard.on('keyup-SHIFT', () => {
+      moveInput.runUp(performance.now());
     });
     keyboard.on('keydown-ESC', () => {
       // Esc fecha o que estiver aberto; sem nada aberto, abre (ou fecha) o menu de pausa.
@@ -879,12 +889,6 @@ export class UIScene extends Phaser.Scene {
     if (this.inventory?.isOpen) this.inventory.close();
     if (this.crafting?.isOpen) this.crafting.close();
     this.build?.close();
-  }
-
-  /** Talento ativo "Correr" (Q ou botão). */
-  private sprint(): void {
-    const result = simulation.sprint();
-    if (result === 'cooldown') this.showNotice(t('msg.sprint_cooldown'));
   }
 
   /** Só um painel aberto de cada vez (mochila/baú, crafting ou construção). */

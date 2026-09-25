@@ -89,7 +89,8 @@ export class Crafting {
         Math.max(
           1,
           Math.round(
-            secondsToTicks(recipe.timeSec) * (1 - talentOf(this.state.data.player, 'craftSpeedPct') / 100),
+            secondsToTicks(recipe.timeSec) *
+              (1 - Math.min(BALANCE.talentCapPct, talentOf(this.state.data.player, 'craftSpeedPct')) / 100),
           ),
         ),
       );

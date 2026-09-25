@@ -3,20 +3,23 @@
   "foundation_wood": {
     "sprite": "foundation_wood",
     "layer": "floor",
-    "cost": [["wood", 1]]
+    "cost": [["wood", 1]],
+    "category": "floors"
   },
   "foundation_stone": {
     "sprite": "foundation_stone",
     "layer": "floor",
     "cost": [["stone", 2]],
-    "unlockLevel": 4
+    "unlockLevel": 4,
+    "category": "floors"
   },
   "wall_wood": {
     "sprite": "wall_wood",
     "layer": "top",
     "solid": true,
     "cost": [["wood", 2]],
-    "hp": 60
+    "hp": 60,
+    "category": "walls"
   },
   "wall_stone": {
     "sprite": "wall_stone",
@@ -24,7 +27,8 @@
     "solid": true,
     "cost": [["stone", 3]],
     "unlockLevel": 5,
-    "hp": 200
+    "hp": 200,
+    "category": "walls"
   },
   "door_wood": {
     "sprite": "door_wood",
@@ -33,11 +37,26 @@
     "rotatable": true,
     "door": true,
     "cost": [
-      ["wood_plank", 2],
-      ["rope", 1]
+      ["wood", 4],
+      ["fiber", 2]
     ],
     "unlockLevel": 2,
-    "hp": 80
+    "hp": 80,
+    "category": "walls"
+  },
+  "door_stone": {
+    "sprite": "door_stone",
+    "layer": "top",
+    "solid": true,
+    "rotatable": true,
+    "door": true,
+    "cost": [
+      ["stone", 6],
+      ["wood_plank", 2]
+    ],
+    "unlockLevel": 8,
+    "hp": 160,
+    "category": "walls"
   },
   "window_wood": {
     "sprite": "window_wood",
@@ -49,7 +68,8 @@
       ["wood", 1]
     ],
     "unlockLevel": 3,
-    "hp": 50
+    "hp": 50,
+    "category": "walls"
   },
   "fence_wood": {
     "sprite": "fence_wood",
@@ -58,7 +78,8 @@
     "rotatable": true,
     "connects": true,
     "cost": [["wood", 1]],
-    "hp": 30
+    "hp": 30,
+    "category": "walls"
   },
   "torch": {
     "sprite": "torch",
@@ -72,7 +93,8 @@
     "cost": [
       ["wood", 1],
       ["fiber", 2]
-    ]
+    ],
+    "category": "crafting"
   },
   "campfire": {
     "sprite": "campfire",
@@ -87,7 +109,8 @@
       ["wood", 4],
       ["stone", 3]
     ],
-    "light": 72
+    "light": 72,
+    "category": "crafting"
   },
   "wood_bench": {
     "sprite": "wood_bench",
@@ -102,7 +125,8 @@
     "cost": [
       ["wood", 10],
       ["stone", 4]
-    ]
+    ],
+    "category": "crafting"
   },
   "storage_chest": {
     "sprite": "chest",
@@ -117,7 +141,8 @@
       ["wood_plank", 4],
       ["wood", 2]
     ],
-    "unlockLevel": 2
+    "unlockLevel": 2,
+    "category": "crafting"
   },
   "furnace": {
     "sprite": "furnace",
@@ -133,7 +158,8 @@
     "cost": [
       ["stone", 12],
       ["clay", 6]
-    ]
+    ],
+    "category": "crafting"
   },
   "garden_bed": {
     "sprite": "garden_bed",
@@ -143,7 +169,8 @@
     "cost": [
       ["wood", 4],
       ["fiber", 2]
-    ]
+    ],
+    "category": "farm"
   },
   "rain_collector": {
     "sprite": "rain_collector",
@@ -163,7 +190,8 @@
       ["wood_plank", 4],
       ["cloth", 3],
       ["rope", 1]
-    ]
+    ],
+    "category": "farm"
   },
   "snare": {
     "sprite": "snare",
@@ -180,7 +208,8 @@
     "cost": [
       ["wood", 2],
       ["rope", 2]
-    ]
+    ],
+    "category": "farm"
   },
   "spike_trap": {
     "sprite": "spike_trap",
@@ -194,7 +223,8 @@
     "cost": [
       ["wood", 4],
       ["nails", 4]
-    ]
+    ],
+    "category": "defense"
   },
   "workbench": {
     "sprite": "workbench",
@@ -211,7 +241,8 @@
       ["iron_ingot", 4],
       ["wood_plank", 6],
       ["nails", 6]
-    ]
+    ],
+    "category": "crafting"
   },
   "motorcycle": {
     "sprite": "motorcycle",
@@ -227,6 +258,7 @@
       ["moto_engine", 1],
       ["moto_frame", 1],
       ["moto_wheel", 2]
-    ]
+    ],
+    "category": "other"
   }
 }

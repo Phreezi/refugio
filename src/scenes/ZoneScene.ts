@@ -24,11 +24,12 @@ import { structureArea, structureFeet, type StructureRecord } from '../systems/b
 import { buildMode, buildTargetTile } from '../ui/buildMode';
 import type { Facing } from '../systems/movement/movement';
 import { content } from '../world/content';
-import { BASE_TILESET_NAME } from '../world/tileset';
+import { BASE_TILESET_NAME, baseTileIndex } from '../world/tileset';
 import { TILE_LAYERS, type TileLayerName } from '../world/zoneMap';
 import { darknessAt } from '../core/DayNight';
 import { BALANCE } from '../data/balance';
 import { SceneKey } from './keys';
+import { grayTexture } from '../display/grayTexture';
 import type { MainMenuData } from './MainMenuScene';
 import type { WorldMapData } from './WorldMapScene';
 
@@ -63,6 +64,9 @@ const MARKER_TEXTURE = 'target_marker';
 const ATTACK_MS = 240;
 const FLOAT_TEXT_MS = 900;
 const FLOAT_TEXT_RISE = 14;
+/** "+2 Madeira": desvanece em 5 s, a subir devagar. */
+const GAIN_TEXT_MS = 5000;
+const GAIN_TEXT_RISE = 18;
 const TILESET_TEXTURE = 'tileset_base';
 const WALK_FRAME_RATE = 8;
 /** Intervalo mínimo entre passos de zoom com a roda do rato. */
@@ -285,7 +289,7 @@ export class ZoneScene extends Phaser.Scene {
     moveInput.keyboardSneak = this.keys?.sneak.some((key) => key.isDown) ?? false;
     // Com a mochila/baú aberto (ou a sair da zona) o jogador fica parado.
     const blocked = uiState.modalOpen || this.leaving;
-    simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction, moveInput.sneak);
+    simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction, moveInput.sneak, moveInput.run);
     // No modo construção, Espaço/clique colocam peças (UIScene) em vez da ação contextual.
     const actionKey = !buildMode.active && (this.keys?.action.some((key) => key.isDown) ?? false);
     simulation.setActionHeld(!blocked && !buildMode.active && (actionKey || uiState.actionHeld));
@@ -580,8 +584,9 @@ export class ZoneScene extends Phaser.Scene {
         if (!view) return;
         view.bar.destroy();
         view.barBack.destroy();
-        // O corpo fica no chão, na posição em que estava (escurecido), até `corpse:gone`.
-        view.sprite.setTint(0x8a7f7a);
+        // O corpo fica no chão, na posição em que estava, a cinzento (morto), até `corpse:gone`.
+        const frame = view.sprite.frame.name;
+        view.sprite.setTexture(grayTexture(this, view.sprite.texture.key), frame);
         view.sprite.setDepth(view.sprite.y - 12);
         this.corpseSprites.set(uid, view.sprite);
       }),
@@ -669,7 +674,15 @@ export class ZoneScene extends Phaser.Scene {
         const row = last?.x === x && last.y === y && now - last.at < 100 ? last.row + 1 : 0;
         this.lastGain = { x, y, at: now, row };
         const text = t('msg.gained', { qty, item: itemName(item) });
-        this.floatText(text, Math.round(x), Math.round(y) - 20 - row * 9);
+        // O que se apanhou vai desvanecendo durante uns segundos (dá tempo de ler).
+        this.floatText(
+          text,
+          Math.round(x),
+          Math.round(y) - 20 - row * 9,
+          'cream',
+          GAIN_TEXT_MS,
+          GAIN_TEXT_RISE,
+        );
       }),
     ];
     return () => {
@@ -906,7 +919,14 @@ export class ZoneScene extends Phaser.Scene {
   }
 
   /** Texto que sobe e desaparece (ex.: "+2 Madeira", "-10"). */
-  private floatText(text: string, x: number, y: number, color: PaletteColor = 'cream'): void {
+  private floatText(
+    text: string,
+    x: number,
+    y: number,
+    color: PaletteColor = 'cream',
+    duration = FLOAT_TEXT_MS,
+    rise = FLOAT_TEXT_RISE,
+  ): void {
     const label = new Label(this, x, y, text, { size: 7, bold: true, color, stroke: true }, [0.5, 1]);
     label.setDepth(LAYER_DEPTH.decor_high + 2);
     const start = this.time.now;
@@ -914,14 +934,14 @@ export class ZoneScene extends Phaser.Scene {
       delay: 30,
       loop: true,
       callback: () => {
-        const progress = (this.time.now - start) / FLOAT_TEXT_MS;
+        const progress = (this.time.now - start) / duration;
         if (progress >= 1) {
           timer.remove();
           label.destroy();
           return;
         }
-        label.setPosition(x, y - Math.round(progress * FLOAT_TEXT_RISE));
-        label.text.setAlpha(1 - progress * progress);
+        label.setPosition(x, y - Math.round(progress * rise));
+        label.text.setAlpha(duration > FLOAT_TEXT_MS ? 1 - progress : 1 - progress * progress);
       },
     });
   }
@@ -982,6 +1002,37 @@ export class ZoneScene extends Phaser.Scene {
     for (const name of TILE_LAYERS) {
       map.createLayer(name, tileset, 0, 0).setDepth(LAYER_DEPTH[name]);
     }
+    this.drawShore(map, tileset.firstgid);
+  }
+
+  /**
+   * Margens da água: espuma clara onde a água toca terra a norte e nos lados, e uma sombra
+   * escura por baixo da margem (a terra fica "acima" da água). Um único Graphics estático.
+   */
+  private drawShore(map: Phaser.Tilemaps.Tilemap, firstgid: number): void {
+    const water = firstgid + baseTileIndex('water');
+    const isWater = (x: number, y: number): boolean => {
+      if (x < 0 || y < 0 || x >= map.width || y >= map.height) return true;
+      return TILE_LAYERS.some((layer) => map.getTileAt(x, y, false, layer)?.index === water);
+    };
+    const g = this.add.graphics().setDepth(LAYER_DEPTH.collision + 0.5);
+    const size = map.tileWidth;
+    const foam = paletteNumber('ice');
+    const bank = paletteNumber('deep_water');
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        if (!isWater(x, y)) continue;
+        const px = x * size;
+        const py = y * size;
+        if (!isWater(x, y - 1)) {
+          g.fillStyle(bank, 1).fillRect(px, py, size, 2); // sombra da margem
+          g.fillStyle(foam, 1).fillRect(px, py + 2, size, 1);
+        }
+        if (!isWater(x, y + 1)) g.fillStyle(foam, 1).fillRect(px, py + size - 1, size, 1);
+        if (!isWater(x - 1, y)) g.fillStyle(foam, 0.9).fillRect(px, py, 1, size);
+        if (!isWater(x + 1, y)) g.fillStyle(foam, 0.9).fillRect(px + size - 1, py, 1, size);
+      }
+    }
   }
 
   /** As animações são globais (do jogo), por isso só se criam na primeira vez. */
@@ -1026,8 +1077,8 @@ export class ZoneScene extends Phaser.Scene {
       left: add(KeyCodes.A, KeyCodes.LEFT),
       right: add(KeyCodes.D, KeyCodes.RIGHT),
       action: add(KeyCodes.SPACE),
-      // Shift ou Ctrl (o Ctrl é o "agachar" habitual nos jogos de PC).
-      sneak: add(KeyCodes.SHIFT, KeyCodes.CTRL),
+      // Ctrl agacha (o habitual nos jogos de PC); o Shift corre (ver `create`).
+      sneak: add(KeyCodes.CTRL),
     };
   }
 

@@ -590,5 +590,35 @@
     "qty": 1,
     "timeSec": 60,
     "unlockLevel": 20
+  },
+  {
+    "id": "r_expedition_backpack",
+    "station": "workbench",
+    "category": "tools",
+    "inputs": [
+      ["military_backpack", 1],
+      ["leather", 12],
+      ["iron_ingot", 6],
+      ["rope", 6]
+    ],
+    "output": "expedition_backpack",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 30
+  },
+  {
+    "id": "r_survivor_backpack",
+    "station": "workbench",
+    "category": "tools",
+    "inputs": [
+      ["expedition_backpack", 1],
+      ["leather", 20],
+      ["electronics", 4],
+      ["cloth", 15]
+    ],
+    "output": "survivor_backpack",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 45
   }
 ]

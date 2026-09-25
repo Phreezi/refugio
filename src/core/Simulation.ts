@@ -36,8 +36,12 @@ export class Simulation {
   private readonly bus: EventBus<GameEvents>;
   private survival: SurvivalRules = survivalRules(BALANCE);
   private survivalKey = '{}';
-  private sprintUntilTick = 0;
-  private sprintReadyTick = 0;
+  /** A correr (Shift / botão "Correr"): mais depressa, mas gasta muito mais fome e sede. */
+  private running = false;
+  private runHunger = 0;
+  private runThirst = 0;
+  /** Ataque automático sem munição: próximo aviso (não a cada tick). */
+  private noAmmoWarnTick = 0;
   private readonly actionCooldownTicks = secondsToTicks(BALANCE.actionCooldownSec);
   readonly actions: PlayerActions;
   readonly interaction: Interaction;
@@ -244,7 +248,14 @@ export class Simulation {
    * Co-op (anfitrião): onde está o convidado (ele anda no ecrã dele e o anfitrião confia na
    * posição, como num jogo entre amigos).
    */
-  setRemotePlayer(x: number, y: number, facing: PlayerState['facing'], moved: boolean, sneak: boolean): void {
+  setRemotePlayer(
+    x: number,
+    y: number,
+    facing: PlayerState['facing'],
+    moved: boolean,
+    sneak: boolean,
+    run = false,
+  ): void {
     const player = this.state.data.player;
     this.previous = { x: player.x, y: player.y };
     player.x = x;
@@ -252,6 +263,7 @@ export class Simulation {
     player.facing = facing;
     this.moved = moved;
     this.sneaking = sneak;
+    this.running = run;
     if (moved) this.tutorial.playerMoved();
   }
 
@@ -321,9 +333,15 @@ export class Simulation {
    * Direção pedida pelo input (é normalizada: nunca anda mais depressa na diagonal).
    * @param sneak agachado: anda a `sneakMultiplier` da velocidade (CLAUDE.md §7.8).
    */
-  setMoveIntent(intent: Vec2, sneak = false): void {
+  setMoveIntent(intent: Vec2, sneak = false, run = false): void {
     this.intent = normalize(intent);
     this.sneaking = sneak;
+    this.running = run;
+  }
+
+  /** O jogador está a correr (e a andar)? (para a animação e o co-op). */
+  get playerRunning(): boolean {
+    return this.running && !this.sneaking;
   }
 
   /** O jogador está agachado (para a animação; e, na Fase 6, para o raio de deteção). */
@@ -399,6 +417,7 @@ export class Simulation {
     this.stats.tick();
     this.crafting.advance(1);
     tickSurvival(this.state.data.player, world.tick, this.survivalRules());
+    this.tickRunDrain();
     this.tickBleeding(world.tick);
     if (this.state.data.player.hp <= 0) this.respawn();
     this.bus.emit('world:tick', { tick: world.tick });
@@ -423,6 +442,7 @@ export class Simulation {
     }
     this.stats.tick();
     tickSurvival(this.state.data.player, tick, this.survivalRules());
+    this.tickRunDrain();
     this.tickBleeding(tick);
     if (this.state.data.player.hp <= 0) this.respawn();
   }
@@ -443,31 +463,24 @@ export class Simulation {
   }
 
   /**
-   * Talento ativo "Correr" (§7.15): mais velocidade durante `sprintSec`, depois espera
-   * `sprintCooldownSec`. Corre no ecrã de quem anda (também no do convidado).
-   * @returns 'ok', 'locked' (sem o talento) ou 'cooldown'.
+   * A correr (Shift / botão "Correr"): gasta fome e sede `sprintDrainMultiplier` vezes mais
+   * depressa enquanto anda (menos com o talento "Fôlego"). Frações acumuladas em memória.
    */
-  sprint(): 'ok' | 'locked' | 'cooldown' {
-    if (!this.state.hasGame) return 'locked';
+  private tickRunDrain(): void {
+    if (!this.running || this.sneaking || !this.moved) return;
     const player = this.state.data.player;
-    if (talentOf(player, 'sprint') <= 0) return 'locked';
-    const tick = this.state.data.world.tick;
-    if (tick < this.sprintReadyTick) return 'cooldown';
-    this.sprintUntilTick = tick + secondsToTicks(BALANCE.sprintSec);
-    this.sprintReadyTick = tick + secondsToTicks(BALANCE.sprintCooldownSec);
-    this.bus.emit('player:sprint', {});
-    return 'ok';
-  }
-
-  /** Sprint: [0, 1] do tempo de espera que falta (0 = pronto) e se está a correr. */
-  get sprintState(): { active: boolean; cooldown: number } {
-    if (!this.state.hasGame) return { active: false, cooldown: 0 };
-    const tick = this.state.data.world.tick;
-    const total = secondsToTicks(BALANCE.sprintCooldownSec);
-    return {
-      active: tick < this.sprintUntilTick,
-      cooldown: Math.max(0, Math.min(1, (this.sprintReadyTick - tick) / total)),
-    };
+    const rules = this.survivalRules();
+    const extra = (BALANCE.sprintDrainMultiplier - 1) * (1 - talentOf(player, 'sprintCostPct') / 100);
+    this.runHunger += extra / rules.hungerEveryTicks;
+    this.runThirst += extra / rules.thirstEveryTicks;
+    if (this.runHunger >= 1) {
+      this.runHunger -= 1;
+      player.hunger = Math.max(0, player.hunger - 1);
+    }
+    if (this.runThirst >= 1) {
+      this.runThirst -= 1;
+      player.thirst = Math.max(0, player.thirst - 1);
+    }
   }
 
   /** A sangrar: perde vida devagar até acabar o tempo ou usar uma ligadura (nunca instantâneo). */
@@ -519,10 +532,17 @@ export class Simulation {
     if (shot !== null) {
       this.nextActionTick = tick + this.combat.attackTicks();
       if (shot === 'no_ammo') {
-        const ammo = this.combat.weapon().ranged?.ammo;
-        this.bus.emit('action:blocked', { reason: 'needs_item', ...(ammo ? { item: ammo } : {}) });
+        this.noAmmo();
         this.actionHeld = false;
       }
+      return;
+    }
+    // Arma à distância sem munição e nada à frente: avisa (senão parecia que não fazia nada).
+    const ranged = this.combat.weapon().ranged;
+    if (ranged && this.combat.ammoCount() === 0 && !this.interaction.currentTarget(PLAYER_FOOTPRINT, true)) {
+      this.noAmmo();
+      this.actionHeld = false;
+      this.nextActionTick = tick + this.actionCooldownTicks;
       return;
     }
     const done = this.interaction.act(PLAYER_FOOTPRINT);
@@ -532,6 +552,12 @@ export class Simulation {
     this.nextActionTick = tick + (attack ? this.combat.attackTicks() : this.actionCooldownTicks);
     // Abrir um baú, beber ou abrir uma porta não se repete com a tecla presa (só golpes em recursos).
     if (done !== 'enemy' && done !== 'resource' && done !== 'swing') this.actionHeld = false;
+  }
+
+  /** Avisa que a arma à distância não tem munição. */
+  private noAmmo(): void {
+    const ammo = this.combat.weapon().ranged?.ammo;
+    this.bus.emit('action:blocked', { reason: 'no_ammo', ...(ammo ? { item: ammo } : {}) });
   }
 
   /** Ataque automático: vira-se para o inimigo mais perto ao alcance e bate (ou dispara). */
@@ -551,8 +577,13 @@ export class Simulation {
       return;
     }
     if (weapon.ranged) {
-      // Sem munição não insiste (nem avisa a cada tick).
-      if (this.combat.shoot() === 'shot') this.nextActionTick = tick + this.combat.attackTicks();
+      const shot = this.combat.shoot();
+      if (shot === 'shot') this.nextActionTick = tick + this.combat.attackTicks();
+      // Sem munição avisa, mas não a cada tick.
+      else if (shot === 'no_ammo' && tick >= this.noAmmoWarnTick) {
+        this.noAmmo();
+        this.noAmmoWarnTick = tick + secondsToTicks(BALANCE.noAmmoWarnSec);
+      }
       return;
     }
     const player = this.state.data.player;
@@ -593,7 +624,7 @@ export class Simulation {
     if (this.world === null || isZero(this.intent) || this.fishing.active) return;
 
     player.facing = facingFromIntent(this.intent, player.facing);
-    const sprinting = this.state.data.world.tick < this.sprintUntilTick;
+    const sprinting = this.running && !this.sneaking;
     const speed =
       BALANCE.playerSpeed *
       (this.sneaking ? BALANCE.sneakMultiplier : 1) *

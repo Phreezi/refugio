@@ -52,6 +52,6 @@ export function gatherPowerBonus(level: number, everyLevels: number): number {
 }
 
 /** Recolha: % de hipótese de cada drop dar +1 (a partir do nível 2). */
-export function gatherExtraPct(level: number, perLevel: number): number {
-  return (level - 1) * perLevel;
+export function gatherExtraPct(level: number, perLevel: number, max = Infinity): number {
+  return Math.min(max, (level - 1) * perLevel);
 }
