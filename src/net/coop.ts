@@ -81,6 +81,25 @@ function peerOptions(): Partial<PeerOptions> {
   return { host: host ?? 'localhost', port: Number(port ?? 9000), path: '/', secure: false, debug: 0 };
 }
 
+/** Um sítio livre ao lado do anfitrião (sem paredes do mapa), para o convidado aparecer. */
+function besideHost(host: { zoneId: string; x: number; y: number }): { x: number; y: number } {
+  const map = content.zoneMap(host.zoneId);
+  const free = (x: number, y: number): boolean => {
+    const tx = Math.floor(x / map.tileSize);
+    const ty = Math.floor(y / map.tileSize);
+    if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return false;
+    return map.solid[ty * map.width + tx] !== true;
+  };
+  for (const [dx, dy] of [
+    [18, 0],
+    [-18, 0],
+    [0, 18],
+    [0, -18],
+  ] as const)
+    if (free(host.x + dx, host.y + dy)) return { x: host.x + dx, y: host.y + dy };
+  return { x: host.x, y: host.y };
+}
+
 /** Tira itens que este jogo não conhece (o save do outro pode ser de outra versão). */
 function knownItems(container: Container): Container {
   return container.map((slot) => (slot && content.items[slot[0]] ? slot : null));
@@ -88,6 +107,8 @@ function knownItems(container: Container): Container {
 
 class Coop {
   role: CoopRole | null = null;
+  /** Nome da personagem do outro jogador (aparece por cima dele e nos avisos). */
+  partnerName: string | null = null;
   /** Código da sessão (anfitrião). */
   code: string | null = null;
   /** Há um convidado ligado (anfitrião) / ligado ao anfitrião (convidado). */
@@ -238,12 +259,15 @@ class Coop {
       player.inventory = knownItems(player.inventory);
       player.hotbar = knownItems(player.hotbar);
       player.equipment = knownItems(player.equipment);
+      // Ao lado do anfitrião (não em cima dele: parecia um jogo novo, só com um boneco).
+      const beside = besideHost(host.player);
       Object.assign(player, {
         zoneId: host.player.zoneId,
-        x: host.player.x,
-        y: host.player.y,
+        x: beside.x,
+        y: beside.y,
         facing: host.player.facing,
       });
+      this.partnerName = player.name;
       state = { ...host, player, unlocks: checked.unlocks, stats: checked.stats, tutorial: checked.tutorial };
     } catch (error) {
       console.warn('[coop] personagem do convidado recusada:', error);
@@ -267,6 +291,7 @@ class Coop {
   }
 
   private guestLeft(): void {
+    this.partnerName = null;
     for (const off of this.offEvents) off();
     this.offEvents = [];
     this.conn = null;
@@ -353,7 +378,13 @@ class Coop {
     if (!state?.hasGame) return;
     this.lastSnap = performance.now();
     this.snapDirty = false;
-    this.send({ t: 'snap', state: state.data, ack: this.ack, warp: this.warp });
+    this.send({
+      t: 'snap',
+      state: state.data,
+      ack: this.ack,
+      warp: this.warp,
+      host: gameState.data.player.name,
+    });
   }
 
   private sendFrame(): void {
@@ -433,6 +464,7 @@ class Coop {
             const message = raw as HostMessage;
             if (message.t === 'snap' && !settled) {
               settled = true;
+              this.partnerName = message.host ?? null;
               window.clearTimeout(timer);
               this.role = 'guest';
               this.connected = true;
@@ -693,6 +725,7 @@ class Coop {
 
   /** Sai do co-op (fecha a ligação; o convidado grava a personagem no save dele). */
   leave(): void {
+    this.partnerName = null;
     if (this.isHost && this.conn?.open) this.send({ t: 'bye' });
     if (this.isGuest) this.saveOwn(true);
     for (const off of this.offEvents) off();

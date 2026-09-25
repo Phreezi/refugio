@@ -96,6 +96,8 @@ export interface GroundBag {
   expiresAt: number;
   /** A mochila deixada ao morrer (marcada no mapa-mundo, Fase 7). */
   death: boolean;
+  /** Corpo de um inimigo (id): desenha-se o inimigo a cinzento em vez da mochila. */
+  corpse?: string;
 }
 
 export interface ZoneState {

@@ -472,5 +472,10 @@
   "skills.reset_confirm": "Repor? ({cost})",
   "skills.reset_done": "Pontos repostos.",
   "skills.reset_nothing": "Não há pontos gastos.",
-  "hud.coins": "{n}"
+  "hud.coins": "{n}",
+  "coop.partner_joined_name": "{name} entrou no teu jogo!",
+  "coop.joined": "Entraste no jogo de {name}!",
+  "msg.make_tool_touch": "Toca aqui para fazer {item}.",
+  "msg.make_tool_keys": "Carrega em Enter (ou clica aqui) para fazer {item}.",
+  "msg.tool_needs": "Faz-se com {needs}."
 }

@@ -10,7 +10,7 @@ import {
 
 describe('Código do co-op', () => {
   it('tem 5 caracteres do alfabeto sem símbolos que se confundem', () => {
-    for (const ch of '01OIL') expect(CODE_ALPHABET).not.toContain(ch);
+    for (const ch of 'OIL') expect(CODE_ALPHABET).not.toContain(ch);
     for (let i = 0; i < 50; i++) {
       const code = randomCode();
       expect(code).toHaveLength(CODE_LENGTH);
@@ -22,7 +22,9 @@ describe('Código do co-op', () => {
     expect(normalizeCode(' k7q2m ')).toBe('K7Q2M');
     expect(normalizeCode('K7Q-2M')).toBe('K7Q2M');
     expect(normalizeCode('K7Q2')).toBeNull();
-    expect(normalizeCode('K7Q2O')).toBeNull(); // O não existe (confunde-se com 0)
+    // O conta como 0 e I/L como 1 (confundem-se).
+    expect(normalizeCode('K7Q2O')).toBe('K7Q20');
+    expect(normalizeCode('k7q2l')).toBe('K7Q21');
     expect(normalizeCode('K7Q2ç')).toBeNull();
   });
 });

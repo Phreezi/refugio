@@ -151,7 +151,7 @@ export class CraftingUI {
     let row = 0;
     for (const tab of this.tabs()) {
       const text = t(tab === 'repair' ? 'craft.cat.repair' : `craft.cat.${tab}`);
-      const tw = Math.max(40, evenCeil(measureTextWidth(text, 8, true)) + 12);
+      const tw = Math.max(40, evenCeil(measureTextWidth(text, 8)) + 12);
       if (dx > 0 && dx + tw > maxWidth) {
         dx = 0;
         row += 1;
@@ -249,7 +249,7 @@ export class CraftingUI {
     });
     if (this.tab !== 'repair') {
       const filter = t('craft.filter');
-      const fw = Math.max(52, evenCeil(measureTextWidth(filter, 8, true)) + 14);
+      const fw = Math.max(52, evenCeil(measureTextWidth(filter, 8)) + 14);
       this.button(
         x + w - 10 - 10 - fw / 2,
         y + 9,

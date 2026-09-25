@@ -126,6 +126,9 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // v18 → v19: os slots de armas e roupa podem ter um 4.º valor, o encantamento (§7.16). Nada
   // a converter: os saves antigos não têm encantamentos.
   18: (s) => s,
+  // v19 → v20: os corpos dos inimigos ficam gravados como pilhas no chão (`corpse` = id do
+  // inimigo). Os saves antigos não os têm.
+  19: (s) => s,
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

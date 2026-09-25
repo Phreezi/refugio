@@ -403,7 +403,6 @@ export class Simulation {
     this.movePlayer();
     if (this.moved) this.tutorial.playerMoved();
     this.combat.collectGround();
-    this.combat.tickCorpses();
     this.combat.syncQuiver();
     this.actions.syncBackpack();
     this.combat.pruneBags();
@@ -431,7 +430,6 @@ export class Simulation {
     if (this.combat.away) return;
     this.combat.sneaking = this.sneaking;
     this.combat.collectGround();
-    this.combat.tickCorpses();
     this.combat.syncQuiver();
     this.actions.syncBackpack();
     this.combat.pruneBags();

@@ -161,7 +161,7 @@ describe('Combate', () => {
     expect(player.equipment[0]?.[2]).toBe(100); // proteção de principiante: não gasta até ao dia 4
   });
 
-  it('matar deixa os drops no corpo; apanham-se ao passar por cima e o corpo desaparece', () => {
+  it('matar deixa os drops no corpo (abre-se como uma mochila); vazio, desaparece', () => {
     const { state, sim, events, run } = setup(map([{ id: 'deer', x: 250, y: 240 }]));
     const deer = sim.combat.list[0];
     if (!deer) throw new Error('sem veado');
@@ -169,10 +169,13 @@ describe('Combate', () => {
     expect(sim.combat.attack(deer.uid)).toBe(true);
     expect(events).toContain('killed:deer');
     expect(countItem([state.data.player.inventory], 'raw_meat')).toBe(0);
-    const corpse = sim.combat.corpses[0];
-    Object.assign(state.data.player, { x: corpse?.x, y: corpse?.y });
+    const index = sim.combat.bags().findIndex((b) => b.corpse === 'deer');
+    expect(index).toBeGreaterThanOrEqual(0);
+    // Passar por cima já não apanha: fica até se abrir.
     run(0.1);
-    expect(sim.combat.corpses).toHaveLength(0);
+    expect(countItem([state.data.player.inventory], 'raw_meat')).toBe(0);
+    expect(sim.combat.takeBag(index)).toBe(true);
+    expect(sim.combat.bags().some((b) => b.corpse)).toBe(false);
     expect(countItem([state.data.player.inventory], 'raw_meat')).toBeGreaterThanOrEqual(2);
     expect(countItem([state.data.player.inventory], 'leather')).toBe(1);
   });
@@ -557,18 +560,21 @@ describe('Aljava e corpos', () => {
     expect(sim.combat.shoot()).toBe('shot');
     run(1);
     expect(sim.combat.list).toHaveLength(0);
-    const corpse = sim.combat.corpses[0];
-    expect(corpse?.items).toMatchObject({ iron_arrow: 1, arrow: 1 });
-    player.x = corpse?.x ?? 0;
-    player.y = corpse?.y ?? 0;
+    const index = sim.combat.bags().findIndex((b) => b.corpse === 'zombie_walker');
+    const corpse = sim.combat.bags()[index];
+    expect(corpse?.items).toEqual(
+      expect.arrayContaining([
+        ['iron_arrow', 1],
+        ['arrow', 1],
+      ]),
+    );
+    // Apanhadas do corpo, as flechas voltam para a aljava.
+    expect(sim.combat.takeBag(index)).toBe(true);
     run(0.1);
-    expect(player.quiver).toEqual([
-      ['arrow', 5],
-      ['iron_arrow', 1],
-    ]);
-    // O corpo desaparece ao fim de corpseSec.
-    run(BALANCE.corpseSec);
-    expect(sim.combat.corpses).toHaveLength(0);
+    expect(
+      countItem([player.inventory], 'arrow') + (player.quiver.find(([i]) => i === 'arrow')?.[1] ?? 0),
+    ).toBe(5);
+    expect(sim.combat.bags().some((b) => b.corpse)).toBe(false);
   });
 });
 

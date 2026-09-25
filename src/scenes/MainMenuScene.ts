@@ -81,7 +81,8 @@ export class MainMenuScene extends Phaser.Scene {
       this,
       cx,
       short ? 6 : Math.round(height * 0.2),
-      t('game.title'),
+      // Em maiúsculas: na fonte pixel, as minúsculas em ponto grande perdem a forma.
+      t('game.title').toUpperCase(),
       { size: short ? 24 : 32, color: 'wheat', bold: true },
       [0.5, 0],
     );
@@ -207,7 +208,7 @@ export class MainMenuScene extends Phaser.Scene {
     const rowSlotW = Math.min(SLOT_BUTTON_WIDTH, Math.floor((width - 16 - 2 * 4) / 3)) & ~1;
     const listX = wide ? listSide : cx;
     let listY = wide ? y - 14 : Math.max(hordeY + 30, rowY - 26);
-    new Label(this, listX, listY - 13, t('menu.games'), { size: 8, bold: true, color: 'wheat' }, [0.5, 0.5]);
+    new Label(this, listX, listY - 16, t('menu.games'), { size: 8, bold: true, color: 'wheat' }, [0.5, 0.5]);
     slots.forEach((slot, i) => {
       const summary = slot?.save;
       const vars = summary
@@ -544,6 +545,8 @@ export class MainMenuScene extends Phaser.Scene {
       (state) => {
         gameState.load(state, true);
         simulation.reset();
+        // Aviso claro de que se entrou no mundo do amigo (senão parecia um jogo novo).
+        uiState.pendingNotice = t('coop.joined', { name: coop.partnerName ?? '?' });
         this.scene.start(SceneKey.Zone, { zoneId: state.player.zoneId } satisfies ZoneSceneData);
       },
       (error: unknown) => {

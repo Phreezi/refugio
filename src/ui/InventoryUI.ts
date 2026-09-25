@@ -30,6 +30,8 @@ const CHEST_COLS = 6;
 const DRAG_THRESHOLD = 4;
 /** Margem entre a hotbar e o fundo do ecrã. */
 const HOTBAR_MARGIN = 6;
+/** Espaço entre a hotbar e o slot da arma. */
+const WEAPON_SLOT_GAP = 4;
 /** Espaço livre entre o painel e a hotbar (o botão Construir fica por cima dela). */
 const PANEL_ABOVE_HOTBAR = 28;
 
@@ -118,6 +120,18 @@ export class InventoryUI {
         ).setDepth(DEPTH.hotbar),
       );
     }
+    // 5.º slot, só para a arma (o slot "Arma" do equipamento), com outra cor.
+    this.hotbar.push(
+      new SlotView(
+        scene,
+        rect.x + rect.w - SLOT_SIZE,
+        rect.y,
+        { container: 'equipment', index: EQUIP_SLOTS.indexOf('weapon') },
+        null,
+      )
+        .setAccent('bark_dark')
+        .setDepth(DEPTH.hotbar),
+    );
     this.unsubscribe = [
       eventBus.on('inventory:changed', () => {
         // A mochila mudou de tamanho (equipou ou tirou uma mochila): refaz o painel.
@@ -152,7 +166,8 @@ export class InventoryUI {
   /** Retângulo da hotbar (centrada em baixo), para a UIScene posicionar o resto à volta. */
   hotbarRect(): Rect {
     const { width, height } = getView();
-    const w = BALANCE.hotbarSlots * SLOT_SIZE + (BALANCE.hotbarSlots - 1) * SLOT_GAP;
+    // Os slots da hotbar e, depois de um espaço, o slot da arma.
+    const w = (BALANCE.hotbarSlots + 1) * SLOT_SIZE + BALANCE.hotbarSlots * SLOT_GAP + WEAPON_SLOT_GAP;
     return { x: Math.round((width - w) / 2), y: height - SLOT_SIZE - HOTBAR_MARGIN, w, h: SLOT_SIZE };
   }
 
@@ -260,6 +275,11 @@ export class InventoryUI {
   private tap(view: SlotView): void {
     if (!this.isOpen && view.ref.container === 'hotbar') {
       this.actions.use(view.ref);
+      return;
+    }
+    // Slot da arma (painel fechado): passa à munição seguinte da aljava.
+    if (!this.isOpen && view.ref.container === 'equipment') {
+      simulation.combat.cycleAmmo();
       return;
     }
     const same = this.selected?.container === view.ref.container && this.selected.index === view.ref.index;
@@ -538,7 +558,7 @@ export class InventoryUI {
       let left = x;
       let by = y + INFO_BUTTONS_DY;
       const action = (label: string, onClick: () => void, style: ButtonStyle = 'secondary'): void => {
-        const bw = Math.max(40, Math.ceil(measureTextWidth(label, 8, true) / 2) * 2 + 12);
+        const bw = Math.max(40, Math.ceil(measureTextWidth(label, 8) / 2) * 2 + 12);
         // Sem espaço na linha, passa para a de baixo.
         if (left > x && left + bw > x + w) {
           left = x;

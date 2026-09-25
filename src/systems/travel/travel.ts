@@ -18,6 +18,8 @@ export interface TravelCost {
 
 /** Pode pagar a viagem? Fica sempre com pelo menos 1 de fome e de sede (viajar nunca mata). */
 export function canTravel(player: { hunger: number; thirst: number }, cost: TravelCost): boolean {
+  // Viagens grátis (ir para casa, o Pinhal) fazem-se sempre, mesmo com fome ou sede a 0.
+  if (cost.hunger <= 0 && cost.thirst <= 0) return true;
   return player.hunger > cost.hunger && player.thirst > cost.thirst;
 }
 

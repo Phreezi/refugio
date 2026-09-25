@@ -2,15 +2,29 @@ import type Phaser from 'phaser';
 import { PALETTE, type PaletteColor } from '../assets/palette';
 import { textResolution } from '../display/view';
 
-/** Fonte da interface: pixel (Pixelify Sans, OFL; ver display/fonts.ts), com reservas. */
-export const UI_FONT = '"Pixelify Sans", "Trebuchet MS", "Segoe UI", system-ui, sans-serif';
+/** Fonte da interface: pixel (Tiny5, OFL; ver display/fonts.ts), com reservas. */
+export const UI_FONT = '"Tiny5", "Trebuchet MS", "Segoe UI", system-ui, sans-serif';
+
+/** Grelha da Tiny5: cada píxel da letra mede 1/8 do tamanho da fonte. */
+const FONT_GRID = 8;
+
+/**
+ * Tamanho (px de jogo) com que se desenha o texto de tamanho `size`: arredondado para cada
+ * píxel da letra ser um número inteiro de píxeis do ecrã (senão as letras ficam irregulares).
+ */
+export function pixelFontSize(size: number): number {
+  const resolution = textResolution();
+  const device = Math.max(FONT_GRID, Math.round((size * resolution) / FONT_GRID) * FONT_GRID);
+  return device / resolution;
+}
+
+/** Um píxel da letra, em píxeis do ecrã (as sombras do canvas não seguem a escala do texto). */
+function fontPixel(size: number): number {
+  return (pixelFontSize(size) * textResolution()) / FONT_GRID;
+}
 
 let measureContext: CanvasRenderingContext2D | null = null;
 
-/**
- * Largura (px de jogo) de uma linha de texto na fonte da interface — medida no browser, porque
- * a mesma fonte tem larguras diferentes em cada sistema (ex.: iPhone vs Windows).
- */
 /**
  * A fonte pixel junta "fi"/"fl" numa ligadura que não encaixa no estilo: um separador
  * invisível (ZWNJ) entre as letras impede-a.
@@ -19,12 +33,16 @@ export function noLigatures(content: string): string {
   return content.replace(/f(?=[ilf])/g, 'f\u200C');
 }
 
-export function measureTextWidth(content: string, size: number, bold = false): number {
+/**
+ * Largura (px de jogo) de uma linha de texto na fonte da interface — medida no browser, porque
+ * a mesma fonte tem larguras diferentes em cada sistema (ex.: iPhone vs Windows).
+ */
+export function measureTextWidth(content: string, size: number): number {
   content = noLigatures(content);
   measureContext ??= document.createElement('canvas').getContext('2d');
   if (!measureContext) return content.length * size * 0.6;
   // Medido 4× maior (mais preciso) e reduzido.
-  measureContext.font = `${bold ? 'bold ' : ''}${String(size * 4)}px ${UI_FONT}`;
+  measureContext.font = `${String(pixelFontSize(size) * 4)}px ${UI_FONT}`;
   return measureContext.measureText(content).width / 4;
 }
 
@@ -66,12 +84,26 @@ export class Label {
     this.text = scene.add
       .text(0, 0, noLigatures(content), {
         fontFamily: UI_FONT,
-        fontSize: `${String(style.size)}px`,
-        fontStyle: style.bold ? 'bold' : '',
+        fontSize: `${String(pixelFontSize(style.size))}px`,
+        // A fonte pixel só tem um peso: o "negrito" falso esborrataria os píxeis.
+        fontStyle: '',
         color: PALETTE[this.color],
         align: style.align ?? 'left',
         resolution: textResolution(),
-        ...(style.stroke ? { stroke: PALETTE.ink, strokeThickness: Math.max(1, style.size / 4) } : {}),
+        // Legível por cima do mundo: sombra de 1 píxel da letra, em baixo e à direita (um
+        // contorno engrossava as letras de 1 píxel e fechava-lhes os buracos).
+        ...(style.stroke
+          ? {
+              shadow: {
+                offsetX: fontPixel(style.size),
+                offsetY: fontPixel(style.size),
+                color: PALETTE.ink,
+                blur: 0,
+                fill: true,
+              },
+              padding: { right: 1, bottom: 1 },
+            }
+          : {}),
         ...(style.wrap === undefined ? {} : { wordWrap: { width: style.wrap } }),
       })
       .setOrigin(0, 0);
