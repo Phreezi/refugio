@@ -629,5 +629,21 @@
     "ammoOf": "arrow",
     "ammoDamage": 6,
     "breakPct": 15
+  },
+  "pouch": {
+    "name": "item.pouch",
+    "icon": "icon_pouch",
+    "type": "backpack",
+    "stack": 1,
+    "rarity": "common",
+    "slots": 5
+  },
+  "military_backpack": {
+    "name": "item.military_backpack",
+    "icon": "icon_military_backpack",
+    "type": "backpack",
+    "stack": 1,
+    "rarity": "epic",
+    "slots": 30
   }
 }

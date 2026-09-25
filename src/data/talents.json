@@ -1,0 +1,93 @@
+{
+  "$comment": "Árvore de talentos (CLAUDE.md §7.15). Cada nível do jogador dá 1 ponto. effect: meleeDamagePct, missPts, armorPct, hungerSlowPct, thirstSlowPct, regenPct, sprint (ativo), gatherPower, extraDropPct, wearSavePct, craftSpeedPct; perRank = valor por ponto; requires = [talento, pontos].",
+  "steady_aim": {
+    "branch": "combat",
+    "effect": "missPts",
+    "perRank": 4,
+    "maxRank": 3,
+    "level": 3
+  },
+  "strong_arm": {
+    "branch": "combat",
+    "effect": "meleeDamagePct",
+    "perRank": 10,
+    "maxRank": 3,
+    "level": 1
+  },
+  "thick_skin": {
+    "branch": "combat",
+    "effect": "armorPct",
+    "perRank": 4,
+    "maxRank": 3,
+    "level": 6,
+    "requires": ["strong_arm", 1]
+  },
+  "berserker": {
+    "branch": "combat",
+    "effect": "meleeDamagePct",
+    "perRank": 15,
+    "maxRank": 2,
+    "level": 12,
+    "requires": ["thick_skin", 2]
+  },
+  "camel": {
+    "branch": "survival",
+    "effect": "thirstSlowPct",
+    "perRank": 15,
+    "maxRank": 2,
+    "level": 2
+  },
+  "light_eater": {
+    "branch": "survival",
+    "effect": "hungerSlowPct",
+    "perRank": 15,
+    "maxRank": 2,
+    "level": 1
+  },
+  "fast_healer": {
+    "branch": "survival",
+    "effect": "regenPct",
+    "perRank": 25,
+    "maxRank": 2,
+    "level": 5,
+    "requires": ["light_eater", 1]
+  },
+  "sprint": {
+    "branch": "survival",
+    "effect": "sprint",
+    "perRank": 1,
+    "maxRank": 1,
+    "level": 8,
+    "requires": ["fast_healer", 1]
+  },
+  "lumberjack": {
+    "branch": "crafts",
+    "effect": "gatherPower",
+    "perRank": 1,
+    "maxRank": 2,
+    "level": 1
+  },
+  "forager": {
+    "branch": "crafts",
+    "effect": "extraDropPct",
+    "perRank": 15,
+    "maxRank": 3,
+    "level": 3,
+    "requires": ["lumberjack", 1]
+  },
+  "careful_hands": {
+    "branch": "crafts",
+    "effect": "wearSavePct",
+    "perRank": 20,
+    "maxRank": 2,
+    "level": 5
+  },
+  "quick_crafter": {
+    "branch": "crafts",
+    "effect": "craftSpeedPct",
+    "perRank": 15,
+    "maxRank": 3,
+    "level": 8,
+    "requires": ["careful_hands", 1]
+  }
+}

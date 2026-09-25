@@ -36,6 +36,14 @@ export interface ResourceDef extends WorldObjectDef {
   respawnSec: number;
   /** XP ao apanhar (omisso = `xpGather`). */
   xp?: number;
+  /** Drops especiais: `pct`% de hipótese a partir do nível `minSkill` da perícia de recolha. */
+  bonus?: readonly BonusDrop[];
+}
+
+export interface BonusDrop {
+  item: string;
+  pct: number;
+  minSkill: number;
 }
 
 export type ResourceDefs = Readonly<Record<string, ResourceDef>>;
@@ -130,6 +138,9 @@ export function ammoFits(ammo: string, def: ItemDef | undefined, weaponAmmo: str
 /** Perícias de combate: cada uma sobe com o uso e faz falhar menos (CLAUDE.md §7.8). */
 export const WEAPON_SKILLS = ['fists', 'blunt', 'blade', 'archery', 'firearms'] as const;
 export type WeaponSkill = (typeof WEAPON_SKILLS)[number];
+/** Todas as perícias que sobem com o uso: as de combate e a de recolha. */
+export const SKILLS = [...WEAPON_SKILLS, 'gathering'] as const;
+export type SkillId = (typeof SKILLS)[number];
 
 /** Perícia de uma arma (`undefined` = punhos). */
 export function skillOf(def: ItemDef | undefined): WeaponSkill {
@@ -165,6 +176,7 @@ export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 export function equipSlotOf(def: ItemDef | undefined): EquipSlot | null {
   if (!def) return null;
   if (def.type === 'armor') return def.equip ?? null;
+  if (def.type === 'backpack') return 'backpack';
   if (def.damage !== undefined) return 'weapon';
   return null;
 }
@@ -234,7 +246,7 @@ export function parseResources(
     input,
     spriteKeys,
     'resources.json',
-    ['hp', 'tool', 'toolRequired', 'drops', 'respawnSec', 'xp'],
+    ['hp', 'tool', 'toolRequired', 'drops', 'respawnSec', 'xp', 'bonus'],
     (id, raw, problems) => {
       if (!isPositiveInt(raw.hp))
         problems.push(`"${id}": hp tem de ser um inteiro > 0 (${describe(raw.hp)})`);
@@ -263,8 +275,22 @@ export function parseResources(
           }
         }
       }
+      const bonus: BonusDrop[] = [];
+      if (raw.bonus !== undefined) {
+        if (!Array.isArray(raw.bonus)) problems.push(`"${id}": bonus tem de ser [[item, pct, minSkill], …]`);
+        else
+          for (const entry of raw.bonus as unknown[]) {
+            const [item, pct, minSkill] = Array.isArray(entry) ? (entry as unknown[]) : [];
+            if (typeof item !== 'string' || !items.has(item))
+              problems.push(`"${id}": bonus com item desconhecido ${describe(item)}`);
+            else if (!isPositiveInt(pct) || pct > 100 || !isPositiveInt(minSkill))
+              problems.push(`"${id}": bonus ${item} com pct/minSkill inválidos`);
+            else bonus.push({ item, pct, minSkill });
+          }
+      }
       return {
         hp: isPositiveInt(raw.hp) ? raw.hp : 1,
+        ...(bonus.length > 0 ? { bonus } : {}),
         ...(tool === undefined ? {} : { tool: tool as ToolKind }),
         toolRequired,
         drops,

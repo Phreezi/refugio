@@ -27,6 +27,7 @@ import {
 } from '../src/data/types.ts';
 import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../src/world/tileset.ts';
 import { ZoneMapError, parseZoneMap } from '../src/world/zoneMap.ts';
+import { parseTalents } from '../src/systems/progression/talents.ts';
 
 const ROOT = new URL('../', import.meta.url);
 const PALETTE_SIZE = 32;
@@ -407,6 +408,24 @@ function checkI18n(): string[] {
   return problems;
 }
 
+/** Talentos (§7.15): dados válidos e nome traduzido em todas as línguas. */
+function checkTalents(): string[] {
+  let ids: string[];
+  try {
+    ids = Object.keys(parseTalents(readJson('src/data/talents.json')));
+  } catch (error) {
+    return [error instanceof Error ? error.message : String(error)];
+  }
+  const problems: string[] = [];
+  for (const lang of ['pt-PT', 'en']) {
+    const dict = readJson(`src/i18n/${lang}.json`);
+    if (!isStringRecord(dict)) continue;
+    for (const id of ids)
+      if (!(`talent.${id}` in dict)) problems.push(`talents.json: "${id}" sem nome em i18n/${lang}.json`);
+  }
+  return problems;
+}
+
 const checks: [string, () => string[]][] = [
   ['paleta', checkPalette],
   ['manifest de assets', checkManifest],
@@ -417,6 +436,7 @@ const checks: [string, () => string[]][] = [
   ['crafting', checkCrafting],
   ['construção', checkStructures],
   ['inimigos', checkEnemies],
+  ['talentos', checkTalents],
   ['loot', checkLoot],
   ['zonas', checkZones],
   ['mapas', checkMaps],

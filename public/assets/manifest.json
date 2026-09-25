@@ -1458,6 +1458,28 @@
         "border": "ink",
         "letter": "R"
       }
+    },
+    "icon_pouch": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "B"
+      },
+      "file": "sprites/icons/pouch.png"
+    },
+    "icon_military_backpack": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "forest",
+        "border": "ink",
+        "letter": "M"
+      },
+      "file": "sprites/icons/military_backpack.png"
     }
   }
 }

@@ -5,7 +5,7 @@ import { gameState } from '../core/GameState';
 import type { ContainerRef, PlayerActions, SlotRef } from '../core/PlayerActions';
 import { simulation } from '../core/Simulation';
 import { BALANCE } from '../data/balance';
-import { equipSlotOf } from '../data/types';
+import { EQUIP_SLOTS, equipSlotOf } from '../data/types';
 import { getView } from '../display/view';
 import { itemName, t } from '../i18n';
 import { content } from '../world/content';
@@ -29,6 +29,8 @@ const CHEST_COLS = 6;
 const DRAG_THRESHOLD = 4;
 /** Margem entre a hotbar e o fundo do ecrã. */
 const HOTBAR_MARGIN = 6;
+/** Espaço livre entre o painel e a hotbar (o botão Construir fica por cima dela). */
+const PANEL_ABOVE_HOTBAR = 28;
 
 interface Rect {
   x: number;
@@ -37,15 +39,23 @@ interface Rect {
   h: number;
 }
 
-/** Slots de equipamento mostrados (arma, cabeça, corpo), ao lado da mochila. */
-const EQUIP_SHOWN = 3;
-const EQUIP_LABELS = ['inv.slot.weapon_short', 'inv.slot.head_short', 'inv.slot.body_short'] as const;
+/** Slots de equipamento mostrados (arma, cabeça, corpo, mochila), ao lado da mochila. */
+const EQUIP_SHOWN = [
+  { index: EQUIP_SLOTS.indexOf('weapon'), label: 'inv.slot.weapon_short' },
+  { index: EQUIP_SLOTS.indexOf('head'), label: 'inv.slot.head_short' },
+  { index: EQUIP_SLOTS.indexOf('body'), label: 'inv.slot.body_short' },
+  { index: EQUIP_SLOTS.indexOf('backpack'), label: 'inv.slot.backpack_short' },
+] as const;
+/** Linhas da coluna do equipamento: os slots mostrados e a aljava. */
+const EQUIP_ROWS = EQUIP_SHOWN.length + 1;
+/** Com uma mochila grande, a grelha pode alargar até estas colunas para caber no ecrã. */
+const INVENTORY_MAX_COLS = 10;
 
-/** Grelha da mochila + coluna do equipamento à direita. */
-function bagSize(scale: number): { w: number; h: number } {
-  const grid = gridSize(BALANCE.inventorySlots, INVENTORY_COLS, scale);
+/** Grelha da mochila (`cols` colunas) + coluna do equipamento à direita. */
+function bagSize(slots: number, cols: number, scale: number): { w: number; h: number } {
+  const grid = gridSize(slots, cols, scale);
   const size = slotSize(scale);
-  const equip = EQUIP_SHOWN * size + (EQUIP_SHOWN - 1) * SLOT_GAP;
+  const equip = EQUIP_ROWS * size + (EQUIP_ROWS - 1) * SLOT_GAP;
   return { w: grid.w + PAD + size, h: Math.max(grid.h, equip) };
 }
 
@@ -57,6 +67,8 @@ function gridSize(slots: number, cols: number, scale: number): { w: number; h: n
 
 interface PanelLayout {
   scale: number;
+  /** Colunas da grelha da mochila. */
+  cols: number;
   bag: { w: number; h: number };
   chest: { w: number; h: number } | null;
   sideBySide: boolean;
@@ -78,6 +90,8 @@ export class InventoryUI {
   private panelSlots: SlotView[] = [];
   private panelObjects: { destroy(): void }[] = [];
   private panelRect: Rect | null = null;
+  /** Espaços da mochila quando o painel foi desenhado. */
+  private builtSlots = 0;
   /** Baú ou contentor com loot aberto ao lado da mochila. */
   private other: OtherContainerRef | null = null;
   /** Destruir pede um segundo toque: o slot à espera de confirmação e até quando (ms). */
@@ -105,7 +119,9 @@ export class InventoryUI {
     }
     this.unsubscribe = [
       eventBus.on('inventory:changed', () => {
-        this.refresh();
+        // A mochila mudou de tamanho (equipou ou tirou uma mochila): refaz o painel.
+        if (this.isOpen && this.inventorySlots !== this.builtSlots) this.rebuildSoon();
+        else this.refresh();
       }),
       eventBus.on('container:open', ({ container }) => {
         this.open(container);
@@ -118,8 +134,18 @@ export class InventoryUI {
     this.refresh();
   }
 
+  /** Espaços da mochila agora (base + mochila equipada). */
+  private get inventorySlots(): number {
+    return gameState.data.player.inventory.length;
+  }
+
   get isOpen(): boolean {
     return this.panelRect !== null;
+  }
+
+  /** Até onde pode descer o painel: acima da hotbar e dos botões Fabricar/Construir. */
+  private panelBottom(): number {
+    return this.hotbarRect().y - PANEL_ABOVE_HOTBAR;
   }
 
   /** Retângulo da hotbar (centrada em baixo), para a UIScene posicionar o resto à volta. */
@@ -265,8 +291,18 @@ export class InventoryUI {
    * alto) um por cima do outro. null se não couber no espaço acima da hotbar.
    */
   private layout(scale: number): PanelLayout | null {
+    // Com muitos espaços (mochila grande), mais colunas até caber em altura.
+    for (let cols = INVENTORY_COLS; cols <= INVENTORY_MAX_COLS; cols++) {
+      const layout = this.layoutWith(scale, cols);
+      if (layout) return layout;
+      if (Math.ceil(this.inventorySlots / cols) <= EQUIP_ROWS) break; // mais colunas não ajudam
+    }
+    return null;
+  }
+
+  private layoutWith(scale: number, cols: number): PanelLayout | null {
     const { width } = getView();
-    const bag = bagSize(scale);
+    const bag = bagSize(this.inventorySlots, cols, scale);
     const chest = this.otherGrid(scale);
     const sideBySide = chest !== null && bag.w + chest.w + PAD * 3 <= width - 8;
     const block = (g: { w: number; h: number }): { w: number; h: number } => ({ w: g.w, h: TITLE_H + g.h });
@@ -279,8 +315,8 @@ export class InventoryUI {
       : blocks.reduce((sum, b) => sum + b.h, 0) + PAD;
     const w = contentW + PAD * 2;
     const h = contentH + INFO_H + PAD * 2;
-    if (w > width - 4 || h > this.hotbarRect().y - 8) return null;
-    return { scale, bag, chest, sideBySide, w, h };
+    if (w > width - 4 || h > this.panelBottom()) return null;
+    return { scale, cols, bag, chest, sideBySide, w, h };
   }
 
   /** (Re)constrói o painel: fundo escurecido, grelhas, título e barra de informação. */
@@ -288,15 +324,14 @@ export class InventoryUI {
     this.clearPanel();
     const scene = this.scene;
     const { width, height } = getView();
-    const hotbarTop = this.hotbarRect().y;
     // Nos ecrãs táteis, slots ×2 (mais fáceis de tocar) se couberem.
     const touch = scene.sys.game.device.input.touch;
     const layout = (touch ? this.layout(2) : null) ?? this.layout(1) ?? this.layoutFallback();
-    const { scale, bag, chest, sideBySide, w, h } = layout;
+    const { scale, cols, bag, chest, sideBySide, w, h } = layout;
     const size = slotSize(scale);
     const x = Math.round((width - w) / 2);
     // Fixo perto do topo, como o fabrico.
-    const y = Math.max(4, Math.min(panelTop(height), hotbarTop - 4 - h));
+    const y = Math.max(4, Math.min(panelTop(height), this.panelBottom() - h));
     this.panelRect = { x, y, w, h };
 
     const add = <T extends { destroy(): void }>(obj: T): T => {
@@ -350,26 +385,28 @@ export class InventoryUI {
     };
     const gx = x + PAD;
     const gy = y + PAD;
-    grid('inventory', BALANCE.inventorySlots, INVENTORY_COLS, gx, gy, t('hud.bag'));
-    // Equipamento: coluna à direita da mochila (arma, cabeça, corpo).
-    for (let i = 0; i < EQUIP_SHOWN; i++) {
+    const slots = this.inventorySlots;
+    this.builtSlots = slots;
+    grid('inventory', slots, cols, gx, gy, t('hud.bag'));
+    // Equipamento: coluna à direita da mochila (arma, cabeça, corpo, mochila).
+    EQUIP_SHOWN.forEach(({ index, label }, row) => {
       this.panelSlots.push(
         new SlotView(
           scene,
           gx + bag.w - size,
-          gy + TITLE_H + i * (size + SLOT_GAP),
-          { container: 'equipment', index: i },
-          t(EQUIP_LABELS[i] ?? 'inv.slot.weapon_short'),
+          gy + TITLE_H + row * (size + SLOT_GAP),
+          { container: 'equipment', index },
+          t(label),
           scale,
         ).setDepth(DEPTH.slots),
       );
-    }
+    });
     // Aljava (por baixo do equipamento): a munição em uso; tocar passa à seguinte.
     const ammo = simulation.combat.activeAmmo();
     const ammoDef = ammo ? content.items[ammo.item] : undefined;
     if (ammo && ammoDef) {
       const ax = gx + bag.w - size;
-      const ay = gy + TITLE_H + EQUIP_SHOWN * (size + SLOT_GAP);
+      const ay = gy + TITLE_H + EQUIP_SHOWN.length * (size + SLOT_GAP);
       add(
         new Button(
           scene,
@@ -440,10 +477,15 @@ export class InventoryUI {
 
   /** Ecrã demasiado pequeno para qualquer escala: usa ×1 mesmo que fique cortado. */
   private layoutFallback(): PanelLayout {
-    const bag = bagSize(1);
+    const { width } = getView();
+    // As colunas que couberem na largura (o que não couber em altura fica cortado).
+    let cols = INVENTORY_COLS;
+    while (cols < INVENTORY_MAX_COLS && bagSize(this.inventorySlots, cols + 1, 1).w + PAD * 2 <= width - 4)
+      cols++;
+    const bag = bagSize(this.inventorySlots, cols, 1);
     const chest = this.otherGrid(1);
     const h = TITLE_H + bag.h + (chest ? TITLE_H + chest.h + PAD : 0) + INFO_H + PAD * 2;
-    return { scale: 1, bag, chest, sideBySide: false, w: Math.max(bag.w, chest?.w ?? 0) + PAD * 2, h };
+    return { scale: 1, cols, bag, chest, sideBySide: false, w: Math.max(bag.w, chest?.w ?? 0) + PAD * 2, h };
   }
 
   /**

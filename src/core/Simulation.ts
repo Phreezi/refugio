@@ -4,7 +4,8 @@ import type { ItemDefs } from '../data/types';
 import type { CollisionWorld } from '../systems/movement/CollisionWorld';
 import { isZero, ZERO, type Vec2 } from '../systems/movement/geometry';
 import { facingFromIntent, moveWithCollision, normalize } from '../systems/movement/movement';
-import { respawnVitals, survivalRules, tickSurvival } from '../systems/survival/survival';
+import { respawnVitals, survivalRules, tickSurvival, type SurvivalRules } from '../systems/survival/survival';
+import { talentOf } from '../data/talents';
 import { eventBus, type EventBus, type GameEvents } from './EventBus';
 import { FixedStep } from './FixedStep';
 import { BASE_ZONE_ID, gameState, type GameState, type PlayerState } from './GameState';
@@ -33,7 +34,10 @@ export class Simulation {
   private readonly clock = new FixedStep(FIXED_STEP_MS, MAX_STEPS_PER_FRAME);
   private readonly state: GameState;
   private readonly bus: EventBus<GameEvents>;
-  private readonly survival = survivalRules(BALANCE);
+  private survival: SurvivalRules = survivalRules(BALANCE);
+  private survivalKey = '{}';
+  private sprintUntilTick = 0;
+  private sprintReadyTick = 0;
   private readonly actionCooldownTicks = secondsToTicks(BALANCE.actionCooldownSec);
   readonly actions: PlayerActions;
   readonly interaction: Interaction;
@@ -383,6 +387,7 @@ export class Simulation {
     this.combat.collectGround();
     this.combat.tickCorpses();
     this.combat.syncQuiver();
+    this.actions.syncBackpack();
     this.combat.pruneBags();
     this.checkExits();
     this.runAction(world.tick);
@@ -393,7 +398,7 @@ export class Simulation {
     this.horde.tick();
     this.stats.tick();
     this.crafting.advance(1);
-    tickSurvival(this.state.data.player, world.tick, this.survival);
+    tickSurvival(this.state.data.player, world.tick, this.survivalRules());
     this.tickBleeding(world.tick);
     if (this.state.data.player.hp <= 0) this.respawn();
     this.bus.emit('world:tick', { tick: world.tick });
@@ -409,6 +414,7 @@ export class Simulation {
     this.combat.collectGround();
     this.combat.tickCorpses();
     this.combat.syncQuiver();
+    this.actions.syncBackpack();
     this.combat.pruneBags();
     this.runAction(tick);
     if (!this.linked && this.zone) {
@@ -416,9 +422,52 @@ export class Simulation {
       this.combat.tick(this.sneaking);
     }
     this.stats.tick();
-    tickSurvival(this.state.data.player, tick, this.survival);
+    tickSurvival(this.state.data.player, tick, this.survivalRules());
     this.tickBleeding(tick);
     if (this.state.data.player.hp <= 0) this.respawn();
+  }
+
+  /** Ritmos de fome/sede/regeneração com os talentos do jogador (§7.15). */
+  private survivalRules(): SurvivalRules {
+    const player = this.state.data.player;
+    const key = JSON.stringify(player.talents);
+    if (key !== this.survivalKey) {
+      this.survivalKey = key;
+      this.survival = survivalRules(BALANCE, {
+        hungerSlowPct: talentOf(player, 'hungerSlowPct'),
+        thirstSlowPct: talentOf(player, 'thirstSlowPct'),
+        regenPct: talentOf(player, 'regenPct'),
+      });
+    }
+    return this.survival;
+  }
+
+  /**
+   * Talento ativo "Correr" (§7.15): mais velocidade durante `sprintSec`, depois espera
+   * `sprintCooldownSec`. Corre no ecrã de quem anda (também no do convidado).
+   * @returns 'ok', 'locked' (sem o talento) ou 'cooldown'.
+   */
+  sprint(): 'ok' | 'locked' | 'cooldown' {
+    if (!this.state.hasGame) return 'locked';
+    const player = this.state.data.player;
+    if (talentOf(player, 'sprint') <= 0) return 'locked';
+    const tick = this.state.data.world.tick;
+    if (tick < this.sprintReadyTick) return 'cooldown';
+    this.sprintUntilTick = tick + secondsToTicks(BALANCE.sprintSec);
+    this.sprintReadyTick = tick + secondsToTicks(BALANCE.sprintCooldownSec);
+    this.bus.emit('player:sprint', {});
+    return 'ok';
+  }
+
+  /** Sprint: [0, 1] do tempo de espera que falta (0 = pronto) e se está a correr. */
+  get sprintState(): { active: boolean; cooldown: number } {
+    if (!this.state.hasGame) return { active: false, cooldown: 0 };
+    const tick = this.state.data.world.tick;
+    const total = secondsToTicks(BALANCE.sprintCooldownSec);
+    return {
+      active: tick < this.sprintUntilTick,
+      cooldown: Math.max(0, Math.min(1, (this.sprintReadyTick - tick) / total)),
+    };
   }
 
   /** A sangrar: perde vida devagar até acabar o tempo ou usar uma ligadura (nunca instantâneo). */
@@ -544,7 +593,11 @@ export class Simulation {
     if (this.world === null || isZero(this.intent) || this.fishing.active) return;
 
     player.facing = facingFromIntent(this.intent, player.facing);
-    const speed = BALANCE.playerSpeed * (this.sneaking ? BALANCE.sneakMultiplier : 1);
+    const sprinting = this.state.data.world.tick < this.sprintUntilTick;
+    const speed =
+      BALANCE.playerSpeed *
+      (this.sneaking ? BALANCE.sneakMultiplier : 1) *
+      (sprinting ? BALANCE.sprintMultiplier : 1);
     const step = (speed * FIXED_STEP_MS) / 1000;
     const delta = { x: this.intent.x * step, y: this.intent.y * step };
     const next = moveWithCollision(player, PLAYER_FOOTPRINT, delta, this.world);

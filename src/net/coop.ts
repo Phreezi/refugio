@@ -296,6 +296,7 @@ class Coop {
           fishing: sim.fishing,
           tutorial: sim.tutorial,
           combat: sim.combat,
+          progression: sim.progression,
         };
         const target = targets[sys];
         const fn: unknown = Reflect.get(target, method);
@@ -473,6 +474,7 @@ class Coop {
       fishing: simulation.fishing,
       tutorial: simulation.tutorial,
       combat: simulation.combat,
+      progression: simulation.progression,
       sim: simulation,
     };
     for (const sys of Object.keys(GUEST_COMMANDS) as CommandSystem[]) {

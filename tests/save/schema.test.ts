@@ -37,7 +37,7 @@ describe('save: formato', () => {
   it('é compacto (sem espaços) e bem abaixo dos 100 KB', () => {
     const text = serializeSave(STATE, 1);
     expect(text).not.toMatch(/\s/);
-    expect(text.length).toBeLessThan(1000);
+    expect(text.length).toBeLessThan(1100);
   });
 
   it('deteta corrupção: JSON partido, checksum errado, campos em falta', () => {
@@ -253,6 +253,17 @@ describe('save: migrações', () => {
     expect(parseSave(text).state.player.look).toBe('boy');
     const bad = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
     bad.player.look = 'dragon';
+    expect(() => validateState(bad)).toThrow();
+  });
+
+  it('v17 → v18: talentos vazios; validam-se', () => {
+    const v17 = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    delete v17.player.talents;
+    const stateJson = JSON.stringify(v17);
+    const text = `{"version":17,"timestamp":9,"checksum":"${checksum(`17|9|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.player.talents).toEqual({});
+    const bad = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    bad.player.talents = { strong_arm: 0 };
     expect(() => validateState(bad)).toThrow();
   });
 

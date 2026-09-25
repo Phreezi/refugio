@@ -1,4 +1,4 @@
-import type { WeaponSkill } from '../../data/types';
+import type { SkillId } from '../../data/types';
 import { totalXpForLevel, type XpCurve } from '../progression/progression';
 
 // Perícias de combate (CLAUDE.md §7.8), lógica pura: cada golpe ou tiro com uma arma dá 1 de
@@ -17,7 +17,7 @@ export interface SkillBalance {
 }
 
 /** Experiência total de cada perícia (as que nunca se usaram não aparecem). */
-export type Skills = Partial<Record<WeaponSkill, number>>;
+export type Skills = Partial<Record<SkillId, number>>;
 
 /** Nível (1 … máximo) a partir da experiência total. */
 export function skillLevel(xp: number, balance: SkillBalance): number {
@@ -37,11 +37,21 @@ export function missPct(level: number, ranged: boolean, balance: SkillBalance): 
  * Soma 1 de experiência à perícia.
  * @returns o nível novo, se subiu (senão null).
  */
-export function trainSkill(skills: Skills, skill: WeaponSkill, balance: SkillBalance): number | null {
+export function trainSkill(skills: Skills, skill: SkillId, balance: SkillBalance): number | null {
   const before = skills[skill] ?? 0;
   const level = skillLevel(before, balance);
   if (level >= balance.skillMaxLevel) return null;
   skills[skill] = before + 1;
   const after = skillLevel(before + 1, balance);
   return after > level ? after : null;
+}
+
+/** Recolha (§7.15): +1 de força por golpe a cada `gatherPowerEveryLevels` níveis. */
+export function gatherPowerBonus(level: number, everyLevels: number): number {
+  return Math.floor(level / everyLevels);
+}
+
+/** Recolha: % de hipótese de cada drop dar +1 (a partir do nível 2). */
+export function gatherExtraPct(level: number, perLevel: number): number {
+  return (level - 1) * perLevel;
 }

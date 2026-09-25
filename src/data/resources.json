@@ -10,7 +10,8 @@
     "tool": "axe",
     "drops": [["wood", 2, 3]],
     "respawnSec": 1200,
-    "xp": 3
+    "xp": 3,
+    "bonus": [["fiber", 15, 3]]
   },
   "tree_large": {
     "sprite": "tree_large",
@@ -23,7 +24,8 @@
     "toolRequired": true,
     "drops": [["wood", 4, 6]],
     "respawnSec": 1800,
-    "xp": 6
+    "xp": 6,
+    "bonus": [["wood_plank", 10, 6]]
   },
   "rock": {
     "sprite": "rock",
@@ -35,7 +37,11 @@
     "tool": "pickaxe",
     "drops": [["stone", 2, 3]],
     "respawnSec": 1200,
-    "xp": 3
+    "xp": 3,
+    "bonus": [
+      ["iron_ore", 6, 5],
+      ["pebble", 25, 1]
+    ]
   },
   "bush_berries": {
     "sprite": "bush_berries",
@@ -46,14 +52,16 @@
     "hp": 1,
     "drops": [["berries", 2, 4]],
     "respawnSec": 600,
-    "xp": 1
+    "xp": 1,
+    "bonus": [["tomato_seeds", 6, 4]]
   },
   "tall_grass": {
     "sprite": "tall_grass",
     "hp": 1,
     "drops": [["fiber", 1, 2]],
     "respawnSec": 300,
-    "xp": 1
+    "xp": 1,
+    "bonus": [["carrot_seeds", 6, 3]]
   },
   "iron_vein": {
     "sprite": "iron_vein",
@@ -66,7 +74,8 @@
     "toolRequired": true,
     "drops": [["iron_ore", 2, 3]],
     "respawnSec": 2400,
-    "xp": 6
+    "xp": 6,
+    "bonus": [["scrap_metal", 15, 5]]
   },
   "clay_pit": {
     "sprite": "clay_pit",
@@ -79,6 +88,7 @@
     "toolRequired": false,
     "drops": [["clay", 2, 3]],
     "respawnSec": 600,
-    "xp": 2
+    "xp": 2,
+    "bonus": [["stone", 20, 2]]
   }
 }

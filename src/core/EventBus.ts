@@ -25,6 +25,8 @@ export interface GameEvents {
   'enemy:missed': { x: number; y: number };
   /** Uma perícia de combate subiu de nível. */
   'skill:levelUp': { skill: string; level: number };
+  'talent:learned': { talent: string; rank: number };
+  'player:sprint': Record<string, never>;
   /** O corpo de um inimigo desapareceu do chão (fumo em x, y). */
   'corpse:gone': { uid: number; x: number; y: number };
   /** Os itens soltos no chão da zona mudaram (flechas caídas ou apanhadas). */

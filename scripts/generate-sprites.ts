@@ -2118,6 +2118,44 @@ const PHASE10D_ICONS: Sprite[] = [
     },
   },
   {
+    // Bolsa: a primeira "mochila" (+5), de pano atado.
+    file: 'pouch',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(5, 7, 6, 7, c('parchment'));
+      img.fill(4, 9, 8, 4, c('parchment'));
+      img.fill(5, 7, 6, 1, c('cream'));
+      img.fill(10, 9, 2, 4, c('wheat'));
+      img.fill(6, 5, 4, 2, c('wheat')); // boca franzida
+      img.fill(5, 7, 6, 1, c('bark')); // atilho
+      img.set(11, 8, c('bark'));
+      img.set(12, 9, c('bark'));
+    },
+  },
+  {
+    // Mochila militar (+30): grande, camuflada, com fivelas.
+    file: 'military_backpack',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      backpack(img, true);
+      img.fill(2, 4, 12, 10, c('sand'));
+      img.fill(2, 4, 12, 2, c('wheat'));
+      img.set(3, 7, c('forest'));
+      img.set(12, 6, c('forest'));
+      img.set(11, 12, c('forest'));
+      img.fill(4, 8, 8, 4, c('bark'));
+      img.fill(0, 7, 2, 5, c('bark'));
+      img.fill(14, 7, 2, 5, c('bark'));
+      img.fill(5, 9, 1, 2, c('stone_light'));
+      img.fill(10, 9, 1, 2, c('stone_light'));
+      img.set(8, 10, c('gold'));
+    },
+  },
+  {
     file: 'military_helmet',
     width: 16,
     height: 16,

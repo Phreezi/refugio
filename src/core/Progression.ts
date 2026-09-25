@@ -2,6 +2,8 @@ import { BALANCE } from '../data/balance';
 import type { EnemyDefs, Recipe, Recipes, ResourceDefs, StructureDefs, ZoneDefs } from '../data/types';
 import { countItem } from '../systems/inventory/inventory';
 import { addXp } from '../systems/progression/progression';
+import { learnTalent, type LearnCheck } from '../systems/progression/talents';
+import { TALENTS } from '../data/talents';
 import { discountedCost, eventActive, eventTicksLeft } from '../systems/travel/events';
 import { secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
@@ -166,6 +168,18 @@ export class Progression {
     this.state.markDirty();
     this.bus.emit('recipe:learned', { recipe: recipeId });
     return 'learned';
+  }
+
+  /** Gasta 1 ponto no talento `id` (§7.15). */
+  learnTalent(id: string): LearnCheck {
+    if (!this.state.hasGame) return 'unknown';
+    const player = this.state.data.player;
+    const result = learnTalent(id, player.level, player.talents, TALENTS);
+    if (result === 'ok') {
+      this.state.markDirty();
+      this.bus.emit('talent:learned', { talent: id, rank: player.talents[id] ?? 0 });
+    }
+    return result;
   }
 
   /** O que passa a estar disponível exatamente no nível `level`. */

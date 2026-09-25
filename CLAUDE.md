@@ -178,7 +178,7 @@ refugio/
 │   │   ├── progression/      # curva de XP, subir de nível
 │   │   └── travel/           # ponto de chegada a uma zona, custo da viagem
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
-│   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, BuildUI (+ buildMode), FishingUI, LevelUpUI, gameSpeed, uiState, fileTransfer, fatalError
+│   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, SkillsUI, BuildUI (+ buildMode), FishingUI, LevelUpUI, gameSpeed, uiState, fileTransfer, fatalError
 │   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
 │   ├── net/                  # co-op (Fase 15): protocol.ts (código, mensagens, comandos; puro), coop.ts (PeerJS, sessões, sincronização)
 │   ├── save/
@@ -206,6 +206,7 @@ refugio/
 │   │   ├── enemyGroups.json  # grupos dos pontos enemy_spawn:<grupo>
 │   │   ├── zones.json        # zonas (nome, mapa, perigo)
 │   │   ├── lootTables.json   # contentores com loot (sprite, footprint, tiragens, entradas, pity)
+│   │   ├── talents.json      # árvore de talentos (ramo, efeito, pontos, requisitos; §7.15)
 │   │   └── balance.json
 │   └── i18n/
 │       ├── pt-PT.json
@@ -356,6 +357,8 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Craft | C | Botão "Fabricar" (à esquerda da hotbar) |
 | Modo construção | B (dentro: clique/Espaço coloca, R roda, Z desfaz, X demolir, B/Esc sai) | Botão "Construir" (por cima do "Fabricar"); toque curto no mundo escolhe o tile, botões Colocar/Rodar/Desfazer/Demolir/Sair |
 | Comer/beber rápido | 1–4 (hotbar) | Hotbar de 4 slots |
+| Perícias e talentos | K (ou Pausa → Perícias) | Pausa → Perícias |
+| Correr (talento ativo) | Q / botão "Correr" (por cima do "Auto") | Botão "Correr" |
 
 Com Ctrl/Cmd premido, os atalhos do browser nas teclas do jogo (Ctrl+S, Ctrl+D, Ctrl+A, Ctrl+F…) são anulados (`src/input/browserShortcuts.ts`); Ctrl+W/T/N não se podem anular, por isso fechar a página com o Ctrl premido pede confirmação.
 
@@ -365,7 +368,7 @@ Os botões que abrem painéis (Mochila, Fabricar, Construir, "II") fecham-nos se
 
 ### 7.3 Inventário
 
-- Grelha de slots. Base 20; mochila pequena +10; mochila grande +20.
+- Grelha de slots. Base 20, mais os `slots` da mochila equipada (slot "Moch." na coluna do equipamento): bolsa +5 → mochila pequena +10 → grande +20 → militar +30; cada uma fabrica-se a partir da anterior. Ao tirar a mochila, o que estava nos espaços dela passa para espaços livres; o que não couber fica numa pilha no chão (`PlayerActions.syncBackpack`, a cada tick). Com muitos espaços, a grelha do painel ganha colunas para caber no ecrã.
 - Stacks: recursos 50, consumíveis 10, munições 100 (flechas, virotes e seixos 999), ferramentas/armas 1.
 - Slots de equipamento: arma, cabeça, corpo, pernas, pés, mochila.
 - Baús na base: 24 slots cada, sem limite de baús (limitado por recursos).
@@ -486,6 +489,13 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - **Canteiro** (`garden_bed`, `farm: true`): com a ação contextual planta-se a primeira semente da mochila (itens com `plant`), rega-se com água (itens com `waters`; primeiro a suja, a garrafa volta) e, passadas `growHours` horas de jogo, colhe-se o fruto e 0–2 sementes (só se couber tudo). Por regar não cresce. Um canteiro com planta não se demole.
 - **Peças que produzem** (`produce: { everyHours, max, drops, needs? }`): uma unidade a cada `everyHours` horas de jogo, até `max`; recolhe-se com a ação (o coletor de água gasta uma garrafa vazia por unidade). Sprite `_full` quando há algo.
 - O tempo offline também conta (§7.6). Save: `base.crops[uid] = [semente, tick em que amadurece | null]`, `base.produce[uid] = tick de início da contagem`.
+
+### 7.15 Perícias e talentos
+
+- **Perícias que sobem com o uso** (`player.skills`): as de armas (§7.8) e a de **recolha** (`gathering`): cada golpe num recurso dá 1 de experiência. A recolha dá +`gatherExtraPctPerLevel`% por nível de hipótese de +1 em cada drop, +1 de força a cada `gatherPowerEveryLevels` níveis e, a partir de `minSkill`, **drops especiais** (`bonus: [[item, pct, minSkill]]` em `resources.json`: seixos e minério nas pedras, sementes na erva e nos arbustos, tábuas nas árvores grandes…). O que não couber fica numa pilha no chão.
+- **Talentos** (`src/data/talents.json`, lógica em `systems/progression/talents.ts`): cada nível dá 1 ponto (pontos = nível − 1 − gastos; quem já jogava fica com os pontos todos). 3 ramos com 4 talentos (Combate, Sobrevivência, Ofícios); cada talento tem `maxRank`, `level` mínimo e `requires: [talento, pontos]` do mesmo ramo (a árvore mostra-os por baixo do que pedem). Efeitos (`effect` × `perRank`): `meleeDamagePct`, `missPts`, `armorPct` (soma à armadura, até ao máximo), `hungerSlowPct`, `thirstSlowPct`, `regenPct`, `gatherPower`, `extraDropPct`, `wearSavePct` (ferramentas e armas), `craftSpeedPct` (conta ao pôr na fila) e o ativo `sprint` (`sprintMultiplier` durante `sprintSec`, espera `sprintCooldownSec`; corre no ecrã de quem anda, por isso também no convidado).
+- Painel "Perícias" (`src/ui/SkillsUI.ts`): separador "Com o uso" (nível, barra e o que dá) e um por ramo, com "Aprender" e o que falta a vermelho. O "Subiste de nível!" lembra o ponto novo. Co-op: `progression.learnTalent` é um comando do convidado.
+- Save v18: `player.talents` (`{ id: pontos }`).
 
 ---
 
@@ -1119,4 +1129,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Save v16: aljava; flechas de pedra/ferro; 60% de falhar à distância no início; corpos com as flechas recuperáveis; linha de vista na mira | Pedido do jogador: flechas até 999 e "dentro" do arco, mais difícil no início, apanhar flechas do corpo, e o ataque automático disparava contra as paredes de casa |
 | 2026-09-25 | Drops ficam no corpo (apanham-se ao passar; fumo ao desaparecer); flecha em uso escolhida; Auto também recolhe; proteção de principiante até ao dia 4 | Pedidos do jogador. Os drops no corpo dão-lhe razão de ser e, no co-op, fica com eles quem os apanhar |
 | 2026-09-25 | Fonte pixel Pixelify Sans (OFL); música sintetizada com volume próprio; 3 jogos com nome; nome e rapaz/rapariga ao criar (save v17); código do co-op escrito no ecrã | Pedidos do jogador: letra retro com acentos, música de fundo, lista de jogos, escolher a personagem só ao criar, sem o pop-up do browser |
+| 2026-09-25 | Save v18: talentos (1 ponto por nível, 3 ramos, um ativo: Correr), perícia de recolha com drops especiais, mochilas que dão espaços (bolsa → pequena → grande → militar) | Pedido do jogador: árvore de perícias passivas/ativas, "com nível alto ganho mais recursos ou recursos especiais", e evoluir a mochila. Os pontos contam-se pelo nível, por isso os jogos em curso ganham logo os pontos que já mereciam |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

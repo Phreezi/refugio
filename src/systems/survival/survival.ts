@@ -31,14 +31,26 @@ export interface SurvivalBalance {
   respawnHpPct: number;
 }
 
-export function survivalRules(balance: SurvivalBalance): SurvivalRules {
+/** Talentos de sobrevivência (§7.15), em %: fome/sede mais lentas, regeneração mais rápida. */
+export interface SurvivalTalents {
+  hungerSlowPct: number;
+  thirstSlowPct: number;
+  regenPct: number;
+}
+
+const NO_TALENTS: SurvivalTalents = { hungerSlowPct: 0, thirstSlowPct: 0, regenPct: 0 };
+
+export function survivalRules(
+  balance: SurvivalBalance,
+  talents: SurvivalTalents = NO_TALENTS,
+): SurvivalRules {
   const max = balance.statMax;
   return {
     max,
-    hungerEveryTicks: secondsToTicks(balance.hungerDecaySec),
-    thirstEveryTicks: secondsToTicks(balance.thirstDecaySec),
+    hungerEveryTicks: secondsToTicks(balance.hungerDecaySec * (1 + talents.hungerSlowPct / 100)),
+    thirstEveryTicks: secondsToTicks(balance.thirstDecaySec * (1 + talents.thirstSlowPct / 100)),
     starvationEveryTicks: secondsToTicks(balance.starvationDamageEverySec),
-    regenEveryTicks: secondsToTicks(balance.regenEverySec),
+    regenEveryTicks: Math.max(1, secondsToTicks(balance.regenEverySec / (1 + talents.regenPct / 100))),
     regenAbove: (max * balance.regenThreshold) / 100,
     respawnValue: Math.round((max * balance.respawnHpPct) / 100),
   };
