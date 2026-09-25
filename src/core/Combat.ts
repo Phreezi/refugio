@@ -1,6 +1,14 @@
 import { PLAYER_FOOTPRINT } from '../config';
 import { BALANCE } from '../data/balance';
-import type { EnemyDef, EnemyDefs, EnemyGroups, ItemDefs } from '../data/types';
+import {
+  skillOf,
+  type EnemyDef,
+  type EnemyDefs,
+  type EnemyGroups,
+  type ItemDef,
+  type ItemDefs,
+} from '../data/types';
+import { missPct, skillLevel, trainSkill } from '../systems/combat/skills';
 import { createEnemy, hitEnemy, stepEnemy, type Enemy } from '../systems/ai/enemyAi';
 import {
   armorPct,
@@ -41,6 +49,10 @@ export interface Projectile {
   damage: number;
   /** Quem disparou (co-op: os drops e os eventos vão para esse jogador). */
   owner: Combat;
+  /** Tiro falhado: passa pelo alvo (uid) sem lhe tocar. */
+  ignore: number | null;
+  /** A munição fica no chão se não acertar em ninguém (flechas). */
+  recover: boolean;
 }
 
 /**
@@ -100,6 +112,10 @@ export class Combat {
   sneaking = false;
   /** Co-op: o jogador está no mapa-mundo ou em pausa (os inimigos ignoram-no). */
   away = false;
+  /** Mira presa (arma à distância com a ação premida): uid do inimigo, ou null. */
+  private lockedUid: number | null = null;
+  /** Sorteio (0…1) de falhar golpes e tiros e do desvio. Substituível nos testes. */
+  roll: () => number = () => nextRandom(this.state.data.world);
   /** Hora real (ms): as mochilas no chão duram horas reais (§7.12). Substituível nos testes. */
   now: () => number = () => Date.now();
 
@@ -306,11 +322,11 @@ export class Combat {
    * Dispara a arma à distância equipada no inimigo mais perto (gasta 1 de munição).
    * @returns 'shot', 'no_ammo' (há alvo mas falta munição) ou null (sem arma à distância/alvo).
    */
-  shoot(): 'shot' | 'no_ammo' | null {
+  shoot(lock = false): 'shot' | 'no_ammo' | null {
     const weapon = this.weapon();
     const ranged = weapon.ranged;
     if (!ranged) return null;
-    const target = this.nearestInRange(ranged.range);
+    const target = this.aimAt(ranged.range, lock);
     if (!target) return null;
     const containers = this.actions.pickupContainers();
     if (!removeItem(containers, ranged.ammo, 1)) return 'no_ammo';
@@ -319,7 +335,14 @@ export class Combat {
     for (const item of wearSlots(equipment, [0])) this.bus.emit('item:broken', { item });
     const from = { x: player.x, y: player.y - SHOT_HEIGHT };
     const body = this.bodyArea(target);
-    const dir = normalize({ x: body.x + body.w / 2 - from.x, y: body.y + body.h / 2 - from.y });
+    let dir = normalize({ x: body.x + body.w / 2 - from.x, y: body.y + body.h / 2 - from.y });
+    const miss = this.trainAndRollMiss(true);
+    if (miss) {
+      // Falha: o tiro sai desviado (para um lado ou para o outro) e passa pelo alvo.
+      const deg = BALANCE.missSpreadDeg * (1 + this.roll()) * (this.roll() < 0.5 ? -1 : 1);
+      const a = (deg * Math.PI) / 180;
+      dir = { x: dir.x * Math.cos(a) - dir.y * Math.sin(a), y: dir.x * Math.sin(a) + dir.y * Math.cos(a) };
+    }
     player.facing =
       Math.abs(dir.x) > Math.abs(dir.y) ? (dir.x > 0 ? 'right' : 'left') : dir.y > 0 ? 'down' : 'up';
     this.projectiles.push({
@@ -335,6 +358,8 @@ export class Combat {
       left: ranged.range,
       damage: weapon.damage,
       owner: this,
+      ignore: miss ? target.uid : null,
+      recover: this.content().items[ranged.ammo]?.recoverable === true,
     });
     this.state.markDirty();
     this.bus.emit('player:action', { kind: 'attack' });
@@ -359,9 +384,14 @@ export class Combat {
         shot.left -= d;
         travelled += d;
         const ground = { x: shot.x - 1, y: shot.y + SHOT_HEIGHT - 1, w: 2, h: 2 };
-        if (world?.blocks(ground)) return false;
+        if (world?.blocks(ground)) {
+          // Fica no chão antes da parede (não dentro dela).
+          if (shot.recover)
+            owner.dropGround(shot.x - shot.dx * 6, shot.y - shot.dy * 6 + SHOT_HEIGHT, shot.ammo);
+          return false;
+        }
         const hit = this.enemies.find((e) => {
-          if (e.dying > 0) return false;
+          if (e.dying > 0 || e.uid === shot.ignore) return false;
           const b = this.bodyArea(e);
           return shot.x >= b.x && shot.x <= b.x + b.w && shot.y >= b.y && shot.y <= b.y + b.h;
         });
@@ -384,8 +414,102 @@ export class Combat {
           return false;
         }
       }
-      return shot.left > 0;
+      if (shot.left > 0) return true;
+      if (shot.recover) owner.dropGround(shot.x, shot.y + SHOT_HEIGHT, shot.ammo);
+      return false;
     });
+  }
+
+  /**
+   * Alvo da arma à distância: com a mira presa (`lock`, a ação premida), o mesmo inimigo
+   * enquanto estiver vivo e ao alcance; senão, o mais perto (e prende-se nele).
+   */
+  private aimAt(range: number, lock: boolean): Enemy | null {
+    const locked = lock && this.lockedUid !== null ? this.get(this.lockedUid) : undefined;
+    if (locked?.dying === 0) {
+      const player = this.state.data.player;
+      if (Math.hypot(locked.x - player.x, locked.y - player.y) <= range) return locked;
+    }
+    const target = this.nearestInRange(range);
+    this.lockedUid = lock && target ? target.uid : null;
+    return target;
+  }
+
+  /** Larga a mira presa (a ação deixou de estar premida): o próximo tiro vai ao mais perto. */
+  releaseLock(): void {
+    this.lockedUid = null;
+  }
+
+  /** Inimigo para onde a arma à distância aponta (a seta do alvo), ou null. */
+  aimTarget(): Enemy | null {
+    const ranged = this.weapon().ranged;
+    if (!ranged) return null;
+    const locked = this.lockedUid !== null ? this.get(this.lockedUid) : undefined;
+    if (locked?.dying === 0) return locked;
+    return this.nearestInRange(ranged.range);
+  }
+
+  /**
+   * Perícia da arma equipada: ganha 1 de experiência (avisa se subir de nível) e sorteia se
+   * este golpe/tiro falha (§7.8).
+   */
+  private trainAndRollMiss(ranged: boolean): boolean {
+    const player = this.state.data.player;
+    const skill = skillOf(this.equippedWeaponDef());
+    const level = skillLevel(player.skills[skill] ?? 0, BALANCE);
+    const miss = this.roll() * 100 < missPct(level, ranged, BALANCE);
+    const up = trainSkill(player.skills, skill, BALANCE);
+    if (up !== null) this.bus.emit('skill:levelUp', { skill, level: up });
+    return miss;
+  }
+
+  /** Arma equipada que conta (com durabilidade), ou undefined (punhos). */
+  private equippedWeaponDef(): ItemDef | undefined {
+    const slot = this.state.data.player.equipment[0];
+    if (!slot || (slot[2] !== undefined && slot[2] <= 0)) return undefined;
+    return this.content().items[slot[0]];
+  }
+
+  /** Deixa 1 de `item` no chão da zona (junta-se a uma pilha igual que esteja mesmo ao lado). */
+  dropGround(x: number, y: number, item: string): void {
+    const zoneId = this.zone?.zoneId;
+    if (!zoneId) return;
+    const ground = zoneState(this.state.data, zoneId).ground;
+    const rx = Math.round(x);
+    const ry = Math.round(y);
+    const near = ground.find((g) => g[2] === item && Math.abs(g[0] - rx) <= 3 && Math.abs(g[1] - ry) <= 3);
+    if (near) near[3] += 1;
+    else {
+      ground.push([rx, ry, item, 1]);
+      if (ground.length > BALANCE.groundItemsMax) ground.shift();
+    }
+    this.state.markDirty();
+    this.bus.emit('ground:changed', { zoneId });
+  }
+
+  /** Apanha a munição do chão por onde o jogador passa (o que não couber fica lá). */
+  collectGround(): void {
+    const zoneId = this.zone?.zoneId;
+    if (!zoneId) return;
+    const ground = this.state.data.zones[zoneId]?.ground;
+    if (!ground || ground.length === 0) return;
+    const { items } = this.content();
+    const player = this.state.data.player;
+    let changed = false;
+    for (const g of ground) {
+      if (items[g[2]]?.recoverable !== true) continue;
+      if (Math.hypot(g[0] - player.x, g[1] - player.y) > BALANCE.groundPickupPx) continue;
+      const left = addItem(this.actions.pickupContainers(), g[2], g[3], items);
+      if (left === g[3]) continue;
+      this.bus.emit('item:gained', { item: g[2], qty: g[3] - left, x: g[0], y: g[1] });
+      g[3] = left;
+      changed = true;
+    }
+    if (!changed) return;
+    zoneState(this.state.data, zoneId).ground = ground.filter((g) => g[3] > 0);
+    this.state.markDirty();
+    this.bus.emit('inventory:changed', {});
+    this.bus.emit('ground:changed', { zoneId });
   }
 
   /** Inimigos vivos na zona (para desenhar). */
@@ -567,6 +691,10 @@ export class Combat {
     const def = enemy ? this.content().enemies[enemy.id] : undefined;
     if (!enemy || !def || enemy.dying > 0) return false;
     const player = this.state.data.player;
+    if (this.trainAndRollMiss(false)) {
+      this.bus.emit('enemy:missed', { x: enemy.x, y: enemy.y - BODY_HEIGHT });
+      return true;
+    }
     const { damage } = this.weapon();
     const equipment = player.equipment;
     const weaponBefore = equipment[0];

@@ -140,6 +140,7 @@ export const HOST_VISUAL_EVENTS: ReadonlySet<string> = new Set([
   'enemy:dying',
   'enemy:exploded',
   'enemy:scream',
+  'enemy:missed',
   'structure:damaged',
   'structure:destroyed',
   'bag:changed',
@@ -168,4 +169,5 @@ export const PROGRESSION_EVENTS: ReadonlySet<string> = new Set([
   'xp:gained',
   'player:levelUp',
   'recipe:learned',
+  'skill:levelUp',
 ]);

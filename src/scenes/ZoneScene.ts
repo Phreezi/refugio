@@ -48,10 +48,14 @@ const SHARED_VIEW_EVENTS: ReadonlySet<keyof GameEvents> = new Set<keyof GameEven
   'enemy:exploded',
   'enemy:scream',
   'bag:changed',
+  'ground:changed',
+  'enemy:missed',
   'inventory:changed',
 ]);
 /** Tinta do boneco do outro jogador (co-op), para se distinguirem. */
 const OTHER_TINT = 0x9fc6ff;
+/** Cor do risco de cada munição em voo (omisso: madeira, como as flechas). */
+const SHOT_COLORS: Readonly<Record<string, PaletteColor>> = { pistol_ammo: 'gold', pebble: 'stone_light' };
 /** Seta por cima do alvo da ação contextual (textura gerada por código). */
 const MARKER_TEXTURE = 'target_marker';
 /** Duração da animação de golpe (2 frames). */
@@ -123,6 +127,7 @@ export class ZoneScene extends Phaser.Scene {
   /** Contentores com loot, pelo id do objeto (ficam escuros quando vazios). */
   private containerSprites = new Map<number, Phaser.GameObjects.Image>();
   private bagSprites: Phaser.GameObjects.Image[] = [];
+  private groundSprites: Phaser.GameObjects.Image[] = [];
   /** Véu escuro da noite, com as luzes "apagadas" nele. */
   private night: Phaser.GameObjects.RenderTexture | null = null;
   /** A sair da zona (fade em curso): o jogador fica parado. */
@@ -230,6 +235,7 @@ export class ZoneScene extends Phaser.Scene {
     this.ghostArea.setDepth(GHOST_AREA_DEPTH);
     this.enemyViews = new Map();
     this.renderBags();
+    this.renderGround();
     this.renderContainers();
     const offFeedback = this.listenForFeedback();
     camera.fadeIn(FADE_MS);
@@ -255,6 +261,7 @@ export class ZoneScene extends Phaser.Scene {
       this.containerSprites.clear();
       this.night = null;
       this.bagSprites = [];
+      this.groundSprites = [];
       this.marker = null;
       this.ghost = null;
       this.ghostArea = null;
@@ -617,6 +624,13 @@ export class ZoneScene extends Phaser.Scene {
       on('inventory:changed', () => {
         this.renderContainers();
       }),
+      on('ground:changed', ({ zoneId }) => {
+        if (zoneId === this.zoneId) this.renderGround();
+      }),
+      on('enemy:missed', ({ x, y }) => {
+        if (preferences().damageNumbers)
+          this.floatText(t('hud.miss'), Math.round(x), Math.round(y) - 2, 'stone_light');
+      }),
       on('bag:changed', ({ zoneId }) => {
         if (zoneId === this.zoneId) this.renderBags();
       }),
@@ -675,7 +689,7 @@ export class ZoneScene extends Phaser.Scene {
       alive.add(shot.id);
       let view = this.shotViews.get(shot.id);
       if (!view) {
-        const color = shot.ammo === 'bolt' ? 'wood_light' : 'gold';
+        const color = SHOT_COLORS[shot.ammo] ?? 'wood_light';
         view = this.add.rectangle(0, 0, 2, 2, paletteNumber(color)).setOrigin(0);
         this.shotViews.set(shot.id, view);
       }
@@ -837,6 +851,18 @@ export class ZoneScene extends Phaser.Scene {
       if (simulation.interaction.isLooted(objectId)) sprite.setTint(0x777777);
       else sprite.clearTint();
     }
+  }
+
+  /** Itens soltos no chão (flechas…): o ícone, pequeno, onde caíram. */
+  private renderGround(): void {
+    for (const sprite of this.groundSprites) sprite.destroy();
+    const ground = gameState.data.zones[this.zoneId]?.ground ?? [];
+    this.groundSprites = ground.map(([x, y, item]) =>
+      this.add
+        .image(x, y, content.items[item]?.icon ?? item)
+        .setOrigin(0.5, 0.75)
+        .setDepth(y - 8),
+    );
   }
 
   /** Mochilas no chão da zona (redesenhadas quando mudam). */
@@ -1043,6 +1069,7 @@ export class ZoneScene extends Phaser.Scene {
     simulation.interaction.refreshCollisions();
     this.renderContainers();
     this.renderBags();
+    this.renderGround();
   }
 
   /** O outro jogador do co-op (se estiver nesta zona): posição interpolada, andar, golpe. */

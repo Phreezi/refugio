@@ -1,6 +1,8 @@
 import { BALANCE } from '../data/balance';
-import type { ItemDef } from '../data/types';
-import { itemName, t, type MessageKey } from '../i18n';
+import { gameState } from '../core/GameState';
+import { skillOf, type ItemDef } from '../data/types';
+import { itemName, t, tKey, type MessageKey } from '../i18n';
+import { missPct, skillLevel } from '../systems/combat/skills';
 
 /**
  * O que um item faz, em linhas curtas (tocar no desenho ou no nome, no fabrico e na mochila):
@@ -19,6 +21,13 @@ export function describeItem(id: string, def: ItemDef | undefined): string[] {
     if (def.ranged)
       add('info.range', { n: Math.round(def.ranged.range / 16), ammo: itemName(def.ranged.ammo) });
     else add('info.reach', { n: def.reach ?? BALANCE.weaponReachPx });
+    const skill = skillOf(def);
+    const level = gameState.hasGame ? skillLevel(gameState.data.player.skills[skill] ?? 0, BALANCE) : 1;
+    add('info.skill', {
+      skill: tKey(`skill.${skill}`),
+      level,
+      miss: Math.round(missPct(level, def.ranged !== undefined, BALANCE)),
+    });
   }
   if (def.toolKind && def.gatherPower !== undefined)
     add(def.toolKind === 'axe' ? 'info.axe' : 'info.pickaxe', { n: def.gatherPower });

@@ -447,5 +447,65 @@
     "timeSec": 0,
     "unlockLevel": 1,
     "xp": 0
+  },
+  {
+    "id": "r_slingshot",
+    "station": "hands",
+    "category": "weapons",
+    "inputs": [
+      ["wood", 2],
+      ["fiber", 2]
+    ],
+    "output": "slingshot",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_pebble",
+    "station": "hands",
+    "category": "weapons",
+    "inputs": [["stone", 1]],
+    "output": "pebble",
+    "qty": 6,
+    "timeSec": 0,
+    "unlockLevel": 1
+  },
+  {
+    "id": "r_short_bow",
+    "station": "hands",
+    "category": "weapons",
+    "inputs": [
+      ["wood", 4],
+      ["fiber", 3]
+    ],
+    "output": "short_bow",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 2
+  },
+  {
+    "id": "r_arrow",
+    "station": "hands",
+    "category": "weapons",
+    "inputs": [["wood", 1]],
+    "output": "arrow",
+    "qty": 5,
+    "timeSec": 0,
+    "unlockLevel": 2
+  },
+  {
+    "id": "r_hunting_bow",
+    "station": "wood_bench",
+    "category": "weapons",
+    "inputs": [
+      ["wood_plank", 3],
+      ["rope", 2],
+      ["leather", 1]
+    ],
+    "output": "hunting_bow",
+    "qty": 1,
+    "timeSec": 20,
+    "unlockLevel": 7
   }
 ]

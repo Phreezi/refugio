@@ -251,9 +251,8 @@ export class Interaction {
     if (!this.zone) return null;
     const player = this.state.data.player;
     const from = { x: player.x, y: player.y - footprint.height / 2 };
-    // Arma à distância: o alvo é o inimigo mais perto ao alcance (mira automática, §7.8).
-    const ranged = this.combat.weapon().ranged;
-    const aimed = ranged ? this.combat.nearestInRange(ranged.range) : null;
+    // Arma à distância: o alvo é o inimigo da mira (o preso, ou o mais perto ao alcance, §7.8).
+    const aimed = this.combat.aimTarget();
     if (aimed) {
       const target = this.enemyTargets().find((t) => t.data.type === 'enemy' && t.data.uid === aimed.uid);
       if (target) return target;

@@ -265,6 +265,8 @@ export class Simulation {
       this.actionQueued = true;
       this.strikeTick = atTick ?? null;
     }
+    // Ao largar a ação, a mira deixa de estar presa (o próximo tiro vai ao mais perto).
+    if (!held) this.combat.releaseLock();
     this.actionHeld = held;
   }
 
@@ -377,6 +379,7 @@ export class Simulation {
     this.state.markDirty(); // o tempo de jogo avançou
     this.movePlayer();
     if (this.moved) this.tutorial.playerMoved();
+    this.combat.collectGround();
     this.checkExits();
     this.runAction(world.tick);
     for (const secondary of this.secondaries) secondary.tickSecondary(world.tick);
@@ -399,6 +402,7 @@ export class Simulation {
   private tickSecondary(tick: number): void {
     if (this.combat.away) return;
     this.combat.sneaking = this.sneaking;
+    this.combat.collectGround();
     this.runAction(tick);
     if (!this.linked && this.zone) {
       this.interaction.tick(tick);
@@ -445,8 +449,9 @@ export class Simulation {
       this.nextActionTick = tick + this.actionCooldownTicks;
       return;
     }
-    // Arma à distância: dispara no inimigo mais perto (se houver); senão, a ação normal.
-    const shot = this.combat.shoot();
+    // Arma à distância: dispara no inimigo mais perto (se houver); senão, a ação normal. Com a
+    // ação premida, a mira fica presa ao mesmo inimigo até se largar.
+    const shot = this.combat.shoot(this.actionHeld);
     if (shot !== null) {
       this.nextActionTick = tick + this.combat.attackTicks();
       if (shot === 'no_ammo') {

@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { EQUIP_SLOTS } from '../data/types';
 import type { StructureRecord } from '../systems/building/building';
+import type { Skills } from '../systems/combat/skills';
 import type { GameStatsCounters } from './Stats';
 import { createStationState, type StationState } from '../systems/crafting/crafting';
 import { createContainer, type Container } from '../systems/inventory/inventory';
@@ -32,6 +33,8 @@ export interface PlayerState {
   bleed: number;
   /** Aspeto da personagem (escolhido ao começar; muda-se nas definições). */
   look: CharacterLook;
+  /** Experiência de cada perícia de combate (§7.8: quanto mais alta, menos se falha). */
+  skills: Skills;
 }
 
 export type CharacterLook = 'boy' | 'girl';
@@ -86,7 +89,12 @@ export interface ZoneState {
   bags: GroundBag[];
   /** Contentores já abertos: id do objeto → [tick em que volta a encher, conteúdo]. */
   loot: Record<string, [number, Container]>;
+  /** Itens soltos no chão (flechas que falharam o alvo…): [x, y, item, quantidade]. */
+  ground: GroundItem[];
 }
+
+/** Item no chão: posição (pés, px da zona), item e quantidade. */
+export type GroundItem = [x: number, y: number, item: string, qty: number];
 
 /**
  * Estado serializável do jogo. Só dados simples (sem classes nem referências ao Phaser),
@@ -142,6 +150,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       xp: 0,
       bleed: 0,
       look: 'boy',
+      skills: {},
     },
     world: { tick: 0, rng: seed >>> 0 },
     base: {
@@ -180,7 +189,7 @@ export function stationState(data: GameStateData, key: string): StationState {
 
 /** Estado de uma zona (criado se ainda não existir). */
 export function zoneState(data: GameStateData, zoneId: string): ZoneState {
-  data.zones[zoneId] ??= { depleted: {}, bags: [], loot: {} };
+  data.zones[zoneId] ??= { depleted: {}, bags: [], loot: {}, ground: [] };
   return data.zones[zoneId];
 }
 

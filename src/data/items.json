@@ -210,7 +210,8 @@
     "gatherPower": 2,
     "damage": 8,
     "durability": 120,
-    "attackSec": 0.7
+    "attackSec": 0.7,
+    "skill": "blade"
   },
   "stone_pickaxe": {
     "name": "item.stone_pickaxe",
@@ -233,7 +234,8 @@
     "gatherPower": 3,
     "damage": 12,
     "attackSec": 0.6,
-    "durability": 220
+    "durability": 220,
+    "skill": "blade"
   },
   "iron_pickaxe": {
     "name": "item.iron_pickaxe",
@@ -278,7 +280,8 @@
     "damage": 20,
     "durability": 180,
     "attackSec": 0.5,
-    "reach": 16
+    "reach": 16,
+    "skill": "blade"
   },
   "cloth_shirt": {
     "name": "item.cloth_shirt",
@@ -453,14 +456,16 @@
       "ammo": "pistol_ammo",
       "range": 160,
       "speed": 400
-    }
+    },
+    "skill": "firearms"
   },
   "bolt": {
     "name": "item.bolt",
     "icon": "icon_bolt",
     "type": "ammo",
     "stack": 100,
-    "rarity": "common"
+    "rarity": "common",
+    "recoverable": true
   },
   "pistol_ammo": {
     "name": "item.pistol_ammo",
@@ -538,5 +543,66 @@
     "type": "resource",
     "stack": 5,
     "rarity": "uncommon"
+  },
+  "slingshot": {
+    "name": "item.slingshot",
+    "icon": "icon_slingshot",
+    "type": "weapon",
+    "stack": 1,
+    "rarity": "common",
+    "damage": 5,
+    "attackSec": 0.8,
+    "durability": 80,
+    "ranged": {
+      "ammo": "pebble",
+      "range": 100,
+      "speed": 200
+    }
+  },
+  "pebble": {
+    "name": "item.pebble",
+    "icon": "icon_pebble",
+    "type": "ammo",
+    "stack": 50,
+    "rarity": "common",
+    "recoverable": true
+  },
+  "short_bow": {
+    "name": "item.short_bow",
+    "icon": "icon_short_bow",
+    "type": "weapon",
+    "stack": 1,
+    "rarity": "common",
+    "damage": 7,
+    "attackSec": 0.9,
+    "durability": 100,
+    "ranged": {
+      "ammo": "arrow",
+      "range": 115,
+      "speed": 220
+    }
+  },
+  "hunting_bow": {
+    "name": "item.hunting_bow",
+    "icon": "icon_hunting_bow",
+    "type": "weapon",
+    "stack": 1,
+    "rarity": "uncommon",
+    "damage": 11,
+    "attackSec": 0.85,
+    "durability": 180,
+    "ranged": {
+      "ammo": "arrow",
+      "range": 135,
+      "speed": 260
+    }
+  },
+  "arrow": {
+    "name": "item.arrow",
+    "icon": "icon_arrow",
+    "type": "ammo",
+    "stack": 50,
+    "rarity": "common",
+    "recoverable": true
   }
 }

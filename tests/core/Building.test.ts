@@ -128,6 +128,7 @@ describe('Building (construção da base)', () => {
       depleted: { ...depleted, '5': state.data.world.tick + 20 },
       bags: [],
       loot: {},
+      ground: [],
     };
     expect(sim.building.place('foundation_wood', 3, 3, 0)).toBeNull();
     for (let i = 0; i < 60; i++) sim.update(FIXED_STEP_MS);

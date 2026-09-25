@@ -1140,6 +1140,61 @@
         "letter": "T"
       }
     },
+    "icon_slingshot": {
+      "type": "image",
+      "file": "sprites/icons/slingshot.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
+    "icon_pebble": {
+      "type": "image",
+      "file": "sprites/icons/pebble.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone",
+        "border": "ink",
+        "letter": "S"
+      }
+    },
+    "icon_short_bow": {
+      "type": "image",
+      "file": "sprites/icons/short_bow.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood",
+        "border": "ink",
+        "letter": "A"
+      }
+    },
+    "icon_hunting_bow": {
+      "type": "image",
+      "file": "sprites/icons/hunting_bow.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "bark",
+        "border": "ink",
+        "letter": "A"
+      }
+    },
+    "icon_arrow": {
+      "type": "image",
+      "file": "sprites/icons/arrow.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "wood_light",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
     "icon_crossbow": {
       "type": "image",
       "file": "sprites/icons/crossbow.png",
