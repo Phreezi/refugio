@@ -394,14 +394,12 @@ class Coop {
   // ——— Convidado ———
 
   /**
-   * Entra na sessão `code` com a personagem do save `own` (ou uma nova, com a aparência `look`)
-   * e espera pelo mundo.
+   * Entra na sessão `code` com a personagem do save `own` (ou uma nova) e espera pelo mundo.
    * @returns o estado a mostrar (o mundo do anfitrião com a personagem do convidado).
    */
-  join(code: string, own: GameStateData | null, look: CharacterLook): Promise<GameStateData> {
+  join(code: string, own: GameStateData | null): Promise<GameStateData> {
     this.leave();
     const mine = own ?? createNewGameState(content.zoneMap(BASE_ZONE_ID).playerSpawn);
-    mine.player.look = look;
     const character: GuestCharacter = {
       player: mine.player,
       unlocks: mine.unlocks,

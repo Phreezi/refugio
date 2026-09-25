@@ -1,22 +1,30 @@
 import Phaser from 'phaser';
-import { PALETTE } from '../assets/palette';
+import { PALETTE, paletteNumber } from '../assets/palette';
 import { clockAt } from '../core/Clock';
 import { FIXED_STEP_MS } from '../config';
 import { eventBus } from '../core/EventBus';
 import { advanceRespawns, offlineTicks } from '../core/offline';
 import { simulation } from '../core/Simulation';
-import { BASE_ZONE_ID, gameState, type CharacterLook } from '../core/GameState';
+import {
+  BASE_ZONE_ID,
+  CHARACTER_LOOKS,
+  DEFAULT_PLAYER_NAME,
+  gameState,
+  PLAYER_NAME_MAX,
+  type CharacterLook,
+} from '../core/GameState';
 import { BALANCE } from '../data/balance';
 import { getView, setupFixedCamera } from '../display/view';
 import { t, type MessageKey } from '../i18n';
 import { coop } from '../net/coop';
 import { normalizeCode } from '../net/protocol';
-import { autosave, saves } from '../save';
+import { autosave, loadSlotSummaries, saves, selectSlot } from '../save';
 import type { LoadedSave, LoadResult } from '../save/SaveManager';
 import { SaveError } from '../save/schema';
 import { Button } from '../ui/Button';
 import { downloadText, pickTextFile, saveFileName } from '../ui/fileTransfer';
 import { Label } from '../ui/text';
+import { createTextInput, type TextInput } from '../ui/textInput';
 import { uiState } from '../ui/uiState';
 import { content } from '../world/content';
 import { SceneKey } from './keys';
@@ -29,7 +37,10 @@ export interface MainMenuData {
 
 const MAIN_BUTTON = { width: 136, height: 22 } as const;
 const SMALL_BUTTON = { width: 64, height: 14, fontSize: 8, style: 'secondary' } as const;
-const LOOK_BUTTON_WIDTH = 108;
+/** A partir desta largura, a lista de jogos fica à direita dos botões. */
+const WIDE_MENU = 420;
+const SLOT_BUTTON_WIDTH = 132;
+const OVERLAY_DEPTH = 100;
 /** Tempo para confirmar uma ação destrutiva (segundo toque no mesmo botão). */
 const CONFIRM_MS = 3000;
 
@@ -43,8 +54,10 @@ export class MainMenuScene extends Phaser.Scene {
   private primaryAction: (() => void) | null = null;
   /** Hordas ligadas (§7.13): vem do save e aplica-se ao continuar ou ao começar um jogo novo. */
   private hordes = false;
-  /** Aparência escolhida (aplica-se ao jogo que começar). */
-  private look: CharacterLook = 'boy';
+  /** Um painel (novo jogo, código) está aberto por cima do menu. */
+  private overlayOpen = false;
+  /** Campos de texto do DOM abertos (fecham-se com o painel ou ao sair da cena). */
+  private inputs: TextInput[] = [];
 
   constructor() {
     super(SceneKey.MainMenu);
@@ -52,6 +65,7 @@ export class MainMenuScene extends Phaser.Scene {
 
   create(data: MainMenuData): void {
     this.busy = false;
+    this.overlayOpen = false;
     this.primaryAction = null;
     const { width, height } = getView();
     const cx = Math.round(width / 2);
@@ -94,17 +108,17 @@ export class MainMenuScene extends Phaser.Scene {
 
     // O save lê-se de forma assíncrona; se o menu entretanto reiniciar, ignora-se o resultado.
     let alive = true;
-    saves.load().then(
-      (result) => {
+    Promise.all([saves.load(), loadSlotSummaries()]).then(
+      ([result, slots]) => {
         if (!alive) return;
         loading.destroy();
-        this.buildButtons(result, data.message !== undefined);
+        this.buildButtons(result, data.message !== undefined, slots);
       },
       (error: unknown) => {
         if (!alive) return;
         console.error('[save] não foi possível ler o save:', error);
         loading.destroy();
-        this.buildButtons({ save: null, corrupted: false }, false);
+        this.buildButtons({ save: null, corrupted: false }, false, []);
         this.setStatus('save.read_failed');
       },
     );
@@ -116,6 +130,8 @@ export class MainMenuScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       alive = false;
+      for (const input of this.inputs) input.destroy();
+      this.inputs = [];
       this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
     });
 
@@ -127,15 +143,15 @@ export class MainMenuScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-SPACE', onKey);
   }
 
-  private buildButtons(result: LoadResult, keepMessage: boolean): void {
+  private buildButtons(result: LoadResult, keepMessage: boolean, slots: (LoadResult | null)[]): void {
     const { width, height } = getView();
-    const cx = Math.round(width / 2);
-    // Coluna de botões (Continuar, Novo jogo, Hordas): cabe até na altura mínima (216 px).
-    const y = Math.round(height * 0.42);
+    const wide = width >= WIDE_MENU;
+    // Com espaço, os botões ficam à esquerda do centro e a lista de jogos à direita.
+    const cx = wide ? Math.round(width * 0.4) : Math.round(width / 2);
+    const y = Math.round(height * 0.4);
     const spacing = 26;
     const save = result.save;
     this.hordes = save?.state.settings.hordes ?? false;
-    this.look = save?.state.player.look ?? 'boy';
 
     if (save) {
       const time = clockAt(save.state.world.tick, BALANCE.dayLengthSec, BALANCE.dayStartHour);
@@ -150,12 +166,12 @@ export class MainMenuScene extends Phaser.Scene {
         'menu.confirm_new',
         { ...MAIN_BUTTON, style: 'secondary' },
         () => {
-          this.startNewGame();
+          this.openNewGame();
         },
       );
     } else {
       this.primaryAction = () => {
-        this.startNewGame();
+        this.openNewGame();
       };
       new Button(this, cx, y, t('menu.new_game'), MAIN_BUTTON, this.primaryAction);
     }
@@ -174,19 +190,38 @@ export class MainMenuScene extends Phaser.Scene {
       },
     );
 
-    // Aparência da personagem: no canto oposto ao co-op (cabe sempre).
-    const lookLabel = (): string => t('look.button', { look: t(`look.${this.look}`) });
-    const lookButton = new Button(
-      this,
-      4 + LOOK_BUTTON_WIDTH / 2,
-      4 + SMALL_BUTTON.height / 2,
-      lookLabel(),
-      { ...SMALL_BUTTON, width: LOOK_BUTTON_WIDTH },
-      () => {
-        this.look = this.look === 'boy' ? 'girl' : 'boy';
-        lookButton.setText(lookLabel());
-      },
-    );
+    // Os meus jogos: à direita (ou por baixo, num ecrã estreito). Tocar escolhe o jogo.
+    const listX = wide ? Math.round(width * 0.78) : cx;
+    let listY = wide ? y - 14 : hordeY + 22;
+    new Label(this, listX, listY - 14, t('menu.games'), { size: 8, bold: true, color: 'wheat' }, [0.5, 0.5]);
+    slots.forEach((slot, i) => {
+      const summary = slot?.save;
+      const label = summary
+        ? t('menu.slot', {
+            name: summary.state.player.name,
+            level: summary.state.player.level,
+            day: clockAt(summary.state.world.tick, BALANCE.dayLengthSec, BALANCE.dayStartHour).day,
+          })
+        : t('menu.slot_empty');
+      new Button(
+        this,
+        listX,
+        listY,
+        label,
+        {
+          width: SLOT_BUTTON_WIDTH,
+          height: 18,
+          fontSize: 8,
+          style: i === saves.slot ? 'primary' : 'secondary',
+        },
+        () => {
+          if (this.busy || i === saves.slot) return;
+          selectSlot(i);
+          this.scene.restart({});
+        },
+      );
+      listY += 21;
+    });
 
     // Co-op (Fase 15): entrar no jogo de um amigo com o código dele. No canto (cabe sempre).
     new Button(
@@ -196,7 +231,7 @@ export class MainMenuScene extends Phaser.Scene {
       t('coop.join'),
       { ...SMALL_BUTTON, width: SMALL_BUTTON.width + 16 },
       () => {
-        this.joinCoop(save);
+        this.openJoin(save);
       },
     );
 
@@ -231,12 +266,183 @@ export class MainMenuScene extends Phaser.Scene {
       ]);
     }
     const rowSpacing = SMALL_BUTTON.width + 8;
-    const firstX = cx - Math.round(((actions.length - 1) * rowSpacing) / 2);
+    const rowCx = Math.round(width / 2);
+    const firstX = rowCx - Math.round(((actions.length - 1) * rowSpacing) / 2);
     actions.forEach(([, make], i) => {
       make(firstX + i * rowSpacing);
     });
 
     if (result.corrupted && !keepMessage) this.setStatus(save ? 'save.recovered' : 'save.corrupt_lost');
+  }
+
+  /**
+   * Painel por cima do menu (novo jogo, entrar com código): fundo escuro, caixa ao centro.
+   * @returns a função que o fecha (e os campos de texto que tiver).
+   */
+  private overlay(title: string, height: number): { x: number; y: number; w: number; close: () => void } {
+    const view = getView();
+    const w = Math.min(220, view.width - 16);
+    const x = Math.round((view.width - w) / 2);
+    const y = Math.round((view.height - height) / 2);
+    const objects: { destroy(): void }[] = [];
+    // O fundo bloqueia os cliques no menu por baixo.
+    objects.push(
+      this.add
+        .rectangle(0, 0, view.width, view.height, paletteNumber('ink'), 0.75)
+        .setOrigin(0)
+        .setDepth(OVERLAY_DEPTH)
+        .setInteractive(),
+      this.add.rectangle(x, y, w, height, paletteNumber('bark_dark')).setOrigin(0).setDepth(OVERLAY_DEPTH),
+      this.add
+        .rectangle(x + 1, y + 1, w - 2, height - 2, paletteNumber('night'))
+        .setOrigin(0)
+        .setDepth(OVERLAY_DEPTH),
+    );
+    objects.push(
+      new Label(this, x + w / 2, y + 12, title, { size: 9, bold: true, color: 'wheat' }, [0.5, 0.5]).setDepth(
+        OVERLAY_DEPTH + 1,
+      ),
+    );
+    this.overlayOpen = true;
+    const previous = this.primaryAction;
+    this.primaryAction = null;
+    return {
+      x,
+      y,
+      w,
+      close: () => {
+        for (const object of objects) object.destroy();
+        for (const input of this.inputs) input.destroy();
+        this.inputs = [];
+        this.overlayOpen = false;
+        this.primaryAction = previous;
+      },
+    };
+  }
+
+  /** Novo jogo: nome da personagem e rapaz/rapariga (o nome aparece no co-op e na lista). */
+  private openNewGame(): void {
+    if (this.busy || this.overlayOpen) return;
+    const panel = this.overlay(t('menu.new_game'), 112);
+    const { x, y, w } = panel;
+    const add = <T extends { destroy(): void }>(object: T): T => {
+      const close = panel.close;
+      panel.close = () => {
+        object.destroy();
+        close();
+      };
+      return object;
+    };
+    add(
+      new Label(this, x + 10, y + 26, t('menu.name'), { size: 8, color: 'cream' }).setDepth(
+        OVERLAY_DEPTH + 1,
+      ),
+    );
+    const start = (): void => {
+      const name = nameInput.value.trim().slice(0, PLAYER_NAME_MAX) || DEFAULT_PLAYER_NAME;
+      panel.close();
+      this.startNewGame(name, look);
+    };
+    const nameInput = createTextInput(this.game.canvas, {
+      x: x + 10,
+      y: y + 36,
+      w: w - 20,
+      h: 18,
+      maxLength: PLAYER_NAME_MAX,
+      placeholder: t('menu.name_placeholder'),
+      onEnter: start,
+    });
+    this.inputs.push(nameInput);
+    let look: CharacterLook = 'boy';
+    const lookButtons = CHARACTER_LOOKS.map((option, i) =>
+      add(
+        new Button(
+          this,
+          x + 10 + (w - 20) / 4 + i * ((w - 20) / 2),
+          y + 68,
+          t(`look.${option}`),
+          {
+            width: (w - 20) / 2 - 4,
+            height: 16,
+            fontSize: 8,
+            style: option === look ? 'primary' : 'secondary',
+          },
+          () => {
+            look = option;
+            lookButtons.forEach((button, j) =>
+              button.setStyle(CHARACTER_LOOKS[j] === look ? 'primary' : 'secondary'),
+            );
+          },
+        ).setDepth(OVERLAY_DEPTH + 1),
+      ),
+    );
+    add(
+      new Button(this, x + w / 2 - 44, y + 94, t('menu.cancel'), { ...SMALL_BUTTON, width: 76 }, () => {
+        panel.close();
+      }).setDepth(OVERLAY_DEPTH + 1),
+    );
+    add(
+      new Button(
+        this,
+        x + w / 2 + 44,
+        y + 94,
+        t('menu.start'),
+        { width: 76, height: 16, fontSize: 8 },
+        start,
+      ).setDepth(OVERLAY_DEPTH + 1),
+    );
+    nameInput.focus();
+  }
+
+  /** Entrar no jogo de um amigo: o código escreve-se num campo com o aspeto do jogo. */
+  private openJoin(save: LoadedSave | null): void {
+    if (this.busy || this.overlayOpen) return;
+    const panel = this.overlay(t('coop.join'), 86);
+    const { x, y, w } = panel;
+    const objects: { destroy(): void }[] = [];
+    const close = (): void => {
+      for (const object of objects) object.destroy();
+      panel.close();
+    };
+    objects.push(
+      new Label(this, x + 10, y + 26, t('coop.enter_code'), { size: 8, color: 'cream' }).setDepth(
+        OVERLAY_DEPTH + 1,
+      ),
+    );
+    const join = (): void => {
+      const value = codeInput.value;
+      close();
+      this.joinCoop(value, save);
+    };
+    const codeInput = createTextInput(this.game.canvas, {
+      x: x + 10,
+      y: y + 36,
+      w: w - 20,
+      h: 18,
+      maxLength: 5,
+      uppercase: true,
+      onEnter: join,
+    });
+    this.inputs.push(codeInput);
+    objects.push(
+      new Button(
+        this,
+        x + w / 2 - 44,
+        y + 70,
+        t('menu.cancel'),
+        { ...SMALL_BUTTON, width: 76 },
+        close,
+      ).setDepth(OVERLAY_DEPTH + 1),
+      new Button(
+        this,
+        x + w / 2 + 44,
+        y + 70,
+        t('coop.enter'),
+        { width: 76, height: 16, fontSize: 8 },
+        join,
+      ).setDepth(OVERLAY_DEPTH + 1),
+    );
+    codeInput.focus();
   }
 
   /** Botão de ação destrutiva: o 1.º toque pede confirmação, o 2.º (em 3 s) executa. */
@@ -263,14 +469,6 @@ export class MainMenuScene extends Phaser.Scene {
     });
   }
 
-  /** Grava a aparência escolhida na personagem do jogo. */
-  private applyLook(): void {
-    const player = gameState.data.player;
-    if (player.look === this.look) return;
-    player.look = this.look;
-    gameState.markDirty();
-  }
-
   /** Grava a escolha das hordas no jogo; ao ligá-las, a primeira vem daqui a uns dias. */
   private applyHordes(): void {
     const data = gameState.data;
@@ -289,7 +487,6 @@ export class MainMenuScene extends Phaser.Scene {
     this.busy = true;
     const state = gameState.load(save.state);
     this.applyHordes();
-    this.applyLook();
     // Tempo em que o jogo esteve fechado: crafts e reaparecimento de recursos avançam (§7.6).
     const ticks = offlineTicks(save.timestamp, Date.now(), BALANCE.offlineCapHours, FIXED_STEP_MS);
     if (ticks > 0) {
@@ -301,12 +498,13 @@ export class MainMenuScene extends Phaser.Scene {
     this.scene.start(SceneKey.Zone, { zoneId: state.player.zoneId } satisfies ZoneSceneData);
   }
 
-  private startNewGame(): void {
+  private startNewGame(name: string, look: CharacterLook): void {
     if (this.busy) return;
     this.busy = true;
     const state = gameState.newGame(content.zoneMap(BASE_ZONE_ID).playerSpawn);
+    state.player.name = name;
+    state.player.look = look;
     this.applyHordes();
-    this.applyLook();
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
     void autosave.flush(); // o jogo novo substitui já o antigo
     this.scene.start(SceneKey.Zone, { zoneId: BASE_ZONE_ID } satisfies ZoneSceneData);
@@ -316,10 +514,8 @@ export class MainMenuScene extends Phaser.Scene {
    * Entra no jogo de um amigo: pede o código, liga-se e joga no mundo dele (que não se grava
    * aqui) com a personagem do nosso save, que continua a ser gravada cá.
    */
-  private joinCoop(save: LoadedSave | null): void {
+  private joinCoop(input: string, save: LoadedSave | null): void {
     if (this.busy) return;
-    const input = window.prompt(t('coop.enter_code'));
-    if (input === null) return;
     const code = normalizeCode(input);
     if (!code) {
       this.setStatus('coop.bad_code');
@@ -328,7 +524,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.busy = true;
     this.setStatus('coop.joining');
     // A personagem do save deste jogador vai para o mundo do amigo (e volta com o que ganhar).
-    coop.join(code, save?.state ?? null, this.look).then(
+    coop.join(code, save?.state ?? null).then(
       (state) => {
         gameState.load(state, true);
         simulation.reset();

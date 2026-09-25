@@ -22,3 +22,8 @@ export const uiState = {
   /** Co-op ligado: o tempo não pára (pausa, mapa-mundo) e a velocidade fica em x1. */
   coop: false,
 };
+
+/** Topo dos painéis (mochila, fabrico): fixo perto de cima, para não saltarem ao mudar de conteúdo. */
+export function panelTop(viewHeight: number): number {
+  return Math.round(viewHeight * 0.08);
+}

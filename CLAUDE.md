@@ -93,6 +93,7 @@ Base (casa) → escolher zona no mapa-mundo → viajar (custa um pouco de comida
 - Personagens: **16×32 px** (estilo Stardew).
 - Resolução **adaptável ao ecrã** com escala inteira (×2, ×3, ×4…) e `pixelArt: true`: escolhe-se o zoom inteiro (píxeis do dispositivo por píxel de jogo) cujo **lado curto** do jogo fica mais perto de **270 px** (≈ 17 tiles, o "zoom" estilo Stardew), e o outro lado enche o ecrã (proporção entre 9:21 e 21:9; fora disso, barras). Funciona **ao alto e ao baixo**: com o telemóvel na vertical vê-se uma área mais alta do que larga (ex.: 270×550). A vista tem sempre dimensões **pares**. Ex.: 1920×1080 → 480×270 ×4; janela 1530×790 → 510×262 ×3. Mínimo 216 px (abaixo disso, zoom fracionário). Valores em `DISPLAY` (`src/config.ts`).
   - O **canvas tem a resolução do dispositivo** e cada câmara amplia o mundo pelo zoom inteiro (`src/display/view.ts`: `getView()`, `setupFixedCamera()`). Assim a pixel art fica exata e o **texto é desenhado à resolução real** (nítido; usar sempre `Label` de `src/ui/text.ts`).
+  - **Fonte**: pixel, **Pixelify Sans** (SIL OFL, `public/assets/fonts/`, carregada antes do arranque por `src/display/fonts.ts`; o `Label` evita a ligadura "fi"). Campos de texto (nome, código do co-op) são `<input>` do DOM com o aspeto do jogo (`src/ui/textInput.ts`).
   - Implementação (`src/display/`): `Scale.NONE` + `scale.resize(canvas)` + `scale.setZoom(1 / dpr)`, com a posição do canvas alinhada a píxeis físicos (também com DPR 1,25 ou 2,625).
   - Com zoom na câmara o Phaser **não arredonda** posições: tudo o que se desenha tem de estar na grelha de píxeis do **ecrã** — coordenadas inteiras de jogo para o que está parado; o jogador e os inimigos (interpolados) em múltiplos de 1/zoom (`toScreenGrid` em `ZoneScene`), o que mantém a pixel art exata e deixa o movimento zoom× mais suave. A câmara segue o jogador, por isso o mundo fica alinhado.
   - **Nenhuma cena pode assumir um tamanho fixo**: usar `getView()` (não `this.scale.width`, que está em píxeis do dispositivo) e reagir a `Phaser.Scale.Events.RESIZE` (removendo o listener no SHUTDOWN). Ponteiros: converter com `camera.getWorldPoint`.
@@ -368,6 +369,7 @@ Os botões que abrem painéis (Mochila, Fabricar, Construir, "II") fecham-nos se
 - Stacks: recursos 50, consumíveis 10, munições 100 (flechas, virotes e seixos 999), ferramentas/armas 1.
 - Slots de equipamento: arma, cabeça, corpo, pernas, pés, mochila.
 - Baús na base: 24 slots cada, sem limite de baús (limitado por recursos).
+- Painéis (mochila, fabrico) fixos perto do topo (`panelTop`), para não saltarem ao mudar de separador.
 - Ações: mover, dividir stack, **largar no chão** (fica numa pilha — `zones.<zona>.bags` com `death: false` — que se abre com a ação contextual ao lado da mochila, para escolher o que apanhar; largar perto junta-se à mesma pilha), **destruir** (2 toques), usar, "guardar tudo semelhante" no baú e **ordenar** (mochila e baú: junta os itens iguais em stacks cheios e agrupa por categoria — ferramentas, armas, armadura, mochilas, consumíveis, recursos, chaves) (qualidade de vida).
 
 ### 7.4 Recolha
@@ -633,7 +635,7 @@ Chaves: road_map, bunker_key, military_keycard
 ### 10.1 Requisitos
 
 - **Save constante**: o jogador nunca deve perder mais de ~15 segundos de progresso.
-- Um único slot de jogo na v1 (preparar estrutura para 3 slots).
+- **3 jogos** (slots) na lista "Os meus jogos" do menu inicial (nome da personagem, nível, dia); os botões Continuar/Novo jogo/Exportar/Importar/Apagar atuam sobre o escolhido (lembrado em `refugio.slot`). "Novo jogo" pede o **nome** e **rapaz/rapariga** (save v17 `player.name`; o nome aparece no co-op).
 - Resistente a corrupção e a fechar o separador a meio.
 
 ### 10.2 Quando guardar
@@ -905,7 +907,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [ ] Personagem com mais frames e peças de equipamento visíveis (camadas de sprite). *(Feito: as personagens em pixel art — rapaz e rapariga, `npm run characters` → `sprites/player.png` e `player_girl.png`, 10×4 frames; escolhe-se no menu inicial, "Personagem"; falta o equipamento visível.)*
 - [ ] Inimigos, recursos, estruturas, ícones finais.
 - [ ] UI final (moldura de madeira/tecido, fonte pixel legível com acentos portugueses).
-- [ ] Música por zona (loops curtos) e efeitos sonoros; tudo com licença registada. *(Efeitos feitos: sintetizados em `src/audio/sfx.ts` — golpes, recolha, dano, fabrico, construção, pesca, nível, alarme da horda, cliques — com volume nas definições; falta a música.)*
+- [ ] Música por zona (loops curtos) e efeitos sonoros; tudo com licença registada. *(Efeitos sintetizados em `src/audio/sfx.ts` — golpes, recolha, dano, fabrico, construção, pesca, nível, alarme da horda, cliques. Música de fundo sintetizada em `src/audio/music.ts` (loop calmo em lá menor). Volumes separados nas definições, com barras deslizantes; falta música por zona.)*
 - [ ] Partículas: folhas, pó, chuva; clima simples.
 
 **Aceitação:** nenhum placeholder no jogo; todos os assets com licença documentada em `LICENSES.md`.
@@ -1116,4 +1118,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Largar/destruir itens; mochilas e pilhas no chão abrem-se como contentor (`bag:<zona>:<índice>`); vedações ligam-se sozinhas; descrição dos itens curta, por baixo do nome | Pedido do jogador: não dava para largar, apanhar escolhendo nem apagar itens; as vedações em fila vertical ficavam de lado; a descrição saía do painel |
 | 2026-09-25 | Save v16: aljava; flechas de pedra/ferro; 60% de falhar à distância no início; corpos com as flechas recuperáveis; linha de vista na mira | Pedido do jogador: flechas até 999 e "dentro" do arco, mais difícil no início, apanhar flechas do corpo, e o ataque automático disparava contra as paredes de casa |
 | 2026-09-25 | Drops ficam no corpo (apanham-se ao passar; fumo ao desaparecer); flecha em uso escolhida; Auto também recolhe; proteção de principiante até ao dia 4 | Pedidos do jogador. Os drops no corpo dão-lhe razão de ser e, no co-op, fica com eles quem os apanhar |
+| 2026-09-25 | Fonte pixel Pixelify Sans (OFL); música sintetizada com volume próprio; 3 jogos com nome; nome e rapaz/rapariga ao criar (save v17); código do co-op escrito no ecrã | Pedidos do jogador: letra retro com acentos, música de fundo, lista de jogos, escolher a personagem só ao criar, sem o pop-up do browser |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

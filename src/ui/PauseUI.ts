@@ -12,6 +12,7 @@ import { missPct, skillLevel } from '../systems/combat/skills';
 import { Button } from './Button';
 import { preferences, setPreference } from './preferences';
 import { sfx } from '../audio/sfx';
+import { music } from '../audio/music';
 import { Label } from './text';
 import { uiState } from './uiState';
 
@@ -110,7 +111,7 @@ export class PauseUI {
           ? 8 + this.skillRows().length
           : this.view === 'coop'
             ? 5
-            : 7;
+            : 8;
     const h = Math.min(height - 8, 34 + lines * ROW + 10);
     const x = Math.round((width - W) / 2);
     const y = Math.max(4, Math.round((height - h) / 2));
@@ -200,14 +201,24 @@ export class PauseUI {
   }
 
   /** Volume: barra deslizante (tocar ou arrastar); ouve-se um som ao largar. */
-  private volumeSlider(x: number, y: number): void {
-    this.label(x + 10, y + 1, t('pause.volume'), { size: 8, color: 'cream' });
-    const width = 72;
+  /**
+   * Barra deslizante (0–1). Arrasta-se livremente: depois de carregar na barra, segue o
+   * ponteiro por todo o ecrã até se largar (mesmo que saia da barra).
+   */
+  private slider(
+    x: number,
+    y: number,
+    title: string,
+    key: 'volume' | 'musicVolume',
+    onRelease: () => void,
+  ): void {
+    this.label(x + 10, y + 1, title, { size: 8, color: 'cream' });
+    const width = 96;
     const left = x + W - 10 - width;
     const top = y + 5;
     const track = this.add(
       this.scene.add
-        .rectangle(left, top - 4, width, 10, paletteNumber('night'), 0.001)
+        .rectangle(left - 6, top - 6, width + 12, 14, paletteNumber('night'), 0.001)
         .setOrigin(0)
         .setDepth(DEPTH.content)
         .setInteractive({ useHandCursor: true }),
@@ -227,28 +238,39 @@ export class PauseUI {
         .setOrigin(0)
         .setDepth(DEPTH.content),
     );
-    const value = this.label(left - 4, y + 1, '', { size: 8, color: 'gold' }, [1, 0]);
-    const show = (volume: number): void => {
-      const px = Math.round(volume * width);
+    const show = (value: number): void => {
+      const px = Math.round(value * width);
       fill.width = px;
-      knob.setX(Math.min(left + width - 4, left + px - 2 < left ? left : left + px - 2));
-      value.setText(`${String(Math.round(volume * 100))}%`);
+      knob.setX(Math.max(left, Math.min(left + width - 4, left + px - 2)));
     };
     const pick = (pointer: Phaser.Input.Pointer): void => {
       const px = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y).x;
-      const volume = Math.max(0, Math.min(1, Math.round(((px - left) / width) * 20) / 20));
-      setPreference('volume', volume);
-      show(volume);
+      const value = Math.max(0, Math.min(1, Math.round(((px - left) / width) * 100) / 100));
+      setPreference(key, value);
+      show(value);
     };
-    show(preferences().volume);
+    show(preferences()[key]);
+    const input = this.scene.input;
+    const move = (pointer: Phaser.Input.Pointer): void => {
+      if (pointer.isDown) pick(pointer);
+    };
+    const release = (): void => {
+      input.off('pointermove', move);
+      input.off('pointerup', release);
+      input.off('pointerupoutside', release);
+      onRelease();
+    };
     track.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       pick(pointer);
+      input.on('pointermove', move);
+      input.on('pointerup', release);
+      input.on('pointerupoutside', release);
     });
-    track.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.isDown) pick(pointer);
-    });
-    track.on('pointerup', () => {
-      sfx.play('pickup'); // ouve-se o volume novo
+    // Se o painel fechar a meio de um arrasto, não fica nada à escuta.
+    track.once('destroy', () => {
+      input.off('pointermove', move);
+      input.off('pointerup', release);
+      input.off('pointerupoutside', release);
     });
   }
 
@@ -267,7 +289,12 @@ export class PauseUI {
       uiState.reopenPause = 'settings';
       this.scene.events.emit('ui:language-changed');
     });
-    this.volumeSlider(x, next());
+    this.slider(x, next(), t('pause.volume'), 'volume', () => {
+      sfx.play('pickup'); // ouve-se o volume novo
+    });
+    this.slider(x, next(), t('pause.music'), 'musicVolume', () => {
+      music.refresh();
+    });
     this.setting(x, next(), t('pause.damage_numbers'), onOff(prefs.damageNumbers), () => {
       setPreference('damageNumbers', !prefs.damageNumbers);
     });

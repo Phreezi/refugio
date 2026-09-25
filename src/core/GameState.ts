@@ -31,8 +31,10 @@ export interface PlayerState {
   xp: number;
   /** A sangrar: ticks que faltam (0 = não). Uma ligadura estanca. */
   bleed: number;
-  /** Aspeto da personagem (escolhido ao começar; muda-se nas definições). */
+  /** Aspeto da personagem (escolhido ao criar o jogo). */
   look: CharacterLook;
+  /** Nome da personagem (e do jogo na lista do menu; aparece no co-op). */
+  name: string;
   /** Experiência de cada perícia de combate (§7.8: quanto mais alta, menos se falha). */
   skills: Skills;
   /**
@@ -44,6 +46,10 @@ export interface PlayerState {
 }
 
 export type CharacterLook = 'boy' | 'girl';
+/** Nome de quem ainda não escolheu nenhum (saves antigos). */
+export const DEFAULT_PLAYER_NAME = 'Sobrevivente';
+/** Tamanho máximo do nome (curto: cabe no HUD e na lista de jogos). */
+export const PLAYER_NAME_MAX = 14;
 export const CHARACTER_LOOKS: readonly CharacterLook[] = ['boy', 'girl'];
 
 export interface WorldState {
@@ -156,6 +162,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       xp: 0,
       bleed: 0,
       look: 'boy',
+      name: DEFAULT_PLAYER_NAME,
       skills: {},
       quiver: [],
     },

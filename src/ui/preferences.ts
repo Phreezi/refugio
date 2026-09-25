@@ -14,6 +14,8 @@ export interface Preferences {
   colorblind: boolean;
   /** Volume dos sons (0–1; 0 = sem som). */
   volume: number;
+  /** Volume da música de fundo (0–1; 0 = sem música). */
+  musicVolume: number;
   /** Ataque automático ligado (botão "Auto" do HUD). */
   autoAttack: boolean;
 }
@@ -26,6 +28,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   vibration: true,
   colorblind: false,
   volume: 0.6,
+  musicVolume: 0.4,
   autoAttack: false,
 };
 
@@ -48,7 +51,10 @@ export function parsePreferences(text: string | null): Preferences {
   for (const key of ['damageNumbers', 'vibration', 'colorblind', 'autoAttack'] as const) {
     if (typeof r[key] === 'boolean') prefs[key] = r[key];
   }
-  if (typeof r.volume === 'number' && r.volume >= 0 && r.volume <= 1) prefs.volume = r.volume;
+  for (const key of ['volume', 'musicVolume'] as const) {
+    const value = r[key];
+    if (typeof value === 'number' && value >= 0 && value <= 1) prefs[key] = value;
+  }
   return prefs;
 }
 

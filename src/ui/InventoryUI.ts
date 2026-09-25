@@ -13,7 +13,7 @@ import { Button, CLOSE_ICON, type ButtonStyle } from './Button';
 import { SLOT_GAP, SLOT_SIZE, SlotView, slotSize } from './SlotView';
 import { describeItem } from './itemInfo';
 import { Label, measureTextWidth } from './text';
-import { REOPEN_GUARD_MS, uiState } from './uiState';
+import { panelTop, REOPEN_GUARD_MS, uiState } from './uiState';
 
 const DEPTH = { hud: 10, dim: 50, panel: 60, slots: 62, hotbar: 70, ghost: 100 } as const;
 const PAD = 8;
@@ -295,7 +295,8 @@ export class InventoryUI {
     const { scale, bag, chest, sideBySide, w, h } = layout;
     const size = slotSize(scale);
     const x = Math.round((width - w) / 2);
-    const y = Math.max(4, Math.round((hotbarTop - 4 - h) / 2));
+    // Fixo perto do topo, como o fabrico.
+    const y = Math.max(4, Math.min(panelTop(height), hotbarTop - 4 - h));
     this.panelRect = { x, y, w, h };
 
     const add = <T extends { destroy(): void }>(obj: T): T => {

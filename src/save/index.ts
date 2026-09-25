@@ -8,7 +8,7 @@ import { LocalStorageAdapter } from './adapters/LocalStorageAdapter';
 import { MemoryAdapter } from './adapters/MemoryAdapter';
 import type { StorageAdapter } from './adapters/StorageAdapter';
 import { Autosave } from './Autosave';
-import { SaveManager } from './SaveManager';
+import { SaveManager, type LoadResult } from './SaveManager';
 
 /** localStorage, se o browser o permitir (em alguns modos privados até o acesso lança erro). */
 function localStorageOrNull(): Storage | null {
@@ -29,7 +29,43 @@ function createWebStorage(storage: Storage | null): StorageAdapter {
 }
 
 const localStorageRef = localStorageOrNull();
-export const saves = new SaveManager(createWebStorage(localStorageRef), 0, Date.now, localStorageRef);
+const storage = createWebStorage(localStorageRef);
+/** Jogos (slots) da lista do menu inicial. */
+export const GAME_SLOTS = 3;
+const SLOT_KEY = 'refugio.slot';
+
+function lastSlot(): number {
+  try {
+    const slot = Number(localStorageRef?.getItem(SLOT_KEY) ?? 0);
+    return Number.isInteger(slot) && slot >= 0 && slot < GAME_SLOTS ? slot : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** O save do jogo escolhido no menu (troca-se com `selectSlot`). */
+export const saves = new SaveManager(storage, lastSlot(), Date.now, localStorageRef);
+
+/** Escolhe o jogo (slot) onde se lê e grava, e lembra-o para a próxima vez. */
+export function selectSlot(slot: number): void {
+  saves.useSlot(slot);
+  try {
+    localStorageRef?.setItem(SLOT_KEY, String(slot));
+  } catch {
+    // Sem localStorage: vale só nesta sessão.
+  }
+}
+
+/** Resumo de cada jogo para a lista do menu (null = vazio). */
+export async function loadSlotSummaries(): Promise<(LoadResult | null)[]> {
+  return Promise.all(
+    Array.from({ length: GAME_SLOTS }, async (_, slot) => {
+      const manager = new SaveManager(storage, slot, Date.now, localStorageRef);
+      const result = await manager.load();
+      return result.save ? result : null;
+    }),
+  );
+}
 export const autosave = new Autosave(saves, gameState, eventBus, secondsToTicks(BALANCE.autosaveSec));
 
 /**

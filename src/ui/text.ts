@@ -2,8 +2,8 @@ import type Phaser from 'phaser';
 import { PALETTE, type PaletteColor } from '../assets/palette';
 import { textResolution } from '../display/view';
 
-/** Fonte da interface (até haver uma fonte pixel própria, Fase 12). */
-export const UI_FONT = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
+/** Fonte da interface: pixel (Pixelify Sans, OFL; ver display/fonts.ts), com reservas. */
+export const UI_FONT = '"Pixelify Sans", "Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 
 let measureContext: CanvasRenderingContext2D | null = null;
 
@@ -11,7 +11,16 @@ let measureContext: CanvasRenderingContext2D | null = null;
  * Largura (px de jogo) de uma linha de texto na fonte da interface — medida no browser, porque
  * a mesma fonte tem larguras diferentes em cada sistema (ex.: iPhone vs Windows).
  */
+/**
+ * A fonte pixel junta "fi"/"fl" numa ligadura que não encaixa no estilo: um separador
+ * invisível (ZWNJ) entre as letras impede-a.
+ */
+export function noLigatures(content: string): string {
+  return content.replace(/f(?=[ilf])/g, 'f\u200C');
+}
+
 export function measureTextWidth(content: string, size: number, bold = false): number {
+  content = noLigatures(content);
   measureContext ??= document.createElement('canvas').getContext('2d');
   if (!measureContext) return content.length * size * 0.6;
   // Medido 4× maior (mais preciso) e reduzido.
@@ -55,7 +64,7 @@ export class Label {
     [this.originX, this.originY] = origin;
     this.color = style.color ?? 'cream';
     this.text = scene.add
-      .text(0, 0, content, {
+      .text(0, 0, noLigatures(content), {
         fontFamily: UI_FONT,
         fontSize: `${String(style.size)}px`,
         fontStyle: style.bold ? 'bold' : '',
@@ -71,6 +80,7 @@ export class Label {
 
   /** Só redesenha se o texto mudar (o HUD chama isto em todos os frames). */
   setText(content: string): this {
+    content = noLigatures(content);
     if (this.text.text === content) return this;
     this.text.setText(content);
     this.align();
