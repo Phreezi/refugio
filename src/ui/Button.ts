@@ -97,6 +97,28 @@ export class Button {
       });
   }
 
+  /**
+   * Premir e largar (para botões que se seguram, como "Correr"): `down` ao tocar, `up` ao
+   * largar ou ao sair do botão.
+   */
+  onPress(down: () => void, up: () => void): this {
+    let held = false;
+    this.fill
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
+        held = true;
+        down();
+      })
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
+        if (held) up();
+        held = false;
+      })
+      .on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
+        if (held) up();
+        held = false;
+      });
+    return this;
+  }
+
   setDepth(depth: number): this {
     this.border.setDepth(depth);
     this.fill.setDepth(depth);

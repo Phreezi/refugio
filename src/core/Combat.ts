@@ -395,7 +395,9 @@ export class Combat {
       dy: dir.y,
       step: ranged.speed / TICKS_PER_SECOND,
       left: ranged.range,
-      damage: weapon.damage + (ammoDef?.ammoDamage ?? 0),
+      damage: Math.round(
+        (weapon.damage + (ammoDef?.ammoDamage ?? 0)) * (1 + talentOf(player, 'rangedDamagePct') / 100),
+      ),
       owner: this,
       ignore: miss ? target.uid : null,
       recover: ammoDef?.recoverable === true,
@@ -512,7 +514,7 @@ export class Combat {
 
   /** Talento "mãos cuidadosas": sorteia se este golpe não gasta a arma. */
   savesWear(): boolean {
-    const pct = talentOf(this.state.data.player, 'wearSavePct');
+    const pct = Math.min(BALANCE.talentCapPct, talentOf(this.state.data.player, 'wearSavePct'));
     return pct > 0 && this.roll() * 100 < pct;
   }
 
@@ -563,7 +565,7 @@ export class Combat {
     return true;
   }
 
-  /** Proteção de principiante (até às 00:00 do dia 4): a arma não gasta usos. */
+  /** Proteção de principiante (até às 00:00 do dia 4): armas, ferramentas e armadura não gastam usos. */
   get beginner(): boolean {
     return beginnerProtected(
       this.state.data.world.tick,
@@ -1038,7 +1040,8 @@ export class Combat {
     const armorSlots = player.equipment.flatMap((slot, i) =>
       slot && items[slot[0]]?.type === 'armor' ? [i] : [],
     );
-    for (const item of wearSlots(player.equipment, armorSlots)) this.bus.emit('item:broken', { item });
+    if (!this.beginner)
+      for (const item of wearSlots(player.equipment, armorSlots)) this.bus.emit('item:broken', { item });
     this.invulnerableUntil = this.state.data.world.tick + secondsToTicks(BALANCE.playerInvulnSec);
     const world = this.zone?.collision;
     if (world) {

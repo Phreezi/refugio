@@ -1,5 +1,5 @@
 // Árvore de talentos (CLAUDE.md §7.15), lógica pura: cada nível do jogador dá 1 ponto, que se
-// gasta em talentos passivos (mais dano, menos fome…) ou ativos (correr). Os dados vêm de
+// gasta em talentos (mais dano, menos fome, correr gastando menos…). Os dados vêm de
 // `talents.json`; aqui só se valida, se somam os efeitos e se decide se um talento se aprende.
 
 export const TALENT_BRANCHES = ['combat', 'survival', 'crafts'] as const;
@@ -12,11 +12,13 @@ export const TALENT_EFFECTS = [
   'hungerSlowPct',
   'thirstSlowPct',
   'regenPct',
-  'sprint',
+  'sprintCostPct',
   'gatherPower',
   'extraDropPct',
   'wearSavePct',
   'craftSpeedPct',
+  'rangedDamagePct',
+  'xpPct',
 ] as const;
 export type TalentEffect = (typeof TALENT_EFFECTS)[number];
 

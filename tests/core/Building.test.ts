@@ -204,11 +204,27 @@ describe('Building (construção da base)', () => {
     expect(state.data.base.chests.s2).toBeUndefined();
   });
 
+  it('uma porta por cima de uma parede troca-a (a parede volta toda para a mochila)', () => {
+    const { state, sim, give } = setup();
+    give([
+      ['wood', 10],
+      ['fiber', 2],
+    ]);
+    expect(sim.building.place('wall_wood', 5, 5, 0)).toBeNull();
+    const wood = () => state.data.player.inventory.reduce((n, s) => n + (s?.[0] === 'wood' ? s[1] : 0), 0);
+    const before = wood();
+    expect(sim.building.check('door_wood', 5, 5)).toBeNull();
+    expect(sim.building.place('door_wood', 5, 5, 0)).toBeNull();
+    // A porta custa 4 madeira; a parede (2) volta.
+    expect(wood()).toBe(before - 4 + 2);
+    expect(state.data.base.structures.map((r) => r[1])).toEqual(['door_wood']);
+  });
+
   it('portas abrem e fecham com a ação; não fecham com o jogador lá dentro', () => {
     const { state, sim, events, give, moveTo, press, tileBlocked } = setup();
     give([
-      ['wood_plank', 4],
-      ['rope', 2],
+      ['wood', 4],
+      ['fiber', 2],
     ]);
     expect(sim.building.place('door_wood', 5, 5, 0)).toBeNull();
     expect(tileBlocked(5, 5)).toBe(true);
@@ -234,7 +250,7 @@ describe('Building (construção da base)', () => {
       ['wood', 50],
       ['stone', 20],
       ['wood_plank', 20],
-      ['rope', 2],
+      ['fiber', 2],
     ]);
     moveTo(9, 10, 'up');
     const place = (id: string, tx: number, ty: number) => {

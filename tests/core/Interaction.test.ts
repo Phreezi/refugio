@@ -1,3 +1,4 @@
+import { secondsToTicks } from '../../src/core/Clock';
 import { describe, expect, it } from 'vitest';
 import { FIXED_STEP_MS, PLAYER_FOOTPRINT } from '../../src/config';
 import { EventBus, type GameEvents } from '../../src/core/EventBus';
@@ -76,6 +77,7 @@ describe('Interaction (ação contextual e recolha)', () => {
 
   it('com machado bastam 3 golpes e o machado gasta-se', () => {
     const { state, events, face, press } = setup();
+    state.data.world.tick = secondsToTicks(3 * BALANCE.dayLengthSec); // já sem proteção de principiante
     state.data.player.inventory[0] = ['stone_axe', 1, 120];
     face('down');
     for (let i = 0; i < 3; i++) press();

@@ -1,14 +1,23 @@
 // Progressão (CLAUDE.md §7.1, §9.5), lógica pura: XP para subir de nível e o que cada nível
-// desbloqueia. A curva é geométrica: do nível n para n+1 são precisos base × growth^(n−1) XP.
+// desbloqueia. A curva é geométrica até `softCapLevel` (do nível n para n+1 são precisos
+// base × growth^(n−1) XP) e daí em diante cresce devagar (+`lateGrowthPct`% por nível), para
+// haver sempre um nível seguinte ao alcance (um jogo sem fim).
 
 export interface XpCurve {
   base: number;
   growth: number;
+  /** A partir deste nível o crescimento passa a linear. */
+  softCapLevel?: number;
+  /** % a mais por nível acima de `softCapLevel`. */
+  lateGrowthPct?: number;
 }
 
 /** XP para passar do nível `level` ao seguinte. */
 export function xpToNext(level: number, curve: XpCurve): number {
-  return Math.round(curve.base * curve.growth ** (level - 1));
+  const cap = curve.softCapLevel ?? Infinity;
+  const geometric = curve.base * curve.growth ** (Math.min(level, cap) - 1);
+  const late = level > cap ? 1 + ((curve.lateGrowthPct ?? 0) / 100) * (level - cap) : 1;
+  return Math.round(geometric * late);
 }
 
 /** XP total acumulado para chegar ao nível `level` (a partir do nível 1 com 0 XP). */

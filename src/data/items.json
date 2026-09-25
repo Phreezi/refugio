@@ -645,5 +645,21 @@
     "stack": 1,
     "rarity": "epic",
     "slots": 30
+  },
+  "expedition_backpack": {
+    "name": "item.expedition_backpack",
+    "icon": "icon_expedition_backpack",
+    "type": "backpack",
+    "stack": 1,
+    "rarity": "epic",
+    "slots": 40
+  },
+  "survivor_backpack": {
+    "name": "item.survivor_backpack",
+    "icon": "icon_survivor_backpack",
+    "type": "backpack",
+    "stack": 1,
+    "rarity": "epic",
+    "slots": 50
   }
 }

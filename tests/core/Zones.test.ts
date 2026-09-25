@@ -212,6 +212,7 @@ describe('Pesca e água do lago', () => {
 
   it('no cais: com cana, apanha o peixe se carregar na zona verde (e falha fora dela)', () => {
     const { state, sim, events, enter, faceFromSouth } = setup();
+    state.data.world.tick = secondsToTicks(3 * BALANCE.dayLengthSec); // já sem proteção de principiante
     const lake = enter('zone_lake');
     const dock = lake.props.find((p) => p.id === 'dock');
     if (!dock) throw new Error('o lago não tem cais');

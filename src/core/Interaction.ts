@@ -382,7 +382,7 @@ export class Interaction {
     }
 
     this.bus.emit('player:action', { kind: 'gather' });
-    if (tool && !this.combat.savesWear()) {
+    if (tool && !this.combat.beginner && !this.combat.savesWear()) {
       const toolItem = tool.container[tool.index]?.[0];
       if (wearTool(tool) && toolItem) this.bus.emit('item:broken', { item: toolItem });
     }
@@ -407,7 +407,8 @@ export class Interaction {
     // Mais recursos com a perícia e os talentos; drops especiais com a perícia alta. O que
     // não couber (só os extras podem não caber) fica numa pilha no chão.
     const extraPct =
-      gatherExtraPct(gatherLevel, BALANCE.gatherExtraPctPerLevel) + talentOf(player, 'extraDropPct');
+      gatherExtraPct(gatherLevel, BALANCE.gatherExtraPctPerLevel, BALANCE.gatherExtraMaxPct) +
+      talentOf(player, 'extraDropPct');
     const drops = rollDrops(def, world).map((drop) => ({
       ...drop,
       qty: drop.qty + (nextRandom(world) * 100 < extraPct ? 1 : 0),

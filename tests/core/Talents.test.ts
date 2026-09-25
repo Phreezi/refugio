@@ -98,22 +98,38 @@ describe('Talentos e perícia de recolha (§7.15)', () => {
     expect(sim.interaction.currentTarget(PLAYER_FOOTPRINT)).toBeNull();
   });
 
-  it('Correr: só com o talento; mais rápido durante uns segundos e depois espera', () => {
-    const { state, sim, tick } = setup();
-    const player = state.data.player;
-    expect(sim.sprint()).toBe('locked');
-    player.level = 20;
-    for (const id of ['light_eater', 'fast_healer', 'sprint'])
-      expect(sim.progression.learnTalent(id)).toBe('ok');
-    sim.setMoveIntent({ x: 1, y: 0 });
-    const x0 = player.x;
-    tick(20);
-    const normal = player.x - x0;
-    expect(sim.sprint()).toBe('ok');
-    const x1 = player.x;
-    tick(20);
-    expect(player.x - x1).toBeGreaterThan(normal * 1.4);
-    expect(sim.sprint()).toBe('cooldown');
+  it('correr: mais depressa, mas gasta muito mais fome e sede (menos com o Fôlego)', () => {
+    const drain = (fôlego: boolean) => {
+      const { state, sim, tick } = setup();
+      const player = state.data.player;
+      if (fôlego) {
+        player.level = 20;
+        for (const id of ['light_eater', 'fast_healer', 'sprint', 'sprint']) sim.progression.learnTalent(id);
+        player.talents.light_eater = 0;
+      }
+      // Anda para um lado e para o outro (sem sair do mapa).
+      const x0 = player.x;
+      sim.setMoveIntent({ x: 1, y: 0 }, false, true);
+      tick(20);
+      const fast = player.x - x0;
+      for (let i = 0; i < 60; i++) {
+        sim.setMoveIntent({ x: i % 2 ? 1 : -1, y: 0 }, false, true);
+        tick(20 * 2);
+      }
+      return { fast, used: 200 - player.hunger - player.thirst };
+    };
+    const run = drain(false);
+    expect(run.fast).toBeGreaterThan(BALANCE.playerSpeed * 1.2);
+    const calm = (() => {
+      const { state, sim, tick } = setup();
+      for (let i = 0; i < 60; i++) {
+        sim.setMoveIntent({ x: i % 2 ? 1 : -1, y: 0 });
+        tick(20 * 2);
+      }
+      return 200 - state.data.player.hunger - state.data.player.thirst;
+    })();
+    expect(run.used).toBeGreaterThan(calm * 3);
+    expect(drain(true).used).toBeLessThan(run.used);
   });
 
   it('a fome desce mais devagar com o talento', () => {

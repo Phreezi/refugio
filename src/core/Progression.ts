@@ -3,7 +3,7 @@ import type { EnemyDefs, Recipe, Recipes, ResourceDefs, StructureDefs, ZoneDefs 
 import { countItem } from '../systems/inventory/inventory';
 import { addXp } from '../systems/progression/progression';
 import { learnTalent, type LearnCheck } from '../systems/progression/talents';
-import { TALENTS } from '../data/talents';
+import { TALENTS, talentOf } from '../data/talents';
 import { discountedCost, eventActive, eventTicksLeft } from '../systems/travel/events';
 import { secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
@@ -149,6 +149,8 @@ export class Progression {
     // Co-op (convidado): a XP conta-se no anfitrião (e chega com o estado dele).
     if (!this.state.hasGame || amount <= 0 || this.state.borrowed) return;
     const player = this.state.data.player;
+    // Talento "Estudioso": mais experiência.
+    amount = Math.round(amount * (1 + talentOf(player, 'xpPct') / 100));
     const reached = addXp(player, amount, BALANCE.xpCurve, BALANCE.maxLevel);
     this.state.markDirty();
     this.bus.emit('xp:gained', { amount });

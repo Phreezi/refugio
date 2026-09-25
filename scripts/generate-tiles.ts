@@ -69,14 +69,34 @@ const painters: Record<BaseTile, Painter> = {
       img.set(ox + x, y + 1, color('forest'));
     }
   },
-  dirt: speckled(
-    'wood',
-    [
-      ['bark', 16],
-      ['wood_light', 6],
-    ],
-    2,
-  ),
+  dirt: (img, ox) => {
+    // Terra batida: base castanha, manchas mais escuras e seixinhos com luz em cima.
+    speckled(
+      'wood',
+      [
+        ['bark', 10],
+        ['wood_light', 4],
+      ],
+      2,
+    )(img, ox);
+    for (const [x, y] of [
+      [3, 3],
+      [11, 6],
+      [6, 12],
+      [13, 13],
+    ] as const) {
+      img.fill(ox + x, y, 2, 1, color('bark'));
+      img.set(ox + x, y - 1, color('wood_light'));
+    }
+    for (const [x, y] of [
+      [8, 2],
+      [2, 9],
+      [12, 10],
+    ] as const) {
+      img.set(ox + x, y, color('stone'));
+      img.set(ox + x, y + 1, color('bark_dark'));
+    }
+  },
   sand: speckled(
     'sand',
     [
@@ -86,51 +106,118 @@ const painters: Record<BaseTile, Painter> = {
     3,
   ),
   water: (img, ox) => {
+    // Água: fundo com zonas mais fundas em pontilhado e ondinhas curvas (claro em cima, escuro
+    // por baixo), desencontradas para a repetição não se notar.
     img.fill(ox, 0, SIZE, SIZE, color('water'));
-    img.fill(ox + 2, 4, 5, 1, color('sky'));
-    img.fill(ox + 9, 10, 5, 1, color('sky'));
-    img.fill(ox + 11, 3, 3, 1, color('deep_water'));
-    img.fill(ox + 3, 13, 3, 1, color('deep_water'));
+    const random = rng(7);
+    for (let i = 0; i < 26; i++) {
+      const x = Math.floor(random() * SIZE);
+      const y = Math.floor(random() * SIZE);
+      if ((x + y) % 2 === 0) img.set(ox + x, y, color('deep_water'));
+    }
+    for (const [x, y, w] of [
+      [1, 3, 4],
+      [9, 6, 5],
+      [4, 11, 4],
+      [12, 13, 3],
+    ] as const) {
+      img.fill(ox + x + 1, y, w - 2, 1, color('sky'));
+      img.set(ox + x, y + 1, color('sky'));
+      img.set(ox + x + w - 1, y + 1, color('sky'));
+      img.fill(ox + x + 1, y + 1, w - 2, 1, color('deep_water'));
+    }
+    img.set(ox + 7, 1, color('ice'));
+    img.set(ox + 14, 9, color('ice'));
   },
-  road: speckled(
-    'stone_dark',
-    [
-      ['stone', 14],
-      ['shadow', 8],
-    ],
-    4,
-  ),
+  road: (img, ox) => {
+    // Alcatrão gasto: cinzento-escuro com grão, uma fenda e uma mancha mais clara.
+    speckled(
+      'stone_dark',
+      [
+        ['stone', 9],
+        ['shadow', 12],
+      ],
+      4,
+    )(img, ox);
+    for (const [x, y] of [
+      [3, 5],
+      [4, 6],
+      [5, 6],
+      [6, 7],
+      [7, 7],
+      [8, 8],
+    ] as const) {
+      img.set(ox + x, y, color('shadow'));
+      img.set(ox + x, y + 1, color('stone'));
+    }
+    img.fill(ox + 11, 11, 3, 2, color('stone'));
+    img.set(ox + 11, 11, color('stone_light'));
+  },
   floor_wood: (img, ox) => {
-    img.fill(ox, 0, SIZE, SIZE, color('wood_light'));
-    for (let y = 3; y < SIZE; y += 4) img.fill(ox, y, SIZE, 1, color('wood'));
-    // Juntas das tábuas desencontradas.
+    // Soalho: tábuas de 4 px com luz em cima, sombra em baixo, veios e pregos; tons alternados.
+    const tones = ['wood_light', 'wood', 'wood_light', 'wood'] as const;
+    tones.forEach((tone, i) => {
+      const y = i * 4;
+      img.fill(ox, y, SIZE, 4, color(tone));
+      img.fill(ox, y, SIZE, 1, color(tone === 'wood' ? 'wood_light' : 'sand'));
+      img.fill(ox, y + 3, SIZE, 1, color('bark'));
+    });
     for (const [x, y] of [
       [5, 0],
       [12, 4],
       [2, 8],
       [9, 12],
     ] as const) {
-      img.fill(ox + x, y, 1, 3, color('wood'));
+      img.fill(ox + x, y, 1, 3, color('bark')); // topos das tábuas
+      img.set(ox + x + 1, y + 1, color('bark_dark')); // prego
+    }
+    for (const [x, y, w] of [
+      [8, 1, 3],
+      [1, 6, 4],
+      [11, 9, 3],
+      [3, 14, 4],
+    ] as const) {
+      img.fill(ox + x, y, w, 1, color('wood')); // veios
     }
   },
-  floor_concrete: speckled(
-    'stone_light',
-    [
-      ['stone', 10],
-      ['parchment', 6],
-    ],
-    5,
-  ),
+  floor_concrete: (img, ox) => {
+    // Lajes de betão 8×8 com bisel (luz em cima-esquerda, junta escura) e grão.
+    speckled(
+      'stone_light',
+      [
+        ['stone', 8],
+        ['parchment', 5],
+      ],
+      5,
+    )(img, ox);
+    for (const [x, y] of [
+      [0, 0],
+      [8, 0],
+      [0, 8],
+      [8, 8],
+    ] as const) {
+      img.fill(ox + x, y, 8, 1, color('parchment'));
+      img.fill(ox + x, y, 1, 8, color('parchment'));
+      img.fill(ox + x, y + 7, 8, 1, color('stone'));
+      img.fill(ox + x + 7, y, 1, 8, color('stone'));
+    }
+    img.set(ox + 12, 3, color('stone_dark')); // fissura
+    img.set(ox + 13, 4, color('stone_dark'));
+    img.set(ox + 3, 12, color('stone_dark'));
+  },
   wall: (img, ox) => {
-    // Tijolos de 8 × 4 com argamassa de 1 px, fiadas desencontradas.
+    // Muro de tijolo (ruínas do mapa): cada tijolo com luz em cima, sombra em baixo e junta.
     for (let y = 0; y < SIZE; y++) {
-      const offset = Math.floor(y / 4) % 2 === 0 ? 0 : 4;
+      const row = Math.floor(y / 4);
+      const offset = row % 2 === 0 ? 0 : 4;
       for (let x = 0; x < SIZE; x++) {
         const mortar = y % 4 === 3 || (x + offset) % 8 === 7;
-        img.set(ox + x, y, color(mortar ? 'stone_dark' : 'stone'));
+        const shade = y % 4 === 0 ? 'stone_light' : y % 4 === 2 ? 'stone_dark' : 'stone';
+        img.set(ox + x, y, color(mortar ? 'shadow' : shade));
       }
     }
-    img.fill(ox, 0, SIZE, 1, color('stone_light'));
+    img.set(ox + 5, 1, color('parchment'));
+    img.set(ox + 13, 9, color('parchment'));
   },
   // Vedação e rochedo têm fundo transparente: ficam na camada `collision`, por cima do chão.
   fence: (img, ox) => {
@@ -143,6 +230,7 @@ const painters: Record<BaseTile, Painter> = {
     }
   },
   boulder: (img, ox) => {
+    // Rochedo: forma irregular com 3 tons, contorno, fissura e musgo em cima.
     const rows: readonly [number, number][] = [
       [5, 6],
       [3, 10],
@@ -152,19 +240,33 @@ const painters: Record<BaseTile, Painter> = {
       [1, 14],
       [1, 14],
       [1, 14],
-      [1, 14],
-      [2, 12],
+      [2, 13],
       [2, 12],
       [3, 10],
+      [4, 8],
     ];
     for (const [i, [x, w]] of rows.entries()) {
       const y = i + 3;
-      img.fill(ox + x, y, w, 1, color('stone'));
-      img.set(ox + x, y, color('stone_dark'));
-      img.set(ox + x + w - 1, y, color('shadow'));
+      for (let xx = x; xx < x + w; xx++) {
+        const t = (xx - x) / w + i / rows.length;
+        img.set(ox + xx, y, color(t < 0.55 ? 'stone_light' : t < 1.1 ? 'stone' : 'stone_dark'));
+      }
+      img.set(ox + x, y, color('ink'));
+      img.set(ox + x + w - 1, y, color('ink'));
     }
-    img.fill(ox + 4, 5, 4, 2, color('stone_light'));
-    img.fill(ox + 3, 13, 10, 2, color('stone_dark'));
+    img.fill(ox + 5, 2, 6, 1, color('ink'));
+    img.fill(ox + 4, 15, 8, 1, color('ink'));
+    for (const [x, y] of [
+      [9, 6],
+      [10, 7],
+      [10, 8],
+      [11, 9],
+    ] as const) {
+      img.set(ox + x, y, color('stone_dark'));
+    }
+    img.fill(ox + 5, 3, 4, 1, color('leaf')); // musgo
+    img.set(ox + 4, 4, color('grass'));
+    img.set(ox + 6, 4, color('grass'));
   },
   floor_dark: (img, ox) => {
     speckled(

@@ -26,7 +26,6 @@ export interface GameEvents {
   /** Uma perícia de combate subiu de nível. */
   'skill:levelUp': { skill: string; level: number };
   'talent:learned': { talent: string; rank: number };
-  'player:sprint': Record<string, never>;
   /** O corpo de um inimigo desapareceu do chão (fumo em x, y). */
   'corpse:gone': { uid: number; x: number; y: number };
   /** Os itens soltos no chão da zona mudaram (flechas caídas ou apanhadas). */
@@ -63,9 +62,10 @@ export interface GameEvents {
       | 'needs_water'
       | 'crop_growing'
       | 'nothing_yet'
-      | 'needs_item';
+      | 'needs_item'
+      | 'no_ammo';
     tool?: string;
-    /** needs_item: o item que falta. */
+    /** needs_item: o item que falta; no_ammo: a munição da arma. */
     item?: string;
     /** crop_growing: horas de jogo que faltam. */
     hours?: number;

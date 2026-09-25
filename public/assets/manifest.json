@@ -562,7 +562,7 @@
       "file": "sprites/wall_wood.png",
       "placeholder": {
         "width": 16,
-        "height": 24,
+        "height": 32,
         "color": "wood_light",
         "border": "bark_dark",
         "letter": "P"
@@ -573,7 +573,7 @@
       "file": "sprites/wall_stone.png",
       "placeholder": {
         "width": 16,
-        "height": 24,
+        "height": 32,
         "color": "stone_light",
         "border": "stone_dark",
         "letter": "P"
@@ -584,7 +584,7 @@
       "file": "sprites/door_wood.png",
       "placeholder": {
         "width": 16,
-        "height": 24,
+        "height": 32,
         "color": "wood",
         "border": "bark_dark",
         "letter": "D"
@@ -595,7 +595,7 @@
       "file": "sprites/door_wood_open.png",
       "placeholder": {
         "width": 16,
-        "height": 24,
+        "height": 32,
         "color": "wood_light",
         "border": "bark_dark",
         "letter": "d"
@@ -606,7 +606,7 @@
       "file": "sprites/door_wood_v.png",
       "placeholder": {
         "width": 16,
-        "height": 24,
+        "height": 32,
         "color": "wood",
         "border": "bark_dark",
         "letter": "D"
@@ -617,8 +617,52 @@
       "file": "sprites/door_wood_v_open.png",
       "placeholder": {
         "width": 16,
-        "height": 24,
+        "height": 32,
         "color": "wood_light",
+        "border": "bark_dark",
+        "letter": "d"
+      }
+    },
+    "door_stone": {
+      "type": "image",
+      "file": "sprites/door_stone.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "stone",
+        "border": "bark_dark",
+        "letter": "D"
+      }
+    },
+    "door_stone_open": {
+      "type": "image",
+      "file": "sprites/door_stone_open.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "stone",
+        "border": "bark_dark",
+        "letter": "d"
+      }
+    },
+    "door_stone_v": {
+      "type": "image",
+      "file": "sprites/door_stone_v.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "stone",
+        "border": "bark_dark",
+        "letter": "D"
+      }
+    },
+    "door_stone_v_open": {
+      "type": "image",
+      "file": "sprites/door_stone_v_open.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "stone",
         "border": "bark_dark",
         "letter": "d"
       }
@@ -628,7 +672,7 @@
       "file": "sprites/window_wood.png",
       "placeholder": {
         "width": 16,
-        "height": 24,
+        "height": 32,
         "color": "sky",
         "border": "bark_dark",
         "letter": "J"
@@ -639,7 +683,7 @@
       "file": "sprites/window_wood_v.png",
       "placeholder": {
         "width": 16,
-        "height": 24,
+        "height": 32,
         "color": "sky",
         "border": "bark_dark",
         "letter": "J"
@@ -1480,6 +1524,28 @@
         "letter": "M"
       },
       "file": "sprites/icons/military_backpack.png"
+    },
+    "icon_expedition_backpack": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "teal",
+        "border": "ink",
+        "letter": "E"
+      },
+      "file": "sprites/icons/expedition_backpack.png"
+    },
+    "icon_survivor_backpack": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "plum",
+        "border": "ink",
+        "letter": "S"
+      },
+      "file": "sprites/icons/survivor_backpack.png"
     }
   }
 }

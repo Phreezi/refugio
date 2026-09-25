@@ -87,6 +87,7 @@ describe('Combate', () => {
 
   it('recuar durante o aviso evita o golpe; a armadura reduz o dano', () => {
     const { state, sim, events, run } = setup(map([{ id: 'walker', x: 290, y: 240 }]));
+    state.data.world.tick = secondsToTicks(3 * BALANCE.dayLengthSec); // já sem proteção de principiante
     const walker = sim.combat.list[0];
     for (let i = 0; i < 400 && walker?.state !== 'windup'; i++) sim.update(FIXED_STEP_MS);
     sim.setMoveIntent({ x: -1, y: 0 });
