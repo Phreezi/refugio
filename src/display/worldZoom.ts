@@ -1,23 +1,18 @@
 // Zoom do mundo escolhido pelo jogador (roda do rato, teclas +/−, pinça com 2 dedos).
-// O zoom da vista (display/view.ts) é o máximo; pode afastar-se até metade, sempre em níveis
+// O zoom da vista (display/view.ts) é o máximo; pode afastar-se um nível, sempre em níveis
 // INTEIROS de píxeis do dispositivo por píxel de jogo, para a pixel art continuar exata.
 // A preferência fica no browser (localStorage): é uma conveniência de quem vê, não do jogo.
 
 const STORAGE_KEY = 'refugio.zoomOut';
 
 /**
- * Níveis de zoom possíveis, do mais perto (o zoom da vista) ao mais longe (≥ metade).
- * Ex.: 4 → [4, 3, 2]; 3 → [3, 2]; 2 → [2, 1]; zoom fracionário (ecrã minúsculo) → só ele.
- * Ao alto (`portrait`): 4 → [3, 2, 1]; 3 → [2, 1].
+ * Níveis de zoom possíveis, do mais perto (o zoom da vista) ao mais longe: no máximo um nível
+ * abaixo, e nunca abaixo de ×2 (pedido do jogador: ver o mundo de muito longe tirava a graça).
+ * Ex.: 4 → [4, 3]; 3 → [3, 2]; 2 → [2]; zoom fracionário (ecrã minúsculo) → só ele.
  */
-export function zoomLevels(viewZoom: number, portrait = false): number[] {
+export function zoomLevels(viewZoom: number): number[] {
   if (!Number.isInteger(viewZoom) || viewZoom < 1) return [viewZoom];
-  // Ao alto (telemóvel): o mais perto é um nível abaixo e pode afastar-se mais um (vê-se mais).
-  const nearest = portrait ? Math.max(1, viewZoom - 1) : viewZoom;
-  const farthest = Math.max(1, Math.ceil(viewZoom / 2) - (portrait ? 1 : 0));
-  const levels: number[] = [];
-  for (let z = nearest; z >= farthest; z--) levels.push(z);
-  return levels;
+  return viewZoom >= 3 ? [viewZoom, viewZoom - 1] : [viewZoom];
 }
 
 /**
@@ -45,8 +40,8 @@ let stepsOut = typeof window === 'undefined' ? 0 : readSteps();
 const listeners = new Set<() => void>();
 
 /** Zoom do mundo para uma vista com este zoom. */
-export function worldZoomFor(viewZoom: number, portrait = false): number {
-  const levels = zoomLevels(viewZoom, portrait);
+export function worldZoomFor(viewZoom: number): number {
+  const levels = zoomLevels(viewZoom);
   return levels[Math.min(stepsOut, levels.length - 1)] ?? viewZoom;
 }
 
@@ -54,8 +49,8 @@ export function worldZoomFor(viewZoom: number, portrait = false): number {
  * Aproxima (+1) ou afasta (−1) um nível.
  * @returns true se o zoom mudou.
  */
-export function stepWorldZoom(direction: 1 | -1, viewZoom: number, portrait = false): boolean {
-  const levels = zoomLevels(viewZoom, portrait);
+export function stepWorldZoom(direction: 1 | -1, viewZoom: number): boolean {
+  const levels = zoomLevels(viewZoom);
   const current = Math.min(stepsOut, levels.length - 1);
   const next = Math.max(0, Math.min(levels.length - 1, current - direction));
   if (next === current) return false;

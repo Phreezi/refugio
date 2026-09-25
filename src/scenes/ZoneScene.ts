@@ -28,8 +28,11 @@ import { BASE_TILESET_NAME, baseTileIndex } from '../world/tileset';
 import { TILE_LAYERS, type TileLayerName } from '../world/zoneMap';
 import { darknessAt } from '../core/DayNight';
 import { BALANCE } from '../data/balance';
-import { SceneKey } from './keys';
+import { SceneKey, ZONE_CROSSED_EVENT } from './keys';
 import { grayTexture } from '../display/grayTexture';
+import { drawCliffs } from '../display/cliffs';
+import { fenceTexture } from '../display/fences';
+import { fenceMask } from '../world/fences';
 import type { MainMenuData } from './MainMenuScene';
 import type { WorldMapData } from './WorldMapScene';
 
@@ -106,15 +109,38 @@ const ENEMY_BAR = 12;
 export interface ZoneSceneData {
   /** Zona a mostrar (omisso = a zona onde o jogador está no GameState). */
   zoneId?: string;
-  /** Mundo contínuo: entrou-se a andar pela borda (sem fade; a vista já era a mesma). */
-  seamless?: boolean;
 }
 
+/**
+ * Y-sort: profundidade = Y_SORT_BASE + y dos pés. A base afasta os objetos das camadas de chão
+ * (as zonas a norte têm y negativo) e de `decor_high`.
+ */
+const Y_SORT_BASE = 100_000;
+const ysort = (y: number): number => Y_SORT_BASE + y;
+/** Profundidades entre estes valores são Y-sort (acompanham o y quando o mundo se desloca). */
+const Y_SORT_RANGE = 50_000;
 /** Marcas por cima dos NPCs ("!", "?"): acima de tudo o que está no chão. */
-const NPC_MARK_DEPTH = 9000;
+const NPC_MARK_DEPTH = 900_000;
+/** Cenário fora das zonas (montanhas): por baixo de todas as camadas. */
+const VOID_DEPTH = -10;
+const VOID_TEXTURE = 'void_cliffs';
 
 /** Mundo contínuo (Etapa E): desenham-se as zonas a menos disto (tiles) da zona atual. */
 const NEIGHBOR_MARGIN_TILES = 40;
+/** …e só se apagam quando ficam a mais disto (evita criar e apagar a andar junto a uma borda). */
+const NEIGHBOR_DROP_TILES = 64;
+
+/** Tudo o que se desenhou de uma zona (a atual ou uma vizinha), para a apagar ou a seguir. */
+interface ZoneView {
+  zoneId: string;
+  tilemap: Phaser.Tilemaps.Tilemap;
+  objects: Phaser.GameObjects.GameObject[];
+  resources: Map<number, Phaser.GameObjects.Image>;
+  containers: Map<number, Phaser.GameObjects.Image>;
+  marks: { npc: string; label: Label }[];
+  /** Base vista de fora: as peças construídas, só desenhadas. */
+  statics: Phaser.GameObjects.Image[];
+}
 
 interface EnemyView {
   sprite: Phaser.GameObjects.Image;
@@ -138,7 +164,6 @@ export class ZoneScene extends Phaser.Scene {
   private zoneId: string = BASE_ZONE_ID;
   private enemyViews = new Map<number, EnemyView>();
   /** Contentores com loot, pelo id do objeto (ficam escuros quando vazios). */
-  private npcMarks: { npc: string; label: Label }[] = [];
   private containerSprites = new Map<number, Phaser.GameObjects.Image>();
   private bagSprites: Phaser.GameObjects.Image[] = [];
   private groundSprites: Phaser.GameObjects.Image[] = [];
@@ -172,6 +197,16 @@ export class ZoneScene extends Phaser.Scene {
   private lastGain: { x: number; y: number; at: number; row: number } | null = null;
   /** Co-op (convidado): as peças desenhadas (para saber se o mundo recebido as mudou). */
   private structuresKey = '';
+  /** Zonas desenhadas (a atual e as vizinhas), pelo id. */
+  private views = new Map<string, ZoneView>();
+  /** Vizinhas por desenhar (uma por frame, para não parar o jogo). */
+  private streamQueue: string[] = [];
+  /** Passou a borda para outra zona (trata-se depois do passo da simulação). */
+  private pendingCross: string | null = null;
+  /** Deslocação total do mundo desde o início da cena (textos que sobem acompanham-na). */
+  private shift = { x: 0, y: 0 };
+  /** Cenário fora das zonas (penhascos e montanhas), em vez de preto. */
+  private voidFill: Phaser.GameObjects.TileSprite | null = null;
 
   constructor() {
     super(SceneKey.Zone);
@@ -182,52 +217,19 @@ export class ZoneScene extends Phaser.Scene {
     this.zoneId = content.zones[zoneId] ? zoneId : BASE_ZONE_ID;
     this.leaving = false;
     this.hurtUntil = 0;
-    const zone = content.zoneMap(this.zoneId);
-    this.createMap();
+    this.views = new Map();
+    this.streamQueue = [];
+    this.pendingCross = null;
+    this.shift = { x: 0, y: 0 };
+    this.voidFill = this.add.tileSprite(0, 0, 16, 16, this.voidTexture()).setOrigin(0).setDepth(VOID_DEPTH);
+    const current = this.createZoneView(this.zoneId);
+    if (!current) throw new Error(`O mapa de ${this.zoneId} não tem o tileset "${BASE_TILESET_NAME}".`);
+    this.views.set(this.zoneId, current);
+    this.useView(current);
     // Mundo contínuo: as zonas à volta também se veem (só as que estão perto).
-    const bounds = this.createNeighbors();
-
-    // Recursos, obstáculos e baús: pés no ponto do mapa (arredondado: posições inteiras), Y-sort.
-    const place = (p: { x: number; y: number }, sprite: string): Phaser.GameObjects.Image => {
-      const x = Math.round(p.x);
-      const y = Math.round(p.y);
-      return this.add.image(x, y, sprite).setOrigin(0.5, 1).setDepth(y);
-    };
-    this.resourceSprites = new Map();
-    for (const p of zone.resources) {
-      const def = content.resources[p.id];
-      if (def) this.resourceSprites.set(p.objectId, place(p, def.sprite));
-    }
-    for (const p of zone.props) {
-      const def = content.props[p.id];
-      if (def) place(p, def.sprite);
-    }
-    const chestSprite = content.props.chest?.sprite;
-    if (chestSprite) for (const p of zone.chests) place(p, chestSprite);
-    for (const p of zone.stations) {
-      const def = content.stations[p.id];
-      if (def) place(p, def.sprite);
-    }
-    this.containerSprites = new Map();
-    for (const p of zone.containers) {
-      const def = content.lootTables[p.id];
-      if (def) this.containerSprites.set(p.objectId, place(p, def.sprite));
-    }
-    // NPCs (§7.18), com "!" (missão nova) ou "?" (pronta a entregar) por cima.
-    this.npcMarks = [];
-    for (const p of zone.npcs ?? []) {
-      const def = content.npcs[p.id];
-      if (!def) continue;
-      place(p, def.sprite);
-      const mark = new Label(
-        this,
-        Math.round(p.x),
-        Math.round(p.y) - 34,
-        '',
-        { size: 9, color: 'gold', stroke: true },
-        [0.5, 1],
-      ).setDepth(NPC_MARK_DEPTH);
-      this.npcMarks.push({ npc: p.id, label: mark });
+    for (const rect of content.world.near(this.zoneId, NEIGHBOR_MARGIN_TILES)) {
+      const view = this.createZoneView(rect.zoneId);
+      if (view) this.views.set(rect.zoneId, view);
     }
     this.renderNpcMarks();
 
@@ -237,14 +239,14 @@ export class ZoneScene extends Phaser.Scene {
     this.player = this.add
       .sprite(x, y, PLAYER_TEXTURES[look], characterFrame(facing, CHARACTER_COLUMNS.idle))
       .setOrigin(0.5, 1)
-      .setDepth(y);
+      .setDepth(ysort(y));
 
     const camera = this.cameras.main;
     // Fora do mapa (ecrãs maiores do que ele, ou zoom afastado) vê-se "noite".
     camera.setBackgroundColor(PALETTE.ink);
     camera.startFollow(this.player, true);
     const applyZoom = (): void => {
-      this.applyCameraZoom(bounds);
+      this.applyCameraZoom(this.viewBounds());
       this.createNightLayer();
     };
     applyZoom();
@@ -263,7 +265,7 @@ export class ZoneScene extends Phaser.Scene {
     }
     this.structureSprites = new Map();
     this.cropSprites = new Map();
-    for (const record of simulation.building.structures()) this.addStructureSprite(record);
+    if (this.zoneId === BASE_ZONE_ID) this.thawStructures(current);
     this.structuresKey = JSON.stringify(gameState.data.base.structures);
     this.marker = this.add.image(0, 0, this.markerTexture()).setOrigin(0.5, 1).setVisible(false);
     this.ghost = this.add.image(0, 0, '__DEFAULT').setOrigin(0.5, 1).setAlpha(0.75).setVisible(false);
@@ -274,7 +276,7 @@ export class ZoneScene extends Phaser.Scene {
     this.renderGround();
     this.renderContainers();
     const offFeedback = this.listenForFeedback();
-    if (!data.seamless) camera.fadeIn(FADE_MS);
+    camera.fadeIn(FADE_MS);
     autosave.start();
     this.scene.launch(SceneKey.UI, {});
 
@@ -296,6 +298,9 @@ export class ZoneScene extends Phaser.Scene {
       this.enemyViews.clear();
       this.containerSprites.clear();
       this.night = null;
+      this.views.clear();
+      this.streamQueue = [];
+      this.voidFill = null;
       this.bagSprites = [];
       this.groundSprites = [];
       this.marker = null;
@@ -330,6 +335,12 @@ export class ZoneScene extends Phaser.Scene {
     // Menu de pausa aberto: o tempo de jogo pára (o ecrã continua a ser desenhado).
     // Em co-op o tempo nunca pára (o outro jogador continua a jogar).
     if (!uiState.paused || uiState.coop) simulation.update(this.game.loop.rawDelta * speed);
+    if (this.pendingCross !== null) {
+      const to = this.pendingCross;
+      this.pendingCross = null;
+      this.crossZone(to);
+    }
+    this.streamNext();
     if (this.player) this.player.anims.timeScale = speed;
     coop.update(performance.now());
     this.renderPlayer();
@@ -338,6 +349,7 @@ export class ZoneScene extends Phaser.Scene {
     this.renderShots();
     this.renderHomestead();
     this.renderLighting();
+    this.renderVoid();
     // Com toque, andar volta a pôr a peça à frente do jogador.
     if (simulation.playerMoved && buildMode.pickedBy === 'touch') {
       buildMode.picked = null;
@@ -353,11 +365,12 @@ export class ZoneScene extends Phaser.Scene {
     if (!def) return;
     const feet = structureFeet(def, tx, ty, simulation.building.tileSize);
     const flat = !def.solid && !def.footprint;
-    const depth = def.layer === 'floor' ? FOUNDATION_DEPTH : flat ? FLAT_DEPTH : feet.y;
+    const depth = def.layer === 'floor' ? FOUNDATION_DEPTH : flat ? FLAT_DEPTH : ysort(feet.y);
     const sprite = this.add
       .image(feet.x, feet.y, this.structureTexture(record, def))
       .setOrigin(0.5, 1)
       .setDepth(depth);
+    if (def.connects) sprite.setTexture(fenceTexture(this), this.builtFenceMask(tx, ty));
     this.structureSprites.set(uid, sprite);
     this.applyDamageTint(uid);
   }
@@ -408,7 +421,7 @@ export class ZoneScene extends Phaser.Scene {
         view = this.add
           .image(sprite.x, sprite.y - 2, plant)
           .setOrigin(0.5, 1)
-          .setDepth(sprite.y - 1);
+          .setDepth(ysort(sprite.y - 1));
         this.cropSprites.set(uid, view);
       } else if (view.texture.key !== plant) view.setTexture(plant);
     }
@@ -463,7 +476,7 @@ export class ZoneScene extends Phaser.Scene {
     ghost
       .setTexture(structureSprite(def, buildMode.rot, false))
       .setPosition(feet.x, feet.y)
-      .setDepth(def.layer === 'floor' ? FOUNDATION_DEPTH + 0.1 : feet.y + 0.5)
+      .setDepth(def.layer === 'floor' ? FOUNDATION_DEPTH + 0.1 : ysort(feet.y + 0.5))
       .setTint(color)
       .setVisible(true);
     const rect = structureArea(def, tx, ty, tileSize);
@@ -557,17 +570,20 @@ export class ZoneScene extends Phaser.Scene {
       on('structure:placed', ({ uid }) => {
         const record = simulation.building.get(uid);
         if (record) this.addStructureSprite(record);
+        this.refreshFences();
       }),
       on('structure:removed', ({ uid }) => {
         this.structureSprites.get(uid)?.destroy();
         this.structureSprites.delete(uid);
         this.cropSprites.get(uid)?.destroy();
         this.cropSprites.delete(uid);
+        this.refreshFences();
       }),
       on('structure:changed', ({ uid }) => {
         const record = simulation.building.get(uid);
         const def = record ? content.structures[record[1]] : undefined;
-        if (record && def) this.structureSprites.get(uid)?.setTexture(this.structureTexture(record, def));
+        if (record && def && !def.connects)
+          this.structureSprites.get(uid)?.setTexture(this.structureTexture(record, def));
         this.applyDamageTint(uid);
       }),
       on('structure:damaged', ({ uid, amount, x, y }) => {
@@ -669,12 +685,10 @@ export class ZoneScene extends Phaser.Scene {
         if (zoneId === this.zoneId) this.renderBags();
       }),
       // Mundo contínuo: passou a borda — a mesma vista, agora a partir da zona vizinha.
-      on('zone:cross', ({ to, x, y }) => {
+      // A cena continua: o mundo desloca-se para as coordenadas da vizinha (ver crossZone).
+      on('zone:cross', ({ to }) => {
         if (this.leaving) return;
-        this.leaving = true;
-        simulation.crossTo(to, content.zoneMap(to), x, y);
-        uiState.pendingNotice = tKey(content.zones[to]?.name ?? to);
-        this.scene.restart({ zoneId: to, seamless: true } satisfies ZoneSceneData);
+        this.pendingCross = to;
       }),
       on('zone:change', ({ from, to, exit }) => {
         if (to === null) {
@@ -769,7 +783,7 @@ export class ZoneScene extends Phaser.Scene {
       }
       const x = Math.round(shot.px + (shot.x - shot.px) * alpha);
       const y = Math.round(shot.py + (shot.y - shot.py) * alpha);
-      view.setPosition(x - 1, y - 1).setDepth(y + 8);
+      view.setPosition(x - 1, y - 1).setDepth(ysort(y + 8));
     }
     for (const [id, view] of this.shotViews) {
       if (alive.has(id)) continue;
@@ -800,7 +814,7 @@ export class ZoneScene extends Phaser.Scene {
       const bob = moving && Math.floor(now / 160) % 2 === 1 ? 1 : 0;
       view.sprite
         .setPosition(x, y - bob)
-        .setDepth(y)
+        .setDepth(ysort(y))
         .setFlipX(enemy.flip);
       // A rebentar (inchado): pisca a vermelho, cada vez mais depressa.
       if (enemy.dying > 0) {
@@ -818,12 +832,12 @@ export class ZoneScene extends Phaser.Scene {
       const top = y - view.sprite.height - 4;
       view.barBack
         .setPosition(x - ENEMY_BAR / 2 - 1, top)
-        .setDepth(y)
+        .setDepth(ysort(y))
         .setVisible(hurt);
       view.bar
         .setPosition(x - ENEMY_BAR / 2, top + 1)
         .setSize(Math.max(1, Math.round((ENEMY_BAR * enemy.hp) / enemy.maxHp)), 2)
-        .setDepth(y)
+        .setDepth(ysort(y))
         .setVisible(hurt);
     }
     // Inimigos que desapareceram sem morrer (a horda foi-se embora): tirar do ecrã.
@@ -935,7 +949,7 @@ export class ZoneScene extends Phaser.Scene {
       this.add
         .image(x, y, content.items[item]?.icon ?? item)
         .setOrigin(0.5, 0.75)
-        .setDepth(y - 8),
+        .setDepth(ysort(y - 8)),
     );
   }
 
@@ -949,8 +963,8 @@ export class ZoneScene extends Phaser.Scene {
         return this.add
           .image(bag.x, bag.y, grayTexture(this, enemy.sprite), 0)
           .setOrigin(0.5, 1)
-          .setDepth(bag.y - 12);
-      return this.add.image(bag.x, bag.y, 'bag_dropped').setOrigin(0.5, 1).setDepth(bag.y);
+          .setDepth(ysort(bag.y - 12));
+      return this.add.image(bag.x, bag.y, 'bag_dropped').setOrigin(0.5, 1).setDepth(ysort(bag.y));
     });
   }
 
@@ -992,6 +1006,8 @@ export class ZoneScene extends Phaser.Scene {
     const label = new Label(this, x, y, text, { size: 7, bold: true, color, stroke: true }, [0.5, 1]);
     label.setDepth(LAYER_DEPTH.decor_high + 2);
     const start = this.time.now;
+    // Se o mundo se deslocar (mudou de zona a andar), o texto acompanha-o.
+    const shift0 = { ...this.shift };
     const timer = this.time.addEvent({
       delay: 30,
       loop: true,
@@ -1002,7 +1018,9 @@ export class ZoneScene extends Phaser.Scene {
           label.destroy();
           return;
         }
-        label.setPosition(x, y - Math.round(progress * rise));
+        const sx = this.shift.x - shift0.x;
+        const sy = this.shift.y - shift0.y;
+        label.setPosition(x - sx, y - sy - Math.round(progress * rise));
         label.text.setAlpha(duration > FLOAT_TEXT_MS ? 1 - progress : 1 - progress * progress);
       },
     });
@@ -1016,7 +1034,7 @@ export class ZoneScene extends Phaser.Scene {
    */
   private applyCameraZoom(area: { x: number; y: number; w: number; h: number }): void {
     const view = getView();
-    const zoom = worldZoomFor(view.zoom, view.height > view.width);
+    const zoom = worldZoomFor(view.zoom);
     const visibleWidth = (view.width * view.zoom) / zoom;
     const visibleHeight = (view.height * view.zoom) / zoom;
     const bx = area.x + Math.min(0, (area.w - visibleWidth) / 2);
@@ -1026,88 +1044,340 @@ export class ZoneScene extends Phaser.Scene {
     camera.setBounds(bx, by, Math.max(area.w, visibleWidth), Math.max(area.h, visibleHeight));
   }
 
-  /**
-   * Mundo contínuo (Etapa E): desenha as zonas vizinhas (chão, obstáculos, recursos e, na base,
-   * as peças construídas) à volta da atual, nas posições do mundo. Só se veem (a lógica é só a
-   * da zona atual); ao passar a borda, a cena recomeça na vizinha com a mesma vista.
-   * @returns a área (px, coordenadas desta zona) com mapas desenhados — os limites da câmara.
-   */
   /** "!" nos NPCs com missão para dar; "?" nos que têm uma missão pronta a entregar. */
   private renderNpcMarks(): void {
     if (!gameState.hasGame) return;
     const quests = simulation.quests;
-    for (const { npc, label } of this.npcMarks) {
+    for (const { npc, label } of [...this.views.values()].flatMap((view) => view.marks)) {
       const ready = quests.handIns(npc).some((q) => quests.ready(q.id));
       label.setText(ready ? '?' : quests.offers(npc).length > 0 ? '!' : '');
     }
   }
 
-  private createNeighbors(): { x: number; y: number; w: number; h: number } {
-    const map = content.zoneMap(this.zoneId);
-    const size = map.tileSize;
-    let x0 = 0;
-    let y0 = 0;
-    let x1 = map.width * size;
-    let y1 = map.height * size;
-    const here = content.world.rect(this.zoneId);
-    if (here) {
-      const tick = gameState.data.world.tick;
-      for (const rect of content.world.near(this.zoneId, NEIGHBOR_MARGIN_TILES)) {
-        const ox = (rect.x - here.x) * size;
-        const oy = (rect.y - here.y) * size;
-        const tilemap = this.make.tilemap({ key: zoneMapKey(rect.zoneId) });
-        const tileset = tilemap.addTilesetImage(BASE_TILESET_NAME, TILESET_TEXTURE);
-        if (!tileset) continue;
-        for (const name of TILE_LAYERS)
-          tilemap.createLayer(name, tileset, ox, oy).setDepth(LAYER_DEPTH[name]);
-        this.drawShore(tilemap, tileset.firstgid, ox, oy);
-        const other = content.zoneMap(rect.zoneId);
-        const depleted = gameState.data.zones[rect.zoneId]?.depleted ?? {};
-        const place = (p: { x: number; y: number }, sprite: string): void => {
-          const x = Math.round(p.x + ox);
-          const y = Math.round(p.y + oy);
-          this.add.image(x, y, sprite).setOrigin(0.5, 1).setDepth(y);
-        };
-        for (const p of other.resources) {
-          const def = content.resources[p.id];
-          const back = depleted[String(p.objectId)];
-          if (def && (back === undefined || back <= tick)) place(p, def.sprite);
-        }
-        for (const p of other.props) {
-          const def = content.props[p.id];
-          if (def) place(p, def.sprite);
-        }
-        const chestSprite = content.props.chest?.sprite;
-        if (chestSprite) for (const p of other.chests) place(p, chestSprite);
-        for (const p of other.containers) {
-          const def = content.lootTables[p.id];
-          if (def) place(p, def.sprite);
-        }
-        for (const p of other.npcs ?? []) {
-          const def = content.npcs[p.id];
-          if (def) place(p, def.sprite);
-        }
-        // A casa construída na base vê-se dos caminhos.
-        if (rect.zoneId === BASE_ZONE_ID) {
-          for (const [, id, tx, ty, rot, state] of gameState.data.base.structures) {
-            const def = content.structures[id];
-            if (!def) continue;
-            const feet = structureFeet(def, tx, ty, size);
-            const flat = !def.solid && !def.footprint;
-            const y = feet.y + oy;
+  /**
+   * Vedações do mapa (tiles `fence`): em vez do tile, a variante que liga às vizinhas (cantos,
+   * T, cruz, verticais), com Y-sort. A colisão continua a ser a do tile.
+   */
+  private drawFences(
+    tilemap: Phaser.Tilemaps.Tilemap,
+    firstgid: number,
+    ox: number,
+    oy: number,
+  ): Phaser.GameObjects.Image[] {
+    const fence = firstgid + baseTileIndex('fence');
+    const layers = TILE_LAYERS.filter((name) => name !== 'ground');
+    const isFence = (x: number, y: number): boolean =>
+      layers.some((layer) => tilemap.getTileAt(x, y, false, layer)?.index === fence);
+    const texture = fenceTexture(this);
+    const images: Phaser.GameObjects.Image[] = [];
+    const size = tilemap.tileWidth;
+    for (const layer of layers) {
+      for (let y = 0; y < tilemap.height; y++) {
+        for (let x = 0; x < tilemap.width; x++) {
+          const tile = tilemap.getTileAt(x, y, false, layer);
+          if (tile?.index !== fence) continue;
+          tile.setVisible(false);
+          const feetY = oy + (y + 1) * size;
+          images.push(
             this.add
-              .image(feet.x + ox, y, structureSprite(def, rot, state === 1))
+              .image(ox + x * size + size / 2, feetY, texture, fenceMask(isFence, x, y))
               .setOrigin(0.5, 1)
-              .setDepth(def.layer === 'floor' ? FOUNDATION_DEPTH : flat ? FLAT_DEPTH : y);
-          }
+              .setDepth(ysort(feetY)),
+          );
         }
-        x0 = Math.min(x0, ox);
-        y0 = Math.min(y0, oy);
-        x1 = Math.max(x1, ox + other.width * size);
-        y1 = Math.max(y1, oy + other.height * size);
       }
     }
+    return images;
+  }
+
+  /** Máscara de uma vedação construída na base (vizinhas também vedações). */
+  private builtFenceMask(tx: number, ty: number): number {
+    const fences = new Set<string>();
+    for (const [, id, x, y] of gameState.data.base.structures) {
+      if (content.structures[id]?.connects) fences.add(`${String(x)},${String(y)}`);
+    }
+    return fenceMask((x, y) => fences.has(`${String(x)},${String(y)}`), tx, ty);
+  }
+
+  /** Pôs-se ou tirou-se uma peça: as vedações construídas voltam a ligar-se às vizinhas. */
+  private refreshFences(): void {
+    for (const [uid, sprite] of this.structureSprites) {
+      const record = simulation.building.get(uid);
+      if (record && content.structures[record[1]]?.connects)
+        sprite.setFrame(this.builtFenceMask(record[2], record[3]));
+    }
+  }
+
+  /** Posição (px) do canto de uma zona nas coordenadas da zona atual (mundo contínuo). */
+  private offsetOf(zoneId: string): { x: number; y: number } {
+    const here = content.world.rect(this.zoneId);
+    const rect = content.world.rect(zoneId);
+    if (!here || !rect || zoneId === this.zoneId) return { x: 0, y: 0 };
+    const size = content.zoneMap(zoneId).tileSize;
+    return { x: (rect.x - here.x) * size, y: (rect.y - here.y) * size };
+  }
+
+  /**
+   * Desenha uma zona (chão, obstáculos, recursos, contentores, NPCs e, na base, as peças
+   * construídas) na sua posição no mundo. Serve para a zona atual e para as vizinhas.
+   */
+  private createZoneView(zoneId: string): ZoneView | null {
+    const { x: ox, y: oy } = this.offsetOf(zoneId);
+    const tilemap = this.make.tilemap({ key: zoneMapKey(zoneId) });
+    const tileset = tilemap.addTilesetImage(BASE_TILESET_NAME, TILESET_TEXTURE);
+    if (!tileset) {
+      tilemap.destroy();
+      return null;
+    }
+    for (const name of TILE_LAYERS) tilemap.createLayer(name, tileset, ox, oy).setDepth(LAYER_DEPTH[name]);
+    const view: ZoneView = {
+      zoneId,
+      tilemap,
+      objects: [
+        this.drawShore(tilemap, tileset.firstgid, ox, oy),
+        ...this.drawFences(tilemap, tileset.firstgid, ox, oy),
+      ],
+      resources: new Map(),
+      containers: new Map(),
+      marks: [],
+      statics: [],
+    };
+    const map = content.zoneMap(zoneId);
+    const tick = gameState.data.world.tick;
+    const depleted = gameState.data.zones[zoneId]?.depleted ?? {};
+    // Pés no ponto do mapa (arredondado: posições inteiras), Y-sort.
+    const place = (p: { x: number; y: number }, sprite: string): Phaser.GameObjects.Image => {
+      const x = Math.round(p.x + ox);
+      const y = Math.round(p.y + oy);
+      const image = this.add.image(x, y, sprite).setOrigin(0.5, 1).setDepth(ysort(y));
+      view.objects.push(image);
+      return image;
+    };
+    for (const p of map.resources) {
+      const def = content.resources[p.id];
+      if (!def) continue;
+      const back = depleted[String(p.objectId)];
+      view.resources.set(p.objectId, place(p, def.sprite).setVisible(back === undefined || back <= tick));
+    }
+    for (const p of map.props) {
+      const def = content.props[p.id];
+      if (def) place(p, def.sprite);
+    }
+    const chestSprite = content.props.chest?.sprite;
+    if (chestSprite) for (const p of map.chests) place(p, chestSprite);
+    for (const p of map.stations) {
+      const def = content.stations[p.id];
+      if (def) place(p, def.sprite);
+    }
+    for (const p of map.containers) {
+      const def = content.lootTables[p.id];
+      if (def) view.containers.set(p.objectId, place(p, def.sprite));
+    }
+    // NPCs (§7.18), com "!" (missão nova) ou "?" (pronta a entregar) por cima.
+    for (const p of map.npcs ?? []) {
+      const def = content.npcs[p.id];
+      if (!def) continue;
+      const sprite = place(p, def.sprite);
+      const label = new Label(
+        this,
+        sprite.x,
+        sprite.y - 34,
+        '',
+        { size: 9, color: 'gold', stroke: true },
+        [0.5, 1],
+      ).setDepth(NPC_MARK_DEPTH);
+      view.objects.push(label.text);
+      view.marks.push({ npc: p.id, label });
+    }
+    // A casa construída na base vê-se de fora (na base, passam a ser as peças "vivas").
+    if (zoneId === BASE_ZONE_ID) {
+      const size = map.tileSize;
+      for (const [, id, tx, ty, rot, state] of gameState.data.base.structures) {
+        const def = content.structures[id];
+        if (!def) continue;
+        const feet = structureFeet(def, tx, ty, size);
+        const flat = !def.solid && !def.footprint;
+        const y = feet.y + oy;
+        const image = this.add
+          .image(feet.x + ox, y, structureSprite(def, rot, state === 1))
+          .setOrigin(0.5, 1)
+          .setDepth(def.layer === 'floor' ? FOUNDATION_DEPTH : flat ? FLAT_DEPTH : ysort(y));
+        if (def.connects) image.setTexture(fenceTexture(this), this.builtFenceMask(tx, ty));
+        view.statics.push(image);
+      }
+    }
+    return view;
+  }
+
+  private destroyView(view: ZoneView): void {
+    for (const object of view.objects) object.destroy();
+    for (const image of view.statics) image.destroy();
+    view.tilemap.destroy();
+  }
+
+  /** A zona atual passa a ser esta: os recursos e contentores dela reagem aos eventos. */
+  private useView(view: ZoneView): void {
+    this.resourceSprites = view.resources;
+    this.containerSprites = view.containers;
+  }
+
+  /** Entrou-se na base: as peças passam a ser as "vivas" (portas, horta, dano da horda…). */
+  private thawStructures(view: ZoneView): void {
+    for (const image of view.statics) image.destroy();
+    view.statics = [];
+    for (const record of simulation.building.structures()) this.addStructureSprite(record);
+  }
+
+  /** Saiu-se da base: as peças ficam só desenhadas (vistas dos caminhos). */
+  private freezeStructures(view: ZoneView): void {
+    view.statics.push(...this.structureSprites.values(), ...this.cropSprites.values());
+    this.structureSprites.clear();
+    this.cropSprites.clear();
+  }
+
+  /** Área (px, coordenadas da zona atual) com mapas desenhados: os limites da câmara. */
+  private viewBounds(): { x: number; y: number; w: number; h: number } {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const zoneId of this.views.keys()) {
+      const map = content.zoneMap(zoneId);
+      const { x, y } = this.offsetOf(zoneId);
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x + map.width * map.tileSize);
+      y1 = Math.max(y1, y + map.height * map.tileSize);
+    }
+    if (!Number.isFinite(x0)) {
+      const map = content.zoneMap(this.zoneId);
+      return { x: 0, y: 0, w: map.width * map.tileSize, h: map.height * map.tileSize };
+    }
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+
+  /**
+   * Mundo contínuo: passou a borda para a zona vizinha. A cena NÃO recomeça (isso parava o jogo
+   * uns segundos no telemóvel): o mundo desenhado desloca-se para as coordenadas da vizinha, a
+   * lógica passa para ela e as zonas que ficam perto vão sendo desenhadas, uma por frame.
+   */
+  private crossZone(to: string): void {
+    const from = this.zoneId;
+    const a = content.world.rect(from);
+    const b = content.world.rect(to);
+    if (!a || !b || !content.zones[to]) return;
+    const map = content.zoneMap(to);
+    const dx = (b.x - a.x) * map.tileSize;
+    const dy = (b.y - a.y) * map.tileSize;
+    const fromView = this.views.get(from);
+    if (from === BASE_ZONE_ID && fromView) this.freezeStructures(fromView);
+    buildMode.active = false;
+    const player = gameState.data.player;
+    // O mesmo ponto do mundo, nas coordenadas da zona nova (continua a andar sem saltos).
+    simulation.crossTo(to, map, player.x - dx, player.y - dy);
+    this.shiftWorld(dx, dy);
+    this.zoneId = to;
+    for (const enemy of this.enemyViews.values()) {
+      enemy.sprite.destroy();
+      enemy.barBack.destroy();
+      enemy.bar.destroy();
+    }
+    this.enemyViews.clear();
+    for (const shot of this.shotViews.values()) shot.destroy();
+    this.shotViews.clear();
+    simulation.setZone(buildZoneContext(to));
+    let view = this.views.get(to);
+    if (!view) {
+      view = this.createZoneView(to) ?? undefined;
+      if (view) this.views.set(to, view);
+    }
+    if (view) {
+      this.useView(view);
+      if (to === BASE_ZONE_ID) this.thawStructures(view);
+    }
+    for (const [objectId, sprite] of this.resourceSprites) {
+      sprite.setVisible(!simulation.interaction.isDepleted(objectId)).setAlpha(1);
+    }
+    this.structuresKey = JSON.stringify(gameState.data.base.structures);
+    this.renderBags();
+    this.renderGround();
+    this.renderContainers();
+    this.renderNpcMarks();
+    // Desenhar as que ficaram perto (aos poucos) e apagar as que ficaram longe.
+    const keep = new Set(content.world.near(to, NEIGHBOR_DROP_TILES).map((r) => r.zoneId));
+    keep.add(to);
+    for (const [zoneId, old] of this.views) {
+      if (keep.has(zoneId)) continue;
+      this.destroyView(old);
+      this.views.delete(zoneId);
+    }
+    this.streamQueue = content.world
+      .near(to, NEIGHBOR_MARGIN_TILES)
+      .map((r) => r.zoneId)
+      .filter((zoneId) => !this.views.has(zoneId));
+    this.applyCameraZoom(this.viewBounds());
+    void autosave.flush();
+    this.scene.get(SceneKey.UI).events.emit(ZONE_CROSSED_EVENT, to);
+  }
+
+  /** Desloca tudo o que está desenhado (dx, dy) px: as coordenadas passam a ser as da zona nova. */
+  private shiftWorld(dx: number, dy: number): void {
+    this.shift = { x: this.shift.x + dx, y: this.shift.y + dy };
+    for (const child of this.children.list) {
+      if (child === this.night || child === this.voidFill) continue;
+      const object = child as Phaser.GameObjects.GameObject &
+        Partial<Phaser.GameObjects.Components.Transform & Phaser.GameObjects.Components.Depth>;
+      if (typeof object.x !== 'number' || typeof object.y !== 'number' || !object.setPosition) continue;
+      object.setPosition(object.x - dx, object.y - dy);
+      const depth = object.depth ?? 0;
+      if (Math.abs(depth - Y_SORT_BASE) < Y_SORT_RANGE) object.setDepth?.(depth - dy);
+    }
+    // As marcas dos NPCs guardam a posição (voltam a alinhar-se quando o texto muda).
+    for (const view of this.views.values()) for (const { label } of view.marks) label.translate(-dx, -dy);
+    const camera = this.cameras.main;
+    camera.setScroll(camera.scrollX - dx, camera.scrollY - dy);
+  }
+
+  /** Desenha a próxima zona vizinha da fila (uma por frame). */
+  private streamNext(): void {
+    const zoneId = this.streamQueue.shift();
+    if (zoneId === undefined || this.views.has(zoneId)) return;
+    const view = this.createZoneView(zoneId);
+    if (!view) return;
+    this.views.set(zoneId, view);
+    this.renderNpcMarks();
+    this.applyCameraZoom(this.viewBounds());
+  }
+
+  /**
+   * Fora das zonas não há preto: penhascos e montanhas (intransitáveis) a encher a vista,
+   * presos ao mundo (não deslizam com a câmara).
+   */
+  private renderVoid(): void {
+    const fill = this.voidFill;
+    if (!fill) return;
+    const view = this.cameras.main.worldView;
+    const x = Math.floor(view.x) - 16;
+    const y = Math.floor(view.y) - 16;
+    const w = Math.ceil(view.width) + 32;
+    const h = Math.ceil(view.height) + 32;
+    if (fill.width !== w || fill.height !== h) fill.setSize(w, h);
+    const here = content.world.rect(this.zoneId);
+    const size = content.zoneMap(this.zoneId).tileSize;
+    fill.setPosition(x, y);
+    fill.setTilePosition(x + (here?.x ?? 0) * size, y + (here?.y ?? 0) * size);
+  }
+
+  /** Textura das montanhas (64×64, repete sem costuras), desenhada uma vez com a paleta. */
+  private voidTexture(): string {
+    if (this.textures.exists(VOID_TEXTURE)) return VOID_TEXTURE;
+    const size = 64;
+    const canvas = this.textures.createCanvas(VOID_TEXTURE, size, size);
+    const ctx = canvas?.getContext();
+    if (!canvas || !ctx) return '__DEFAULT';
+    drawCliffs(ctx, size);
+    canvas.refresh();
+    return VOID_TEXTURE;
   }
 
   /**
@@ -1124,15 +1394,15 @@ export class ZoneScene extends Phaser.Scene {
       // Um "clique" da roda gera vários eventos (sobretudo em touchpads): um passo por 150 ms.
       if (event.deltaY === 0 || this.time.now - lastWheel < WHEEL_COOLDOWN_MS) return;
       lastWheel = this.time.now;
-      stepWorldZoom(event.deltaY < 0 ? 1 : -1, getView().zoom, getView().height > getView().width);
+      stepWorldZoom(event.deltaY < 0 ? 1 : -1, getView().zoom);
     };
     // passive: false — só assim o preventDefault impede o zoom da página.
     canvas.addEventListener('wheel', onWheel, { passive: false });
     const zoomIn = (): void => {
-      stepWorldZoom(1, getView().zoom, getView().height > getView().width);
+      stepWorldZoom(1, getView().zoom);
     };
     const zoomOut = (): void => {
-      stepWorldZoom(-1, getView().zoom, getView().height > getView().width);
+      stepWorldZoom(-1, getView().zoom);
     };
     for (const key of ['PLUS', 'NUMPAD_ADD']) this.input.keyboard?.on(`keydown-${key}`, zoomIn);
     for (const key of ['MINUS', 'NUMPAD_SUBTRACT']) this.input.keyboard?.on(`keydown-${key}`, zoomOut);
@@ -1141,21 +1411,16 @@ export class ZoneScene extends Phaser.Scene {
     };
   }
 
-  private createMap(): void {
-    const map = this.make.tilemap({ key: zoneMapKey(this.zoneId) });
-    const tileset = map.addTilesetImage(BASE_TILESET_NAME, TILESET_TEXTURE);
-    if (!tileset) throw new Error(`O mapa de ${this.zoneId} não tem o tileset "${BASE_TILESET_NAME}".`);
-    for (const name of TILE_LAYERS) {
-      map.createLayer(name, tileset, 0, 0).setDepth(LAYER_DEPTH[name]);
-    }
-    this.drawShore(map, tileset.firstgid);
-  }
-
   /**
    * Margens da água: espuma clara onde a água toca terra a norte e nos lados, e uma sombra
    * escura por baixo da margem (a terra fica "acima" da água). Um único Graphics estático.
    */
-  private drawShore(map: Phaser.Tilemaps.Tilemap, firstgid: number, ox = 0, oy = 0): void {
+  private drawShore(
+    map: Phaser.Tilemaps.Tilemap,
+    firstgid: number,
+    ox = 0,
+    oy = 0,
+  ): Phaser.GameObjects.Graphics {
     const water = firstgid + baseTileIndex('water');
     const isWater = (x: number, y: number): boolean => {
       if (x < 0 || y < 0 || x >= map.width || y >= map.height) return true;
@@ -1179,6 +1444,7 @@ export class ZoneScene extends Phaser.Scene {
         if (!isWater(x + 1, y)) g.fillStyle(foam, 0.9).fillRect(px + size - 1, py, 1, size);
       }
     }
+    return g;
   }
 
   /** As animações são globais (do jogo), por isso só se criam na primeira vez. */
@@ -1346,7 +1612,7 @@ export class ZoneScene extends Phaser.Scene {
     const a = coop.alpha(now, view.at, coop.otherInterval);
     const x = this.toScreenGrid(view.px + (view.x - view.px) * a);
     const y = this.toScreenGrid(view.py + (view.y - view.py) * a);
-    other.setVisible(true).setPosition(x, y).setDepth(y);
+    other.setVisible(true).setPosition(x, y).setDepth(ysort(y));
     this.nameTag('other', coop.partnerName, x, y);
     const sinceAttack = now - coop.otherAttackAt;
     if (sinceAttack < ATTACK_MS) {
@@ -1377,7 +1643,7 @@ export class ZoneScene extends Phaser.Scene {
     // A câmara segue o boneco, por isso o mundo inteiro também fica alinhado.
     const x = this.toScreenGrid(previous.x + (state.x - previous.x) * alpha);
     const y = this.toScreenGrid(previous.y + (state.y - previous.y) * alpha);
-    player.setPosition(x, y).setDepth(y);
+    player.setPosition(x, y).setDepth(ysort(y));
     this.nameTag('self', coop.connected ? gameState.data.player.name : null, x, y);
     // A aparência pode mudar no menu de pausa.
     const texture = PLAYER_TEXTURES[state.look];

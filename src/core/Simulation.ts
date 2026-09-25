@@ -640,6 +640,8 @@ export class Simulation {
    */
   crossTo(to: string, _map: ZoneMap, x: number, y: number): void {
     const player = this.state.data.player;
+    // A posição anterior passa para as coordenadas da zona nova (a interpolação não salta).
+    this.previous = { x: this.previous.x + x - player.x, y: this.previous.y + y - player.y };
     player.zoneId = to;
     player.x = x;
     player.y = y;

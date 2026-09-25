@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { pinchStep, zoomLevels } from '../../src/display/worldZoom';
 
 describe('zoomLevels', () => {
-  it('do zoom da vista até metade, só inteiros', () => {
-    expect(zoomLevels(4)).toEqual([4, 3, 2]);
+  it('só um nível abaixo do zoom da vista, nunca abaixo de ×2', () => {
+    expect(zoomLevels(4)).toEqual([4, 3]);
     expect(zoomLevels(3)).toEqual([3, 2]);
-    expect(zoomLevels(2)).toEqual([2, 1]);
+    expect(zoomLevels(2)).toEqual([2]);
     expect(zoomLevels(1)).toEqual([1]);
-    expect(zoomLevels(6)).toEqual([6, 5, 4, 3]);
-    // Ao alto: um nível abaixo no mais perto e mais um para afastar.
-    expect(zoomLevels(4, true)).toEqual([3, 2, 1]);
-    expect(zoomLevels(3, true)).toEqual([2, 1]);
+    expect(zoomLevels(6)).toEqual([6, 5]);
   });
 
   it('com zoom fracionário (ecrã minúsculo) não há alternativas', () => {
