@@ -2,7 +2,7 @@
 // sessão e as mensagens trocadas entre o anfitrião e o convidado (pelo canal de dados).
 
 import type { FishingSession } from '../core/Fishing';
-import type { GameStateData, PlayerState } from '../core/GameState';
+import type { CharacterLook, GameStateData, PlayerState } from '../core/GameState';
 import type { Facing } from '../systems/movement/movement';
 
 /** Letras e números sem os que se confundem (0/O, 1/I/L): 31 símbolos. */
@@ -62,7 +62,8 @@ export type HostMessage =
   | {
       t: 'frame';
       tick: number;
-      host: [number, number, Facing, 0 | 1, 0 | 1] | null;
+      /** O anfitrião, se estiver na mesma zona: [x, y, direção, a andar, agachado, aparência]. */
+      host: [number, number, Facing, 0 | 1, 0 | 1, CharacterLook] | null;
       you: [hp: number, hunger: number, thirst: number, bleed: number];
       enemies: EnemyFrame[];
       fish: FishingSession | null;

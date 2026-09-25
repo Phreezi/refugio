@@ -14,6 +14,7 @@ import {
   createNewGameState,
   gameState,
   GameState,
+  type CharacterLook,
   type GameStateData,
 } from '../core/GameState';
 import { simulation, Simulation } from '../core/Simulation';
@@ -61,6 +62,7 @@ export interface AvatarView {
   sneak: boolean;
   /** Zona onde está. */
   zone: string;
+  look: CharacterLook;
   /** Quando chegou a posição (ms, performance.now) — para interpolar. */
   at: number;
 }
@@ -209,7 +211,7 @@ class Coop {
       const sneak = message.sneak === 1;
       sim.setRemotePlayer(message.x, message.y, message.facing, moved, sneak);
       sim.autoAttack = message.auto === 1;
-      this.other = this.avatar(message.x, message.y, message.facing, moved, sneak, message.zone);
+      this.other = this.avatar(message.x, message.y, message.facing, moved, sneak, message.zone, player.look);
     } else if (message.t === 'act') sim.setActionHeld(message.held === 1, message.tick);
     else if (message.t === 'away') sim.away = message.on === 1;
     else this.runCommand(message.sys, message.m, message.args, message.seq);
@@ -363,7 +365,14 @@ class Coop {
       t: 'frame',
       tick: state.data.world.tick,
       host: together
-        ? [host.x, host.y, host.facing, simulation.playerMoved ? 1 : 0, simulation.playerSneaking ? 1 : 0]
+        ? [
+            host.x,
+            host.y,
+            host.facing,
+            simulation.playerMoved ? 1 : 0,
+            simulation.playerSneaking ? 1 : 0,
+            host.look,
+          ]
         : null,
       you: [guest.hp, guest.hunger, guest.thirst, guest.bleed],
       enemies: sim.combat.list.map((e) => [
@@ -384,12 +393,14 @@ class Coop {
   // ——— Convidado ———
 
   /**
-   * Entra na sessão `code` com a personagem do save `own` (ou uma nova) e espera pelo mundo.
+   * Entra na sessão `code` com a personagem do save `own` (ou uma nova, com a aparência `look`)
+   * e espera pelo mundo.
    * @returns o estado a mostrar (o mundo do anfitrião com a personagem do convidado).
    */
-  join(code: string, own: GameStateData | null): Promise<GameStateData> {
+  join(code: string, own: GameStateData | null, look: CharacterLook): Promise<GameStateData> {
     this.leave();
     const mine = own ?? createNewGameState(content.zoneMap(BASE_ZONE_ID).playerSpawn);
+    mine.player.look = look;
     const character: GuestCharacter = {
       player: mine.player,
       unlocks: mine.unlocks,
@@ -519,8 +530,8 @@ class Coop {
     this.frameAt = performance.now();
     const zone = gameState.hasGame ? gameState.data.player.zoneId : '';
     if (message.host) {
-      const [x, y, facing, moved, sneak] = message.host;
-      this.other = this.avatar(x, y, facing, moved === 1, sneak === 1, zone);
+      const [x, y, facing, moved, sneak, look] = message.host;
+      this.other = this.avatar(x, y, facing, moved === 1, sneak === 1, zone, look);
     } else this.other = null;
     if (!gameState.hasGame) return;
     const player = gameState.data.player;
@@ -656,6 +667,7 @@ class Coop {
     moved: boolean,
     sneak: boolean,
     zone: string,
+    look: CharacterLook,
   ): AvatarView {
     const old = this.other?.zone === zone ? this.other : null;
     return {
@@ -667,6 +679,7 @@ class Coop {
       moved,
       sneak,
       zone,
+      look,
       at: performance.now(),
     };
   }

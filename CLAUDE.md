@@ -264,7 +264,7 @@ npm run validate-data   # valida referências cruzadas entre JSONs (paleta, mani
 npm run palette    # regenera public/assets/palette.png
 npm run tiles      # regenera public/assets/tiles/base_tiles.png (ordem = src/world/tileset.ts)
 npm run sprites    # regenera public/assets/sprites/*.png (pixel art de recursos e obstáculos; `-- --preview f.png`)
-npm run characters # regenera public/assets/sprites/player.png (spritesheet da personagem; `-- --preview f.png`)
+npm run characters # regenera public/assets/sprites/player.png e player_girl.png (spritesheets das personagens; `-- --preview f.png`)
 npm run map:base   # gera maps/base.json (recusa substituir sem `-- --force`: o mapa edita-se no Tiled)
 npm run map:pine   # gera maps/pine_forest.json (idem)
 npm run map:farm   # gera maps/farm.json (idem; usa scripts/mapgen.ts)
@@ -894,7 +894,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 - [x] Definir guia de estilo (paleta final, contornos, luz de cima-esquerda, proporções). *(Acima.)*
 - [ ] Tilesets finais por bioma (base, floresta, quinta, lago, estrada, aldeia, industrial, militar, cidade).
-- [ ] Personagem com mais frames e peças de equipamento visíveis (camadas de sprite). *(Feito: a personagem em pixel art, `npm run characters` → `sprites/player.png`, 10×4 frames; falta o equipamento visível.)*
+- [ ] Personagem com mais frames e peças de equipamento visíveis (camadas de sprite). *(Feito: as personagens em pixel art — rapaz e rapariga, `npm run characters` → `sprites/player.png` e `player_girl.png`, 10×4 frames; escolhe-se no menu inicial, "Personagem"; falta o equipamento visível.)*
 - [ ] Inimigos, recursos, estruturas, ícones finais.
 - [ ] UI final (moldura de madeira/tecido, fonte pixel legível com acentos portugueses).
 - [ ] Música por zona (loops curtos) e efeitos sonoros; tudo com licença registada. *(Efeitos feitos: sintetizados em `src/audio/sfx.ts` — golpes, recolha, dano, fabrico, construção, pesca, nível, alarme da horda, cliques — com volume nas definições; falta a música.)*
@@ -1101,4 +1101,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Ataque automático (botão "Auto"/F, preferência do dispositivo `autoAttack`) | Pedido do jogador ("muito importante"): andar e atacar sozinho o que estiver ao alcance |
 | 2026-09-25 | Tirado o tamanho da interface das definições | Pedido do jogador: o zoom (Ctrl + roda, pinça) já faz isso |
 | 2026-09-25 | Textos com origem vertical 0,5 centrados pelo meio das maiúsculas (medido no browser), não pela caixa do texto | O "Viajar" aparecia descentrado noutra fonte (Windows): a caixa inclui espaço para acentos e descendentes |
+| 2026-09-25 | Save v14: `player.look` (`boy`/`girl`); a aparência escolhe-se no menu inicial (vale para o jogo que começar ou continuar, e para a personagem levada ao co-op) | Pedido do jogador ("personagem menina"). Mesmo layout de spritesheet; no co-op o anfitrião manda a sua aparência no `frame` e o outro boneco só leva o tom azulado se as aparências forem iguais |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

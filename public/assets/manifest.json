@@ -26,6 +26,21 @@
       },
       "file": "sprites/player.png"
     },
+    "player_girl": {
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 10,
+      "rows": 4,
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "rose",
+        "border": "ink",
+        "style": "character"
+      },
+      "file": "sprites/player_girl.png"
+    },
     "zombie_walker": {
       "type": "image",
       "placeholder": {
