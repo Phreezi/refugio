@@ -19,6 +19,9 @@ import { rollLoot } from '../systems/loot/loot';
 import { stationKey } from './Crafting';
 import type { PlayerActions } from './PlayerActions';
 
+/** Espaços mínimos de uma mochila/pilha no chão aberta (para se poder largar lá mais). */
+const BAG_MIN_SLOTS = 10;
+
 /** Tudo o que a lógica precisa de saber da zona onde o jogador está. */
 export interface ZoneContext {
   zoneId: string;
@@ -279,7 +282,14 @@ export class Interaction {
       this.combat.attack(data.uid);
     } else if (data.type === 'bag') {
       this.bus.emit('player:action', { kind: 'open' });
-      this.combat.takeBag(data.index);
+      // Abre-se ao lado da mochila para escolher o que apanhar (com espaço para largar lá mais).
+      const zoneId = this.zone.zoneId;
+      const bag = zoneState(this.state.data, zoneId).bags[data.index];
+      if (bag) {
+        const slots = Math.max(BAG_MIN_SLOTS, Math.ceil((bag.items.length + 1) / 5) * 5);
+        while (bag.items.length < slots) bag.items.push(null);
+        this.bus.emit('container:open', { container: `bag:${zoneId}:${String(data.index)}` });
+      }
     } else if (data.type === 'loot') {
       this.bus.emit('player:action', { kind: 'open' });
       this.openLoot(data.placement);

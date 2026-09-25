@@ -669,6 +669,8 @@ export interface StructureDef {
   footprint?: Footprint;
   /** Duas orientações (horizontal/vertical). */
   rotatable: boolean;
+  /** Vira-se sozinha para ligar às peças iguais ao lado (vedações em fila vertical ficam verticais). */
+  connects: boolean;
   /** Abre e fecha com a ação contextual (fechada é sólida). */
   door: boolean;
   /** Estação de crafting (id de `stations.json`). */
@@ -736,6 +738,7 @@ const STRUCTURE_KEYS = new Set([
   'solid',
   'footprint',
   'rotatable',
+  'connects',
   'door',
   'station',
   'chest',
@@ -814,6 +817,7 @@ export function parseStructures(
       cost,
       solid: flag(id, raw, 'solid'),
       rotatable: flag(id, raw, 'rotatable'),
+      connects: flag(id, raw, 'connects'),
       door: flag(id, raw, 'door'),
       chest: flag(id, raw, 'chest'),
       needsFoundation: flag(id, raw, 'needsFoundation'),

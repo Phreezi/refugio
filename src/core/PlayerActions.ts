@@ -8,11 +8,11 @@ import {
   storeSimilar,
   type Container,
 } from '../systems/inventory/inventory';
-import type { EventBus, GameEvents } from './EventBus';
+import type { EventBus, GameEvents, OtherContainerRef } from './EventBus';
 import { chestContents, zoneState, type GameState } from './GameState';
 
 /** Onde está um slot: mochila, hotbar ou um baú (`chest:<id>`). */
-export type ContainerRef = 'inventory' | 'hotbar' | 'equipment' | `chest:${string}` | `loot:${string}`;
+export type ContainerRef = 'inventory' | 'hotbar' | 'equipment' | OtherContainerRef;
 
 export interface SlotRef {
   container: ContainerRef;
@@ -27,6 +27,8 @@ export class PlayerActions {
   private readonly state: GameState;
   private readonly bus: EventBus<GameEvents>;
   private readonly items: () => ItemDefs;
+  /** Largar itens no chão onde está o jogador (ligado ao combate pela Simulation). */
+  dropItems: (items: Container) => boolean = () => false;
   /** Ler uma nota: aprende a receita (ligado à progressão pela Simulation). */
   readNote: (recipe: string) => 'learned' | 'known' | 'unknown' = () => 'unknown';
 
@@ -41,6 +43,11 @@ export class PlayerActions {
     if (ref === 'inventory') return data.player.inventory;
     if (ref === 'hotbar') return data.player.hotbar;
     if (ref === 'equipment') return data.player.equipment;
+    if (ref.startsWith('bag:')) {
+      // bag:<zona>:<índice> — mochila ou pilha de itens no chão.
+      const [, zoneId = '', index = ''] = ref.split(':');
+      return zoneState(data, zoneId).bags[Number(index)]?.items ?? [];
+    }
     if (ref.startsWith('loot:')) {
       // loot:<zona>:<id do objeto>
       const [, zoneId = '', objectId = ''] = ref.split(':');
@@ -142,6 +149,25 @@ export class PlayerActions {
       }
     }
     return false;
+  }
+
+  /** Larga o slot inteiro no chão (numa pilha que se abre com a ação para o voltar a apanhar). */
+  drop(ref: SlotRef): boolean {
+    const container = this.container(ref.container);
+    const slot = container[ref.index];
+    if (!slot || ref.container.startsWith('bag:') || !this.dropItems([slot])) return false;
+    container[ref.index] = null;
+    this.changed();
+    return true;
+  }
+
+  /** Destrói o slot inteiro (sem volta: a interface pede confirmação). */
+  destroy(ref: SlotRef): boolean {
+    const container = this.container(ref.container);
+    if (!container[ref.index]) return false;
+    container[ref.index] = null;
+    this.changed();
+    return true;
   }
 
   split(ref: SlotRef): boolean {

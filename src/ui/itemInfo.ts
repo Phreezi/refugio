@@ -20,7 +20,7 @@ export function describeItem(id: string, def: ItemDef | undefined): string[] {
     add('info.speed', { n: (Math.round((1 / sec) * 10) / 10).toFixed(1) });
     if (def.ranged)
       add('info.range', { n: Math.round(def.ranged.range / 16), ammo: itemName(def.ranged.ammo) });
-    else add('info.reach', { n: def.reach ?? BALANCE.weaponReachPx });
+
     const skill = skillOf(def);
     const level = gameState.hasGame ? skillLevel(gameState.data.player.skills[skill] ?? 0, BALANCE) : 1;
     add('info.skill', {

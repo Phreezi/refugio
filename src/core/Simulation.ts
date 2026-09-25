@@ -116,6 +116,7 @@ export class Simulation {
     this.actions = new PlayerActions(state, bus, items);
     this.progression = new Progression(state, bus, progression);
     this.actions.readNote = (recipe) => this.progression.learn(recipe);
+    this.actions.dropItems = (items) => this.combat.dropHere(items);
     this.building = new Building(state, bus, this.actions);
     this.building.isUnlocked = (id) => this.progression.isStructureUnlocked(id);
     this.combat = new Combat(state, bus, this.actions, combat);
@@ -380,6 +381,7 @@ export class Simulation {
     this.movePlayer();
     if (this.moved) this.tutorial.playerMoved();
     this.combat.collectGround();
+    this.combat.pruneBags();
     this.checkExits();
     this.runAction(world.tick);
     for (const secondary of this.secondaries) secondary.tickSecondary(world.tick);
@@ -403,6 +405,7 @@ export class Simulation {
     if (this.combat.away) return;
     this.combat.sneaking = this.sneaking;
     this.combat.collectGround();
+    this.combat.pruneBags();
     this.runAction(tick);
     if (!this.linked && this.zone) {
       this.interaction.tick(tick);

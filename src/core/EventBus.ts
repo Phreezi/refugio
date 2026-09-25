@@ -1,3 +1,6 @@
+/** Contentores que abrem ao lado da mochila. */
+export type OtherContainerRef = `chest:${string}` | `loot:${string}` | `bag:${string}`;
+
 export type Handler<T> = (payload: T) => void;
 
 /**
@@ -94,8 +97,11 @@ export interface GameEvents {
   /** Hordas (§7.13). */
   'horde:started': { size: number };
   'horde:ended': { won: boolean };
-  /** Abrir um baú (`chest:<id>`) ou contentor com loot (`loot:<zona>:<id>`), ao lado da mochila. */
-  'container:open': { container: `chest:${string}` | `loot:${string}` };
+  /**
+   * Abrir um baú (`chest:<id>`), contentor com loot (`loot:<zona>:<id>`) ou mochila/pilha no
+   * chão (`bag:<zona>:<índice>`), ao lado da mochila.
+   */
+  'container:open': { container: OtherContainerRef };
   /** Abrir o painel de crafting de uma estação (`<tipo>_<id do objeto>`). */
   'station:open': { stationKey: string };
   /** Um craft terminou (mãos: já está no inventário; estação: à espera de ser recolhido). */

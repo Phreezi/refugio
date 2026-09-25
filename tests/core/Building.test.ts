@@ -89,6 +89,18 @@ describe('Building (construção da base)', () => {
     expect(events).toEqual(['placed:1']);
   });
 
+  it('vedações em fila vertical viram-se sozinhas (e a vizinha também)', () => {
+    const { state, sim, give } = setup();
+    give([['wood', 10]]);
+    expect(sim.building.place('fence_wood', 2, 2, 0)).toBeNull();
+    expect(sim.building.place('fence_wood', 2, 3, 0)).toBeNull();
+    expect(sim.building.place('fence_wood', 2, 4, 0)).toBeNull();
+    expect(state.data.base.structures.map((r) => r[4])).toEqual([1, 1, 1]);
+    // Uma ao lado da de baixo: essa passa a ligar na horizontal.
+    expect(sim.building.place('fence_wood', 3, 4, 0)).toBeNull();
+    expect(state.data.base.structures.map((r) => r[4])).toEqual([1, 1, 0, 0]);
+  });
+
   it('sem materiais não coloca nada', () => {
     const { state, sim, give } = setup();
     give([['wood', 1]]);
