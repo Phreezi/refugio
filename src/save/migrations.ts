@@ -107,6 +107,11 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
       zones: Object.fromEntries(Object.entries(zones).map(([id, zone]) => [id, { ...zone, ground: [] }])),
     };
   },
+  // v15 → v16: aljava (a munição passa a entrar na arma à distância quando se equipa).
+  15: (s) => {
+    const player = s.player as Record<string, unknown>;
+    return { ...s, player: { ...player, quiver: [] } };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

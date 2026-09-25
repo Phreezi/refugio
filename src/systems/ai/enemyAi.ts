@@ -46,6 +46,8 @@ export interface Enemy {
   horde: boolean;
   /** Ticks seguidos sem se aproximar do jogador (preso numa parede). */
   stuck: number;
+  /** Flechas (recuperáveis) espetadas: ficam no corpo quando morre. Não se grava. */
+  arrows?: Record<string, number>;
   /** Peça construída que está a atacar (uid), quando o aviso é contra ela. */
   siege: number | null;
   /** Alertado por um grito: ticks em que vai à procura do jogador (sem desistir). */

@@ -2380,6 +2380,22 @@ const RANGED_ICONS: Sprite[] = [
       img.set(9, 6, c('orange'));
     },
   },
+  ...(['stone_arrow', 'iron_arrow'] as const).map((file): Sprite => ({
+    file,
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      // Duas flechas com ponta maior (pedra cinzenta ou ferro claro).
+      const tip = file === 'stone_arrow' ? c('stone_dark') : c('ice');
+      for (const o of [0, 5]) {
+        for (let i = 0; i < 8; i++) img.set(1 + i + o, 13 - i, c('wood_light'));
+        img.fill(9 + o, 4, 2, 2, tip);
+        img.set(10 + o, 3, tip);
+        img.set(1 + o, 13, c('cream'));
+      }
+    },
+  })),
   {
     file: 'arrow',
     width: 16,

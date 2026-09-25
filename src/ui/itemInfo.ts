@@ -41,7 +41,11 @@ export function describeItem(id: string, def: ItemDef | undefined): string[] {
   if (def.plant) add('info.plant', { item: itemName(def.plant.crop), h: def.plant.growHours });
   if (def.waters) add('info.waters');
   if (def.teaches) add('info.note');
-  if (def.type === 'ammo') add('info.ammo');
+  if (def.type === 'ammo') {
+    add('info.ammo');
+    if (def.ammoDamage) add('info.ammo_damage', { n: def.ammoDamage });
+    if (def.breakPct !== undefined) add('info.break', { n: def.breakPct });
+  }
   if (def.durability !== undefined) add('info.durability', { n: def.durability });
   if (lines.length === 0) add(def.type === 'resource' ? 'info.material' : 'info.none');
   return lines;

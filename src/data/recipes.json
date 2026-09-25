@@ -495,6 +495,32 @@
     "unlockLevel": 2
   },
   {
+    "id": "r_stone_arrow",
+    "station": "hands",
+    "category": "weapons",
+    "inputs": [
+      ["wood", 1],
+      ["stone", 1]
+    ],
+    "output": "stone_arrow",
+    "qty": 5,
+    "timeSec": 0,
+    "unlockLevel": 3
+  },
+  {
+    "id": "r_iron_arrow",
+    "station": "wood_bench",
+    "category": "weapons",
+    "inputs": [
+      ["wood", 1],
+      ["iron_ingot", 1]
+    ],
+    "output": "iron_arrow",
+    "qty": 10,
+    "timeSec": 10,
+    "unlockLevel": 10
+  },
+  {
     "id": "r_hunting_bow",
     "station": "wood_bench",
     "category": "weapons",

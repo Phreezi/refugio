@@ -11,6 +11,8 @@ export interface SkillBalance {
   missPctMelee: number;
   missPctRanged: number;
   missPctPerLevel: number;
+  /** À distância desce mais depressa (começa muito mais alto). */
+  missPctPerLevelRanged: number;
   missPctMin: number;
 }
 
@@ -27,7 +29,8 @@ export function skillLevel(xp: number, balance: SkillBalance): number {
 /** % de falhar um golpe ou tiro com esta perícia neste nível. */
 export function missPct(level: number, ranged: boolean, balance: SkillBalance): number {
   const base = ranged ? balance.missPctRanged : balance.missPctMelee;
-  return Math.max(balance.missPctMin, base - (level - 1) * balance.missPctPerLevel);
+  const perLevel = ranged ? balance.missPctPerLevelRanged : balance.missPctPerLevel;
+  return Math.max(balance.missPctMin, base - (level - 1) * perLevel);
 }
 
 /**

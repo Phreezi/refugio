@@ -377,7 +377,9 @@ describe('Armas à distância (Fase 10)', () => {
     run(0.6);
     expect(sim.combat.shots).toHaveLength(0);
     expect(walker.hp).toBe(40 - 18);
-    // Sem virotes: avisa e não dispara.
+    // O virote que sobrou entrou na besta (aljava). Sem virotes: avisa e não dispara.
+    expect(player.quiver).toEqual([['bolt', 1]]);
+    player.quiver = [];
     player.inventory[0] = null;
     expect(sim.combat.shoot()).toBe('no_ammo');
     expect(events.filter((e) => e.startsWith('hurt:'))).toEqual([]);
@@ -391,21 +393,20 @@ describe('Armas à distância (Fase 10)', () => {
     expect(countItem([state.data.player.inventory], 'bolt')).toBe(5);
   });
 
-  it('as paredes param os projéteis', () => {
+  it('a mira não atravessa paredes (nem o ataque automático dispara contra elas)', () => {
     const zone = map([{ id: 'walker', x: 330, y: 240 }]);
     // Uma parede entre o jogador e o inimigo (coluna de tiles x = 17).
     for (let y = 0; y < N; y++) (zone.solid as boolean[])[y * N + 17] = true;
-    const { state, sim, run } = setup(zone);
+    const { state, sim } = setup(zone);
     state.data.player.equipment[0] = ['crossbow', 1, 240];
     state.data.player.inventory[0] = ['bolt', 1];
     const walker = sim.combat.list[0];
     if (!walker) throw new Error('sem arrastado');
     walker.state = 'idle';
     walker.timer = 1000;
-    expect(sim.combat.shoot()).toBe('shot');
-    run(0.3);
-    expect(sim.combat.shots).toHaveLength(0);
-    expect(walker.hp).toBe(40);
+    expect(sim.combat.canSee(walker)).toBe(false);
+    expect(sim.combat.shoot()).toBeNull();
+    expect(sim.combat.aimTarget()).toBeNull();
   });
 });
 
@@ -439,7 +440,8 @@ describe('Arco, mira presa, flechas no chão e perícias', () => {
 
   it('uma flecha que falha fica no chão e apanha-se ao passar por cima', () => {
     const { state, sim, run } = setup(map([{ id: 'walker', x: 300, y: 240 }]));
-    sim.combat.roll = () => 0; // falha sempre
+    let rolls = 0;
+    sim.combat.roll = () => (rolls++ === 0 ? 0 : 0.99); // falha o tiro; a flecha não parte
     const player = state.data.player;
     player.equipment[0] = ['short_bow', 1, 100];
     player.inventory[0] = ['arrow', 3];
@@ -453,12 +455,14 @@ describe('Arco, mira presa, flechas no chão e perícias', () => {
     const ground = state.data.zones[ZONE]?.ground ?? [];
     expect(ground).toHaveLength(1);
     expect(ground[0]?.[2]).toBe('arrow');
-    expect(countItem([player.inventory], 'arrow')).toBe(2);
+    // As flechas entram no arco (aljava); a do chão também vai lá parar.
+    expect(player.quiver).toEqual([['arrow', 2]]);
     const [gx, gy] = ground[0] ?? [0, 0];
     player.x = gx;
     player.y = gy;
     run(0.1);
-    expect(countItem([player.inventory], 'arrow')).toBe(3);
+    expect(player.quiver).toEqual([['arrow', 3]]);
+    expect(countItem([player.inventory], 'arrow')).toBe(0);
     expect(state.data.zones[ZONE]?.ground).toEqual([]);
   });
 
@@ -474,6 +478,70 @@ describe('Arco, mira presa, flechas no chão e perícias', () => {
     expect(player.skills.blade).toBe(15);
     expect(events).toContain('skill:blade:2');
     expect(player.skills.fists).toBeUndefined();
+  });
+});
+
+describe('Aljava e corpos', () => {
+  it('as flechas entram no arco; ao tirar o arco voltam para a mochila e o excesso fica no chão', () => {
+    const { state, sim, run } = setup(map([]));
+    const player = state.data.player;
+    player.equipment[0] = ['short_bow', 1, 100];
+    player.inventory[0] = ['arrow', 999];
+    player.inventory[1] = ['stone_arrow', 40];
+    player.hotbar[2] = ['arrow', 500];
+    run(0.1);
+    expect(player.quiver).toEqual([
+      ['arrow', 1499],
+      ['stone_arrow', 40],
+    ]);
+    expect(sim.combat.ammoCount()).toBe(1539);
+    // Tira o arco com a mochila quase cheia: o que não couber fica numa pilha no chão.
+    player.inventory.fill(['wood', 50]);
+    player.inventory[0] = null;
+    player.hotbar.fill(['stone', 50]);
+    player.equipment[0] = null;
+    run(0.1);
+    expect(player.quiver).toEqual([]);
+    expect(player.inventory[0]).toEqual(['arrow', 999]);
+    const pile = state.data.zones[ZONE]?.bags[0]?.items ?? [];
+    expect(pile).toEqual([
+      ['arrow', 500],
+      ['stone_arrow', 40],
+    ]);
+  });
+
+  it('o arco usa primeiro a flecha com mais dano; as que não partem apanham-se do corpo', () => {
+    const { state, sim, run } = setup(map([{ id: 'walker', x: 300, y: 240 }]));
+    sim.combat.roll = () => 0.99; // acerta e não parte
+    const player = state.data.player;
+    player.equipment[0] = ['short_bow', 1, 100];
+    player.quiver = [
+      ['arrow', 5],
+      ['iron_arrow', 1],
+    ];
+    const walker = sim.combat.list[0];
+    if (!walker) throw new Error('sem arrastado');
+    walker.state = 'idle';
+    walker.timer = 10000;
+    walker.hp = 7 + 6 + 1; // a de ferro (7 + 6) não chega; a seguinte mata
+    expect(sim.combat.shoot()).toBe('shot');
+    run(1);
+    expect(walker.hp).toBe(1);
+    expect(sim.combat.shoot()).toBe('shot');
+    run(1);
+    expect(sim.combat.list).toHaveLength(0);
+    const corpse = sim.combat.corpses[0];
+    expect(corpse?.arrows).toEqual({ iron_arrow: 1, arrow: 1 });
+    player.x = corpse?.x ?? 0;
+    player.y = corpse?.y ?? 0;
+    run(0.1);
+    expect(player.quiver).toEqual([
+      ['arrow', 5],
+      ['iron_arrow', 1],
+    ]);
+    // O corpo desaparece ao fim de corpseSec.
+    run(BALANCE.corpseSec);
+    expect(sim.combat.corpses).toHaveLength(0);
   });
 });
 

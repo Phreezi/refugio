@@ -141,6 +141,7 @@ export const HOST_VISUAL_EVENTS: ReadonlySet<string> = new Set([
   'enemy:exploded',
   'enemy:scream',
   'enemy:missed',
+  'corpse:gone',
   'structure:damaged',
   'structure:destroyed',
   'bag:changed',
