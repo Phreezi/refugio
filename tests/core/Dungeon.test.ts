@@ -148,7 +148,8 @@ describe('Zonas T4 (Fase 10)', () => {
     const military = realMap('zone_military');
     expect(military.containers.filter((c) => c.id === 'armory').length).toBeGreaterThanOrEqual(6);
     const city = realMap('zone_city');
-    expect(city.containers.filter((c) => c.id === 'city_store')).toHaveLength(16);
+    // 16 nas lojas dos prédios e mais algumas na área de combate a leste (Etapa E).
+    expect(city.containers.filter((c) => c.id === 'city_store').length).toBeGreaterThanOrEqual(16);
     expect(city.enemySpawns.length).toBeGreaterThanOrEqual(10);
   });
 });

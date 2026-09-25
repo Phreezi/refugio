@@ -3,6 +3,7 @@ import { EQUIP_SLOTS } from '../data/types';
 import type { StructureRecord } from '../systems/building/building';
 import type { Skills } from '../systems/combat/skills';
 import type { TalentEffect, Talents } from '../systems/progression/talents';
+import { emptyQuestState, type QuestState } from '../systems/quests/quests';
 import type { GameStatsCounters } from './Stats';
 import { createStationState, type StationState } from '../systems/crafting/crafting';
 import { createContainer, type Container } from '../systems/inventory/inventory';
@@ -50,6 +51,8 @@ export interface PlayerState {
   coins: number;
   /** Efeitos temporários da comida (§7.17): [efeito, valor, tick em que acaba]. */
   buffs: Buff[];
+  /** Missões (§7.18): ativas (progresso de cada objetivo) e feitas. */
+  quests: QuestState;
 }
 
 /** Efeito temporário (comida encomendada): soma-se aos talentos até `until`. */
@@ -182,6 +185,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       quiver: [],
       coins: 0,
       buffs: [],
+      quests: emptyQuestState(),
     },
     world: { tick: 0, rng: seed >>> 0 },
     base: {

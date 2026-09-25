@@ -14,6 +14,7 @@ import type { ResourcePlacement, ZoneMap } from '../world/zoneMap';
 import { secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
 import { BASE_ZONE_ID, zoneState, type GameState } from './GameState';
+import { NPC_FOOTPRINT } from '../systems/quests/quests';
 import { structureChestId, structureStationKey, type Building } from './Building';
 import type { Combat } from './Combat';
 import type { Fishing } from './Fishing';
@@ -64,7 +65,8 @@ export type TargetData =
   | { type: 'producer'; placement: ResourcePlacement; uid: number }
   | { type: 'repair'; placement: ResourcePlacement; uid: number }
   | { type: 'fish'; placement: ResourcePlacement }
-  | { type: 'teleport'; placement: ResourcePlacement };
+  | { type: 'teleport'; placement: ResourcePlacement }
+  | { type: 'npc'; placement: ResourcePlacement };
 /** Os recursos que reaparecem verificam-se uma vez por segundo de jogo. */
 const RESPAWN_CHECK_TICKS = 20;
 
@@ -200,6 +202,13 @@ export class Interaction {
         });
       }
     }
+    for (const placement of zone.map.npcs ?? []) {
+      list.push({
+        kind: 'container',
+        area: areaOf(placement, NPC_FOOTPRINT),
+        data: { type: 'npc', placement },
+      });
+    }
     for (const placement of zone.map.containers) {
       list.push({
         kind: 'container',
@@ -319,6 +328,9 @@ export class Interaction {
       this.fishing.start();
     } else if (data.type === 'teleport') {
       this.useWaystone();
+    } else if (data.type === 'npc') {
+      this.bus.emit('player:action', { kind: 'open' });
+      this.bus.emit('npc:talk', { npc: data.placement.id });
     } else if (data.type === 'repair') {
       this.bus.emit('player:action', { kind: 'gather' });
       const missing = this.building.repair(data.uid);
@@ -346,18 +358,16 @@ export class Interaction {
   }
 
   /**
-   * Poste de teletransporte (Etapa E): a primeira vez ativa-o (fica como destino); depois abre
-   * a escolha do destino (mapa-mundo sem custo de viagem).
+   * Poste de teletransporte (Etapa E): abre a escolha do destino. Nas zonas, o poste só funciona
+   * depois de o técnico ao lado o reparar (§7.18); o da base funciona sempre.
    */
   private useWaystone(): void {
     const zoneId = this.zone?.zoneId;
     if (!zoneId) return;
     this.bus.emit('player:action', { kind: 'use' });
-    const waystones = this.state.data.waystones;
-    if (zoneId !== BASE_ZONE_ID && !waystones.includes(zoneId)) {
-      waystones.push(zoneId);
-      this.state.markDirty();
-      this.bus.emit('waystone:activated', { zoneId });
+    if (zoneId !== BASE_ZONE_ID && !this.state.data.waystones.includes(zoneId)) {
+      this.bus.emit('action:blocked', { reason: 'post_broken' });
+      return;
     }
     this.bus.emit('waystone:use', { zoneId });
   }

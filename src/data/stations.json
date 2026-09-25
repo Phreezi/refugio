@@ -60,5 +60,14 @@
     },
     "queue": 3,
     "deliver": true
+  },
+  "merchant": {
+    "sprite": "npc_merchant",
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "queue": 1,
+    "trade": true
   }
 }

@@ -16,6 +16,8 @@ import { Homestead } from './Homestead';
 import { Horde, type HordeContent } from './Horde';
 import { Stats } from './Stats';
 import { Tutorial } from './Tutorial';
+import { Quests, type QuestContent } from './Quests';
+import { removeItem } from '../systems/inventory/inventory';
 import { Progression, type ProgressionContent } from './Progression';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
@@ -49,6 +51,12 @@ function travelExits(zone: ZoneContext): ZoneMap['exits'] {
   });
 }
 
+/** Como se paga o teletransporte: moedas ou um pergaminho de viagem. */
+export type TeleportPay = 'coins' | 'scroll';
+
+/** Pergaminho de viagem (§7.18). */
+export const TRAVEL_SCROLL = 'travel_scroll';
+
 /** Prop dos postes de teletransporte nos mapas (`prop:waystone`). */
 export const WAYSTONE_PROP = 'waystone';
 
@@ -72,6 +80,7 @@ export class Simulation {
   readonly combat: Combat;
   readonly fishing: Fishing;
   readonly homestead: Homestead;
+  readonly quests: Quests;
   readonly horde: Horde;
   readonly stats: Stats;
   readonly tutorial: Tutorial;
@@ -142,6 +151,12 @@ export class Simulation {
       enemyGroups: content.enemyGroups,
       lootTables: content.lootTables,
     }),
+    quests: () => QuestContent = () => ({
+      quests: content.quests,
+      npcs: content.npcs,
+      waystones: content.waystones,
+      items: content.items,
+    }),
   ) {
     this.state = state;
     this.bus = bus;
@@ -158,6 +173,11 @@ export class Simulation {
     this.horde = new Horde(state, bus, this.combat, horde);
     this.fishing = new Fishing(state, bus, this.actions, items);
     this.homestead = new Homestead(state, bus, this.actions, this.building, items);
+    this.quests = new Quests(state, bus, quests, this.actions, this.progression);
+    // Falar com um NPC conta para as missões (e a interface abre a conversa).
+    bus.on('npc:talk', ({ npc }) => {
+      this.quests.talkTo(npc);
+    });
     this.interaction = new Interaction(
       state,
       bus,
@@ -203,7 +223,10 @@ export class Simulation {
     // Co-op (convidado): os inimigos são os do anfitrião (chegam pela rede).
     if (this.remote) this.combat.setRemote([]);
     this.horde.setZone(zone);
-    if (zone) this.progression.visit(zone.zoneId);
+    if (zone) {
+      this.progression.visit(zone.zoneId);
+      this.quests.visit(zone.zoneId);
+    }
     this.interaction.setZone(zone);
     this.syncLinks();
   }
@@ -260,6 +283,7 @@ export class Simulation {
     this.combat.link(primary.combat);
     this.building.link(primary.building);
     this.progression.visit(zone.zoneId);
+    this.quests.visit(zone.zoneId);
     this.interaction.setZone(zone);
   }
 
@@ -369,16 +393,33 @@ export class Simulation {
    * Teletransporte (Etapa E): sem custo, para a base ou para uma zona com o poste ativado;
    * chega-se ao lado do poste. @returns false se o destino não tiver poste ativado.
    */
-  teleport(to: string, map: ZoneMap): boolean {
-    if (to !== BASE_ZONE_ID && !this.state.data.waystones.includes(to)) return false;
+  teleport(to: string, map: ZoneMap, pay: TeleportPay = 'coins'): boolean {
+    const player = this.state.data.player;
+    if (to !== BASE_ZONE_ID) {
+      if (!this.state.data.waystones.includes(to)) return false;
+      // Paga-se em moedas (mais, quanto mais perigosa a zona) ou com um pergaminho.
+      if (pay === 'scroll') {
+        if (!removeItem(this.actions.pickupContainers(), TRAVEL_SCROLL, 1)) return false;
+      } else {
+        const price = this.teleportPrice(to);
+        if (player.coins < price) return false;
+        player.coins -= price;
+      }
+    }
     const post = map.props.find((p) => p.id === WAYSTONE_PROP);
     const at = post ? { x: post.x, y: post.y + BALANCE.teleportArrivalPx } : { ...map.playerSpawn };
-    const player = this.state.data.player;
     player.zoneId = to;
     player.x = at.x;
     player.y = at.y;
     this.state.markDirty();
+    this.bus.emit('inventory:changed', {});
     return true;
+  }
+
+  /** Moedas do teletransporte para uma zona (para casa é grátis). */
+  teleportPrice(to: string): number {
+    if (to === BASE_ZONE_ID) return 0;
+    return BALANCE.teleportCoinsPerDanger * Math.max(1, this.progression.zoneDanger(to));
   }
 
   /** Onde o jogador reaparece se morrer (o `player_spawn` da base). */

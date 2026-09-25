@@ -22,6 +22,7 @@ import { CraftingUI } from '../ui/CraftingUI';
 import { FishingUI } from '../ui/FishingUI';
 import { LevelUpUI } from '../ui/LevelUpUI';
 import { PauseUI } from '../ui/PauseUI';
+import { DialogUI, goalText } from '../ui/DialogUI';
 import { SkillsUI, skillEffectText } from '../ui/SkillsUI';
 import { preferences, setPreference } from '../ui/preferences';
 import { autosave } from '../save';
@@ -120,6 +121,9 @@ export class UIScene extends Phaser.Scene {
   private bleedLabel: Label | null = null;
   /** Proteção de principiante (armas sem desgaste até ao dia 4). */
   private beginnerLabel: Label | null = null;
+  /** Missão em curso (§7.18): título e o que falta, por baixo das barras. */
+  private questLabel: Label | null = null;
+  private dialog: DialogUI | null = null;
   private seedHintShown = false;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
   private hordeLabel: Label | null = null;
@@ -248,6 +252,7 @@ export class UIScene extends Phaser.Scene {
       this.quitToMenu();
     };
     this.skills = new SkillsUI(this);
+    this.dialog = new DialogUI(this);
     this.pause.onSkills = () => {
       this.skills?.open();
     };
@@ -287,6 +292,9 @@ export class UIScene extends Phaser.Scene {
       this.pause = null;
       this.skills?.destroy();
       this.skills = null;
+      this.dialog?.destroy();
+      this.dialog = null;
+      this.questLabel = null;
       this.sprintButton = null;
       this.sprintVisible = true;
       this.sprintReady = false;
@@ -366,6 +374,7 @@ export class UIScene extends Phaser.Scene {
     }
     this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
     this.beginnerLabel?.setVisible(simulation.combat.beginner && !uiState.modalOpen);
+    this.renderQuest();
     this.renderBossBar();
     this.renderHint();
     this.renderWeapon();
@@ -565,6 +574,17 @@ export class UIScene extends Phaser.Scene {
       eventBus.on('talents:reset', () => {
         this.showNotice(t('skills.reset_done'));
       }),
+      // NPCs e missões (§7.18).
+      eventBus.on('npc:talk', ({ npc }) => {
+        this.closePanels();
+        this.dialog?.open(npc);
+      }),
+      eventBus.on('quest:accepted', ({ quest }) => {
+        this.showNotice(t('quest.accepted', { title: tKey(`quest.${quest}`) }));
+      }),
+      eventBus.on('quest:done', ({ quest }) => {
+        this.showNotice(t('quest.completed', { title: tKey(`quest.${quest}`) }));
+      }),
       eventBus.on('waystone:activated', () => {
         this.showNotice(t('msg.waystone_on'));
       }),
@@ -586,6 +606,7 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'nothing_yet') this.showNotice(t('farm.nothing_yet'));
         else if (reason === 'needs_level') this.showNotice(t('msg.needs_level', { level: level ?? 1 }));
         else if (reason === 'zone_level') this.showNotice(t('msg.zone_level', { level: level ?? 1 }));
+        else if (reason === 'post_broken') this.showNotice(t('msg.post_broken'));
         else if (reason === 'food_only') this.showNotice(t('msg.food_only'));
         else if (reason === 'no_ammo') this.showNotice(t('msg.no_ammo', { item: itemName(item ?? '') }));
         else if (reason === 'needs_item')
@@ -706,6 +727,31 @@ export class UIScene extends Phaser.Scene {
       color: 'lime',
       stroke: true,
     }).setVisible(false);
+    this.questLabel = new Label(this, HUD_MARGIN, y + 26, '', {
+      size: 7,
+      color: 'wheat',
+      stroke: true,
+    });
+  }
+
+  /** Registo da missão em curso (a primeira ativa): título e objetivos com progresso. */
+  private renderQuest(): void {
+    const label = this.questLabel;
+    if (!label) return;
+    const quest = simulation.quests.active()[0];
+    if (!quest || uiState.modalOpen) {
+      label.setVisible(false);
+      return;
+    }
+    const progress = simulation.quests.progress(quest.id);
+    const goals = quest.goals.map((goal, i) => {
+      const [done, total] = progress[i] ?? [0, 1];
+      return `${done >= total ? '✓' : '·'} ${goalText(goal)} ${String(done)}/${String(total)}`;
+    });
+    const lines = [tKey(`quest.${quest.id}`), ...goals];
+    if (simulation.quests.ready(quest.id))
+      lines.push(t('quest.ready_hint', { npc: tKey(`npc.${quest.turnIn}`) }));
+    label.setText(lines.join('\n')).setVisible(true);
   }
 
   /** Botão de velocidade (x1 → x2 → x3 → x1), por baixo do relógio. */
@@ -932,6 +978,7 @@ export class UIScene extends Phaser.Scene {
       // Esc fecha o que estiver aberto; sem nada aberto, abre (ou fecha) o menu de pausa.
       if (this.pause?.isOpen) this.pause.close();
       else if (this.skills?.isOpen) this.skills.close();
+      else if (this.dialog?.isOpen) this.dialog.close();
       else if (this.inventory?.isOpen) this.inventory.close();
       else if (this.crafting?.isOpen) this.crafting.close();
       else if (this.build?.isOpen) this.build.close();

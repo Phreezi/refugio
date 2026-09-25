@@ -394,6 +394,94 @@ for (const [name, rows] of Object.entries({ ...HEAD, ...TORSO, ...LONG_HAIR })) 
   });
 }
 
+/** NPCs (§7.18): parados, de frente; cores próprias por papel. */
+const NPC_LOOKS: readonly [string, Partial<Look>, boolean][] = [
+  [
+    'technician',
+    {
+      h: 'stone',
+      l: 'stone_light',
+      d: 'stone_dark',
+      b: 'orange',
+      B: 'blood',
+      c: 'amber',
+      p: 'stone_dark',
+      P: 'shadow',
+    },
+    false,
+  ],
+  [
+    'merchant',
+    {
+      h: 'bark_dark',
+      l: 'bark',
+      d: 'ink',
+      b: 'forest',
+      B: 'forest_dark',
+      c: 'leaf',
+      p: 'bark',
+      P: 'bark_dark',
+      w: 'wheat',
+      T: 'cream',
+      W: 'sand',
+    },
+    false,
+  ],
+  [
+    'old_man',
+    {
+      h: 'parchment',
+      l: 'cream',
+      d: 'stone_light',
+      b: 'plum',
+      B: 'shadow',
+      c: 'rose',
+      p: 'stone',
+      P: 'stone_dark',
+    },
+    false,
+  ],
+  [
+    'fisher',
+    { h: 'wood', l: 'wood_light', d: 'bark', b: 'teal', B: 'deep_water', c: 'sky', p: 'sand', P: 'wood' },
+    false,
+  ],
+  [
+    'farmer',
+    { h: 'wheat', l: 'cream', d: 'sand', b: 'leaf', B: 'forest', c: 'lime', p: 'water', P: 'deep_water' },
+    true,
+  ],
+  [
+    'doctor',
+    {
+      h: 'bark_dark',
+      l: 'bark',
+      d: 'ink',
+      b: 'cream',
+      B: 'stone_light',
+      c: 'parchment',
+      p: 'sky',
+      P: 'water',
+    },
+    true,
+  ],
+  [
+    'sergeant',
+    {
+      h: 'ink',
+      l: 'shadow',
+      d: 'ink',
+      b: 'forest_dark',
+      B: 'shadow',
+      c: 'forest',
+      p: 'forest_dark',
+      P: 'shadow',
+      f: 'ink',
+    },
+    false,
+  ],
+];
+
 const dir = new URL('public/assets/sprites/', ROOT);
 mkdirSync(dir, { recursive: true });
 const sheets: [string, Bitmap][] = [
@@ -404,6 +492,10 @@ for (const [name, img] of sheets) {
   writeFileSync(new URL(`${name}.png`, dir), img.toPng());
   console.log(`sprites/${name}.png (10×4 frames de 16×32)`);
 }
+for (const [id, colors, longHair] of NPC_LOOKS) {
+  writeFileSync(new URL(`npc_${id}.png`, dir), frame('down', 0, { ...PLAYER, ...colors }, longHair).toPng());
+}
+console.log(`sprites/npc_*.png (${String(NPC_LOOKS.length)} NPCs, 16×32)`);
 
 const previewIndex = process.argv.indexOf('--preview');
 const previewPath = previewIndex >= 0 ? process.argv[previewIndex + 1] : undefined;

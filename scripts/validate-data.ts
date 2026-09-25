@@ -28,6 +28,7 @@ import {
 import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../src/world/tileset.ts';
 import { ZoneMapError, parseZoneMap, type ZoneMap } from '../src/world/zoneMap.ts';
 import { buildWorldLayout } from '../src/world/worldLayout.ts';
+import { QuestDataError, parseNpcs, parseQuests, parseWaystoneCosts } from '../src/systems/quests/quests.ts';
 import { parseTalents } from '../src/systems/progression/talents.ts';
 
 const ROOT = new URL('../', import.meta.url);
@@ -284,6 +285,51 @@ function loadZones(): ZoneDefs | string[] {
   }
 }
 
+function loadNpcIds(): string[] | null {
+  const stations = loadStations();
+  if (Array.isArray(stations)) return null;
+  try {
+    return Object.keys(parseNpcs(readJson('src/data/npcs.json'), manifestKeys(), Object.keys(stations)));
+  } catch {
+    return null;
+  }
+}
+
+/** NPCs, missões e postes a reparar (§7.18), com nomes e textos em todas as línguas. */
+function checkQuests(): string[] {
+  const items = loadItems();
+  const stations = loadStations();
+  const zones = loadZones();
+  if (Array.isArray(items) || Array.isArray(stations) || Array.isArray(zones))
+    return ['dados base inválidos'];
+  const enemies = Object.keys(readJson('src/data/enemies.json') as object).filter((id) => id !== '$comment');
+  const problems: string[] = [];
+  try {
+    const npcs = parseNpcs(readJson('src/data/npcs.json'), manifestKeys(), Object.keys(stations));
+    const quests = parseQuests(readJson('src/data/quests.json'), {
+      items: Object.keys(items),
+      npcs: Object.keys(npcs),
+      zones: Object.keys(zones),
+      enemies,
+    });
+    parseWaystoneCosts(readJson('src/data/waystones.json'), Object.keys(items), Object.keys(zones));
+    for (const lang of ['pt-PT', 'en']) {
+      const dict = readJson(`src/i18n/${lang}.json`);
+      if (!isStringRecord(dict)) continue;
+      for (const id of Object.keys(npcs))
+        for (const key of [`npc.${id}`, `npc.${id}.hello`])
+          if (!(key in dict)) problems.push(`npcs.json: falta "${key}" em i18n/${lang}.json`);
+      for (const q of quests)
+        for (const key of [`quest.${q.id}`, `quest.${q.id}.text`, `quest.${q.id}.done`])
+          if (!(key in dict)) problems.push(`quests.json: falta "${key}" em i18n/${lang}.json`);
+    }
+  } catch (error) {
+    if (error instanceof QuestDataError) problems.push(...error.problems);
+    else throw error;
+  }
+  return problems;
+}
+
 function loadLootIds(): string[] | null {
   const items = loadItems();
   if (Array.isArray(items)) return null;
@@ -364,6 +410,7 @@ function checkMaps(): string[] {
           zoneIds: Object.keys(zones),
           enemyGroupIds: Object.keys(groups),
           lootTableIds: loadLootIds() ?? [],
+          npcIds: loadNpcIds() ?? [],
         },
         file,
       );
@@ -481,6 +528,7 @@ const checks: [string, () => string[]][] = [
   ['talentos', checkTalents],
   ['loot', checkLoot],
   ['zonas', checkZones],
+  ['missões', checkQuests],
   ['mapas', checkMaps],
   ['i18n', checkI18n],
 ];

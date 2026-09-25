@@ -98,5 +98,6 @@
   "groundThingsMax": 300,
   "orderHours": 1,
   "deliveryOffsetPx": 16,
-  "teleportArrivalPx": 20
+  "teleportArrivalPx": 20,
+  "teleportCoinsPerDanger": 5
 }

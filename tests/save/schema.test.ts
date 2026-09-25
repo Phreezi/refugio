@@ -256,6 +256,17 @@ describe('save: migrações', () => {
     expect(() => validateState(bad)).toThrow();
   });
 
+  it('v21 → v22: missões vazias; validam-se', () => {
+    const v21 = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    delete v21.player.quests;
+    const stateJson = JSON.stringify(v21);
+    const text = `{"version":21,"timestamp":9,"checksum":"${checksum(`21|9|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.player.quests).toEqual({ active: {}, done: [] });
+    const bad = structuredClone(STATE) as unknown as { player: { quests: unknown } };
+    bad.player.quests = { active: { q: [-1] }, done: [] };
+    expect(() => validateState(bad)).toThrow();
+  });
+
   it('v20 → v21: moedas dos slots e dos baús passam para o contador; buffs e postes vazios', () => {
     const v20 = structuredClone(STATE) as unknown as {
       player: Record<string, unknown> & { inventory: unknown[]; hotbar: unknown[] };

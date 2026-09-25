@@ -1,0 +1,73 @@
+{
+  "$comment": "Reparar o poste de teletransporte de cada zona (§7.18): o técnico pede estes itens e moedas.",
+  "zone_pine_forest": {
+    "items": [
+      ["wood", 20],
+      ["stone", 10]
+    ],
+    "coins": 10
+  },
+  "zone_farm": {
+    "items": [
+      ["wood_plank", 10],
+      ["rope", 3]
+    ],
+    "coins": 20
+  },
+  "zone_lake": {
+    "items": [
+      ["fish", 3],
+      ["clay", 10]
+    ],
+    "coins": 30
+  },
+  "zone_road": {
+    "items": [
+      ["scrap_metal", 10],
+      ["nails", 10]
+    ],
+    "coins": 50
+  },
+  "zone_village": {
+    "items": [
+      ["cloth", 10],
+      ["bandage", 3]
+    ],
+    "coins": 70
+  },
+  "zone_deep_forest": {
+    "items": [
+      ["leather", 6],
+      ["iron_ingot", 4]
+    ],
+    "coins": 90
+  },
+  "zone_industrial": {
+    "items": [
+      ["electronics", 4],
+      ["chemicals", 4]
+    ],
+    "coins": 120
+  },
+  "zone_hospital": {
+    "items": [
+      ["medkit", 2],
+      ["electronics", 4]
+    ],
+    "coins": 150
+  },
+  "zone_military": {
+    "items": [
+      ["pistol_ammo", 30],
+      ["iron_ingot", 10]
+    ],
+    "coins": 200
+  },
+  "zone_city": {
+    "items": [
+      ["electronics", 8],
+      ["medkit", 3]
+    ],
+    "coins": 250
+  }
+}

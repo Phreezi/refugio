@@ -59,6 +59,8 @@ function setup(seed = 7) {
     () => content,
     () => content,
     () => content,
+    () => content,
+    () => content,
   );
   const enter = (zoneId: string, map = realMap(zoneId)) => {
     sim.setZone({
@@ -278,44 +280,60 @@ describe('Mundo contínuo (Etapa E)', () => {
 });
 
 describe('Teletransporte (Etapa E)', () => {
-  it('todas as zonas normais têm um poste perto da entrada, fora das colisões', () => {
+  it('todas as zonas normais têm um poste ao fundo (depois da área de combate), com o técnico ao lado', () => {
     for (const [zoneId, zone] of Object.entries(zones)) {
       if (zoneId === BASE_ZONE_ID || zone.dungeon || zone.event || zone.hidden) continue;
       const map = realMap(zoneId);
       const post = map.props.find((p) => p.id === 'waystone');
+      const technician = map.npcs?.find((n) => n.id === 'technician');
       expect(post, zoneId).toBeDefined();
-      if (!post) continue;
-      expect(Math.hypot(post.x - map.playerSpawn.x, post.y - map.playerSpawn.y)).toBeLessThan(120);
+      expect(technician, zoneId).toBeDefined();
+      if (!post || !technician) continue;
+      expect(post.x, zoneId).toBeGreaterThan(map.width * map.tileSize * 0.75);
+      expect(Math.hypot(post.x - technician.x, post.y - technician.y)).toBeLessThan(48);
     }
   });
 
-  it('o poste ativa-se com a ação e depois leva lá de graça (e a base está sempre)', () => {
+  it('o poste avariado manda falar com o técnico; reparado (itens + moedas) leva lá a pagar', () => {
     const { state, sim, bus, enter, press, faceFromSouth } = setup();
     const uses: string[] = [];
+    const blocked: string[] = [];
     bus.on('waystone:use', ({ zoneId }) => uses.push(zoneId));
+    bus.on('action:blocked', ({ reason }) => blocked.push(reason));
     const pine = realMap('zone_pine_forest');
     const post = pine.props.find((p) => p.id === 'waystone');
     if (!post) throw new Error('sem poste');
-    // Ainda não ativado: não se vai lá por teletransporte.
     expect(sim.teleport('zone_pine_forest', pine)).toBe(false);
     state.data.player.zoneId = 'zone_pine_forest';
     enter('zone_pine_forest', pine);
     faceFromSouth(post);
     press();
+    expect(uses).toEqual([]);
+    expect(blocked).toContain('post_broken');
+    // O técnico pede o material e as moedas.
+    const cost = content.waystones.zone_pine_forest;
+    if (!cost) throw new Error('sem custo');
+    expect(sim.quests.repairWaystone('zone_pine_forest')).toBe('missing');
+    cost.items.forEach(([item, qty], i) => (state.data.player.inventory[i] = [item, qty]));
+    expect(sim.quests.repairWaystone('zone_pine_forest')).toBe('no_coins');
+    state.data.player.coins = cost.coins + 100;
+    expect(sim.quests.repairWaystone('zone_pine_forest')).toBe('ok');
     expect(state.data.waystones).toEqual(['zone_pine_forest']);
+    expect(state.data.player.coins).toBe(100);
+    press();
     expect(uses).toEqual(['zone_pine_forest']);
-    // Para casa (sempre) e de volta ao poste, sem gastar fome nem sede.
+    // Para casa é grátis; para lá paga-se em moedas (ou com um pergaminho).
     const { hunger, thirst } = state.data.player;
     expect(sim.teleport(BASE_ZONE_ID, realMap(BASE_ZONE_ID))).toBe(true);
-    expect(state.data.player.zoneId).toBe(BASE_ZONE_ID);
+    expect(state.data.player.coins).toBe(100);
     expect(sim.teleport('zone_pine_forest', pine)).toBe(true);
-    expect(state.data.player).toMatchObject({
-      zoneId: 'zone_pine_forest',
-      x: post.x,
-      y: post.y + BALANCE.teleportArrivalPx,
-      hunger,
-      thirst,
-    });
+    expect(state.data.player.coins).toBe(100 - sim.teleportPrice('zone_pine_forest'));
+    expect(state.data.player).toMatchObject({ zoneId: 'zone_pine_forest', x: post.x, hunger, thirst });
+    state.data.player.coins = 0;
+    expect(sim.teleport('zone_pine_forest', pine, 'coins')).toBe(false);
+    state.data.player.hotbar[3] = ['travel_scroll', 1];
+    expect(sim.teleport('zone_pine_forest', pine, 'scroll')).toBe(true);
+    expect(state.data.player.hotbar[3]).toBeNull();
   });
 });
 

@@ -1,0 +1,271 @@
+[
+  {
+    "id": "q_welcome",
+    "giver": "old_man",
+    "level": 1,
+    "goals": [
+      {
+        "type": "talk",
+        "npc": "merchant"
+      }
+    ],
+    "reward": {
+      "xp": 20,
+      "coins": 10
+    }
+  },
+  {
+    "id": "q_supplies",
+    "giver": "old_man",
+    "level": 1,
+    "after": "q_welcome",
+    "goals": [
+      {
+        "type": "collect",
+        "item": "wood",
+        "qty": 15
+      },
+      {
+        "type": "collect",
+        "item": "stone",
+        "qty": 10
+      }
+    ],
+    "reward": {
+      "xp": 60,
+      "coins": 15,
+      "items": [["travel_scroll", 1]]
+    }
+  },
+  {
+    "id": "q_pine",
+    "giver": "old_man",
+    "level": 1,
+    "after": "q_supplies",
+    "goals": [
+      {
+        "type": "reach",
+        "zone": "zone_pine_forest"
+      },
+      {
+        "type": "kill",
+        "enemy": "zombie_walker",
+        "qty": 5
+      }
+    ],
+    "reward": {
+      "xp": 120,
+      "coins": 25
+    }
+  },
+  {
+    "id": "q_find_farmer",
+    "giver": "old_man",
+    "turnIn": "farmer",
+    "level": 2,
+    "after": "q_pine",
+    "goals": [
+      {
+        "type": "talk",
+        "npc": "farmer"
+      }
+    ],
+    "reward": {
+      "xp": 80,
+      "coins": 10
+    }
+  },
+  {
+    "id": "q_harvest",
+    "giver": "farmer",
+    "level": 2,
+    "after": "q_find_farmer",
+    "goals": [
+      {
+        "type": "collect",
+        "item": "berries",
+        "qty": 8
+      },
+      {
+        "type": "collect",
+        "item": "cloth",
+        "qty": 4
+      }
+    ],
+    "reward": {
+      "xp": 150,
+      "coins": 30,
+      "items": [["carrot_seeds", 4]]
+    }
+  },
+  {
+    "id": "q_find_fisher",
+    "giver": "farmer",
+    "turnIn": "fisher",
+    "level": 3,
+    "after": "q_harvest",
+    "goals": [
+      {
+        "type": "talk",
+        "npc": "fisher"
+      }
+    ],
+    "reward": {
+      "xp": 100,
+      "coins": 10
+    }
+  },
+  {
+    "id": "q_catch",
+    "giver": "fisher",
+    "level": 3,
+    "after": "q_find_fisher",
+    "goals": [
+      {
+        "type": "collect",
+        "item": "fish",
+        "qty": 5
+      }
+    ],
+    "reward": {
+      "xp": 200,
+      "coins": 40,
+      "items": [["travel_scroll", 2]]
+    }
+  },
+  {
+    "id": "q_wolves",
+    "giver": "fisher",
+    "level": 6,
+    "after": "q_catch",
+    "goals": [
+      {
+        "type": "kill",
+        "enemy": "wolf",
+        "qty": 4
+      }
+    ],
+    "reward": {
+      "xp": 300,
+      "coins": 60
+    }
+  },
+  {
+    "id": "q_iron",
+    "giver": "fisher",
+    "level": 10,
+    "after": "q_wolves",
+    "goals": [
+      {
+        "type": "collect",
+        "item": "iron_ingot",
+        "qty": 6
+      }
+    ],
+    "reward": {
+      "xp": 450,
+      "coins": 80,
+      "items": [["iron_arrow", 20]]
+    }
+  },
+  {
+    "id": "q_find_doctor",
+    "giver": "fisher",
+    "turnIn": "doctor",
+    "level": 16,
+    "after": "q_iron",
+    "goals": [
+      {
+        "type": "reach",
+        "zone": "zone_hospital"
+      },
+      {
+        "type": "talk",
+        "npc": "doctor"
+      }
+    ],
+    "reward": {
+      "xp": 500,
+      "coins": 50
+    }
+  },
+  {
+    "id": "q_medicine",
+    "giver": "doctor",
+    "level": 16,
+    "after": "q_find_doctor",
+    "goals": [
+      {
+        "type": "collect",
+        "item": "bandage",
+        "qty": 5
+      },
+      {
+        "type": "collect",
+        "item": "chemicals",
+        "qty": 3
+      }
+    ],
+    "reward": {
+      "xp": 700,
+      "coins": 150,
+      "items": [["medkit", 2]]
+    }
+  },
+  {
+    "id": "q_find_sergeant",
+    "giver": "doctor",
+    "turnIn": "sergeant",
+    "level": 20,
+    "after": "q_medicine",
+    "goals": [
+      {
+        "type": "talk",
+        "npc": "sergeant"
+      }
+    ],
+    "reward": {
+      "xp": 800,
+      "coins": 50
+    }
+  },
+  {
+    "id": "q_tanks",
+    "giver": "sergeant",
+    "level": 20,
+    "after": "q_find_sergeant",
+    "goals": [
+      {
+        "type": "kill",
+        "enemy": "zombie_tank",
+        "qty": 3
+      }
+    ],
+    "reward": {
+      "xp": 1200,
+      "coins": 300,
+      "items": [["travel_scroll", 5]]
+    }
+  },
+  {
+    "id": "q_city",
+    "giver": "sergeant",
+    "level": 25,
+    "after": "q_tanks",
+    "goals": [
+      {
+        "type": "reach",
+        "zone": "zone_city"
+      },
+      {
+        "type": "kill",
+        "enemy": "any",
+        "qty": 30
+      }
+    ],
+    "reward": {
+      "xp": 2000,
+      "coins": 500
+    }
+  }
+]

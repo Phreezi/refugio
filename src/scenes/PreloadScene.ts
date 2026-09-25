@@ -13,6 +13,10 @@ import stationsJson from '../data/stations.json';
 import structuresJson from '../data/structures.json';
 import zonesJson from '../data/zones.json';
 import resourcesJson from '../data/resources.json';
+import npcsJson from '../data/npcs.json';
+import questsJson from '../data/quests.json';
+import waystonesJson from '../data/waystones.json';
+import { parseNpcs, parseQuests, parseWaystoneCosts } from '../systems/quests/quests';
 import {
   parseEnemies,
   parseEnemyGroups,
@@ -145,6 +149,18 @@ export class PreloadScene extends Phaser.Scene {
 
     const zones = this.zones ?? parseZones(zonesJson);
     content.setZones(zones);
+    // NPCs, missões e postes a reparar (§7.18).
+    const npcs = parseNpcs(npcsJson, Object.keys(manifest.assets), Object.keys(stations));
+    content.setQuests(
+      npcs,
+      parseQuests(questsJson, {
+        items: Object.keys(items),
+        npcs: Object.keys(npcs),
+        zones: Object.keys(zones),
+        enemies: Object.keys(enemies),
+      }),
+      parseWaystoneCosts(waystonesJson, Object.keys(items), Object.keys(zones)),
+    );
     for (const [zoneId, zone] of Object.entries(zones)) {
       const cached: unknown = this.cache.tilemap.get(zoneMapKey(zoneId));
       const data =
@@ -162,6 +178,7 @@ export class PreloadScene extends Phaser.Scene {
           zoneIds: Object.keys(zones),
           enemyGroupIds: Object.keys(groups),
           lootTableIds: Object.keys(lootTables),
+          npcIds: Object.keys(npcs),
         },
         zone.map,
       );

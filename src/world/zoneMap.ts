@@ -60,6 +60,8 @@ export interface ZoneMap {
   /** Contentores com loot (`container:<tabela>`): o id é a tabela de loot. */
   containers: readonly ResourcePlacement[];
   enemySpawns: readonly TaggedPoint[];
+  /** NPCs (`npc:<id>`, §7.18): o id é o de `npcs.json`; ponto = pés. */
+  npcs?: readonly ResourcePlacement[];
 }
 
 export interface ZoneMapRules {
@@ -80,6 +82,8 @@ export interface ZoneMapRules {
   lootTableIds?: Iterable<string>;
   /** Grupos válidos em `enemy_spawn:<grupo>` (omisso = não se verifica). */
   enemyGroupIds?: Iterable<string>;
+  /** NPCs válidos em `npc:<id>` (omisso = não se verifica). */
+  npcIds?: Iterable<string>;
 }
 
 export class ZoneMapError extends Error {
@@ -249,6 +253,8 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
   const containers: ResourcePlacement[] = [];
   const lootIds = rules.lootTableIds ? new Set(rules.lootTableIds) : null;
   const enemySpawns: TaggedPoint[] = [];
+  const npcs: ResourcePlacement[] = [];
+  const npcIds = rules.npcIds ? new Set(rules.npcIds) : null;
   const objectLayers = layers.filter((l) => l.name === OBJECT_LAYER);
   const objectLayer = objectLayers[0];
   if (
@@ -296,9 +302,12 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
       } else if (kind === 'enemy_spawn' && id) {
         if (groupIds && !groupIds.has(id)) problems.push(`${label}: grupo de inimigos desconhecido "${id}"`);
         enemySpawns.push({ id, ...point });
+      } else if (kind === 'npc' && id) {
+        if (npcIds && !npcIds.has(id)) problems.push(`${label}: NPC desconhecido "${id}"`);
+        npcs.push({ id, objectId, ...point });
       } else {
         problems.push(
-          `${label}: nome inválido (player_spawn, exit[:<zona>], resource:<id>, prop:<id>, chest:<id>, station:<tipo>, container:<id>, enemy_spawn:<id>)`,
+          `${label}: nome inválido (player_spawn, exit[:<zona>], resource:<id>, prop:<id>, chest:<id>, station:<tipo>, container:<id>, enemy_spawn:<id>, npc:<id>)`,
         );
       }
     }
@@ -329,5 +338,6 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
     stations,
     containers,
     enemySpawns,
+    npcs,
   };
 }

@@ -11,6 +11,10 @@ import resources from '../../src/data/resources.json';
 import stations from '../../src/data/stations.json';
 import structures from '../../src/data/structures.json';
 import zones from '../../src/data/zones.json';
+import npcs from '../../src/data/npcs.json';
+import quests from '../../src/data/quests.json';
+import waystones from '../../src/data/waystones.json';
+import { parseNpcs, parseQuests, parseWaystoneCosts } from '../../src/systems/quests/quests';
 import {
   parseEnemies,
   parseEnemyGroups,
@@ -32,7 +36,17 @@ export function loadContent() {
   const itemDefs = parseItems(items, keys);
   const stationDefs = parseStations(stations, keys);
   const enemyDefs = parseEnemies(enemies, keys, Object.keys(itemDefs));
+  const zoneDefs = parseZones(zones);
+  const npcDefs = parseNpcs(npcs, keys, Object.keys(stationDefs));
   return {
+    npcs: npcDefs,
+    quests: parseQuests(quests, {
+      items: Object.keys(itemDefs),
+      npcs: Object.keys(npcDefs),
+      zones: Object.keys(zoneDefs),
+      enemies: Object.keys(enemyDefs),
+    }),
+    waystones: parseWaystoneCosts(waystones, Object.keys(itemDefs), Object.keys(zoneDefs)),
     items: itemDefs,
     resources: parseResources(resources, keys, Object.keys(itemDefs)),
     props: parseProps(props, keys),
@@ -40,7 +54,7 @@ export function loadContent() {
     recipes: parseRecipes(recipes, Object.keys(itemDefs), Object.keys(stationDefs)),
     structures: parseStructures(structures, keys, Object.keys(itemDefs), Object.keys(stationDefs)),
     enemies: enemyDefs,
-    zones: parseZones(zones),
+    zones: zoneDefs,
     lootTables: parseLootTables(lootTables, keys, Object.keys(itemDefs)),
     enemyGroups: parseEnemyGroups(enemyGroups, Object.keys(enemyDefs)),
   };
