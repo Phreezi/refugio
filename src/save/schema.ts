@@ -5,7 +5,7 @@ import { WEAPON_SKILLS } from '../data/types';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -158,6 +158,8 @@ export function validateState(input: unknown): GameStateData {
       )
     )
       problems.push('player.quiver inválido');
+    if (typeof player.name !== 'string' || player.name.trim() === '' || player.name.length > 14)
+      problems.push('player.name inválido');
   }
   if (!isObject(world)) problems.push('falta world');
   else {

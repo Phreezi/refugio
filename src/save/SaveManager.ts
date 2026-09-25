@@ -32,8 +32,9 @@ export interface LoadResult {
  */
 export class SaveManager {
   private readonly adapter: StorageAdapter;
-  private readonly keys: readonly [string, string];
-  private readonly emergencyKey: string;
+  private keys: readonly [string, string] = ['', ''];
+  private emergencyKey = '';
+  private gameSlot = 0;
   private readonly emergency: SyncStorage | null;
   private readonly now: () => number;
   /** Índice do slot onde se grava a seguir (null = ainda não se sabe; descobre-se ao gravar). */
@@ -53,11 +54,25 @@ export class SaveManager {
     emergency: SyncStorage | null = null,
   ) {
     this.adapter = adapter;
-    const prefix = `${KEY_PREFIX}.${String(gameSlot)}`;
-    this.keys = [`${prefix}.${SLOT_SUFFIXES[0]}`, `${prefix}.${SLOT_SUFFIXES[1]}`];
-    this.emergencyKey = `${prefix}.${EMERGENCY_SUFFIX}`;
     this.emergency = emergency;
     this.now = now;
+    this.useSlot(gameSlot);
+  }
+
+  /** Slot de jogo em uso (0, 1, 2…). */
+  get slot(): number {
+    return this.gameSlot;
+  }
+
+  /** Passa a ler/gravar noutro slot de jogo (outro jogo da lista do menu). */
+  useSlot(gameSlot: number): void {
+    const prefix = `${KEY_PREFIX}.${String(gameSlot)}`;
+    this.gameSlot = gameSlot;
+    this.keys = [`${prefix}.${SLOT_SUFFIXES[0]}`, `${prefix}.${SLOT_SUFFIXES[1]}`];
+    this.emergencyKey = `${prefix}.${EMERGENCY_SUFFIX}`;
+    this.next = null;
+    this.lastTimestamp = 0;
+    this.discovering = null;
   }
 
   get storageName(): string {

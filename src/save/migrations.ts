@@ -112,6 +112,11 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     const player = s.player as Record<string, unknown>;
     return { ...s, player: { ...player, quiver: [] } };
   },
+  // v16 → v17: nome da personagem (jogos antigos ficam "Sobrevivente"; muda-se ao criar um novo).
+  16: (s) => {
+    const player = s.player as Record<string, unknown>;
+    return { ...s, player: { ...player, name: 'Sobrevivente' } };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

@@ -256,6 +256,17 @@ describe('save: migrações', () => {
     expect(() => validateState(bad)).toThrow();
   });
 
+  it('v16 → v17: nome da personagem; valida-se', () => {
+    const v16 = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    delete v16.player.name;
+    const stateJson = JSON.stringify(v16);
+    const text = `{"version":16,"timestamp":9,"checksum":"${checksum(`16|9|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.player.name).toBe('Sobrevivente');
+    const bad = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    bad.player.name = '   ';
+    expect(() => validateState(bad)).toThrow();
+  });
+
   it('v15 → v16: aljava vazia; valida-se', () => {
     const v15 = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
     delete v15.player.quiver;

@@ -4,6 +4,7 @@
 
 import { eventBus, type EventBus, type GameEvents } from '../core/EventBus';
 import { preferences } from '../ui/preferences';
+import { music } from './music';
 
 type Wave = OscillatorType;
 
@@ -127,6 +128,11 @@ class Sfx {
     if (this.context.state === 'suspended') void this.context.resume();
   }
 
+  /** O contexto de áudio (partilhado com a música), depois do primeiro gesto. */
+  get audioContext(): AudioContext | null {
+    return this.context;
+  }
+
   play(name: SoundName): void {
     const volume = preferences().volume;
     const context = this.context;
@@ -197,6 +203,7 @@ export const sfx = new Sfx();
 export function installSfx(bus: EventBus<GameEvents> = eventBus): void {
   const unlock = (): void => {
     sfx.unlock();
+    music.start();
   };
   window.addEventListener('pointerdown', unlock);
   window.addEventListener('keydown', unlock);

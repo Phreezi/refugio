@@ -15,7 +15,7 @@ import { countItem } from '../systems/inventory/inventory';
 import { content } from '../world/content';
 import { Button, CLOSE_ICON } from './Button';
 import { Label, measureTextWidth } from './text';
-import { REOPEN_GUARD_MS, uiState } from './uiState';
+import { panelTop, REOPEN_GUARD_MS, uiState } from './uiState';
 
 const DEPTH = { dim: 50, panel: 60, content: 62 } as const;
 const PAD = 8;
@@ -221,7 +221,8 @@ export class CraftingUI {
     const tabsH = (tabs.at(-1)?.row ?? 0) * (TAB_H + TAB_GAP) + TAB_H;
     const h = Math.min(hotbarTop - 8, PAD * 2 + 14 + tabsH + 6 + Math.max(1, rows) * ROW_H + queueH);
     const x = Math.round((width - w) / 2);
-    const y = Math.max(4, Math.round((hotbarTop - 4 - h) / 2));
+    // Fixo perto do topo (não salta ao trocar de separador: só a altura muda).
+    const y = Math.max(4, Math.min(panelTop(height), hotbarTop - 4 - h));
     this.rect = { x, y, w, h };
     // Se não couberem todas, a lista divide-se em páginas (com ‹ › por baixo).
     const listSpace = h - (PAD * 2 + 14 + tabsH + 6) - queueH;
