@@ -314,7 +314,6 @@
   "coop.hud_guest": "Co-op (convidado)",
   "coop.hud_waiting": "Co-op {code}: à espera",
   "coop.hud_connected": "Co-op {code}: ligado",
-  "coop.host_only": "No co-op, a mochila, o fabrico e a construção são de quem convidou.",
   "coop.join": "Entrar com código",
   "coop.enter_code": "Código do amigo (5 letras/números):",
   "coop.bad_code": "Código inválido: são 5 letras ou números.",
@@ -323,7 +322,5 @@
   "coop.join_failed": "Não foi possível entrar. Tenta outra vez.",
   "coop.lost": "A ligação ao jogo do amigo terminou.",
   "coop.partner_joined": "O parceiro entrou no jogo!",
-  "coop.partner_left": "O parceiro saiu.",
-  "coop.partner_down": "O parceiro caiu! Volta daqui a pouco.",
-  "coop.you_down": "Caíste! Voltas ao pé do teu amigo daqui a pouco."
+  "coop.partner_left": "O parceiro saiu."
 }

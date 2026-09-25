@@ -2,6 +2,8 @@
 // por isso acelera TUDO o que corre no passo fixo — relógio do dia, fome/sede, movimento,
 // golpes, reaparecimento de recursos. Preferência de quem joga, guardada no browser.
 
+import { uiState } from './uiState';
+
 export const GAME_SPEEDS = [1, 2, 3] as const;
 export type GameSpeed = (typeof GAME_SPEEDS)[number];
 
@@ -18,8 +20,9 @@ function read(): GameSpeed {
 
 let current: GameSpeed = typeof window === 'undefined' ? 1 : read();
 
+/** Velocidade atual (em co-op fica sempre em x1: o tempo é o mesmo para os dois jogadores). */
 export function gameSpeed(): GameSpeed {
-  return current;
+  return uiState.coop ? 1 : current;
 }
 
 /** Passa à velocidade seguinte (x1 → x2 → x3 → x1). */

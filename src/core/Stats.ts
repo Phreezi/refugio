@@ -11,7 +11,8 @@ export class Stats {
   constructor(state: GameState, bus: EventBus<GameEvents>) {
     this.state = state;
     const add = (key: keyof GameStatsCounters): void => {
-      if (!state.hasGame) return;
+      // Co-op (convidado): quem conta é o anfitrião (o estado daqui vem dele).
+      if (!state.hasGame || state.borrowed) return;
       state.data.stats[key] += 1;
     };
     bus.on('enemy:killed', () => {

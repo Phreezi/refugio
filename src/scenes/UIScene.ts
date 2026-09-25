@@ -384,7 +384,7 @@ export class UIScene extends Phaser.Scene {
     bar.fill.setVisible(visible);
     if (!boss || !def) return;
     bar.label.setText(tKey(`enemy.${boss.id}`));
-    bar.fill.width = Math.max(0, Math.round((BOSS_BAR * boss.hp) / def.hp));
+    bar.fill.width = Math.max(0, Math.round((BOSS_BAR * boss.hp) / boss.maxHp));
   }
 
   /** Texto do aviso da horda (vazio se as hordas estiverem desligadas ou ainda longe). */
@@ -413,9 +413,6 @@ export class UIScene extends Phaser.Scene {
         if (coop.isHost && coop.connected !== this.coopWasConnected)
           this.showNotice(t(coop.connected ? 'coop.partner_joined' : 'coop.partner_left'));
         this.coopWasConnected = coop.connected;
-      }),
-      eventBus.on('partner:down', () => {
-        this.showNotice(t(coop.isGuest ? 'coop.you_down' : 'coop.partner_down'));
       }),
       eventBus.on('player:died', ({ zoneId, bag }) => {
         const zone = tKey(content.zones[zoneId]?.name ?? zoneId);
@@ -550,12 +547,6 @@ export class UIScene extends Phaser.Scene {
         ? t(coop.connected ? 'coop.hud_connected' : 'coop.hud_waiting', { code: coop.code })
         : '';
     this.coopLabel?.setText(text);
-  }
-
-  /** O convidado só anda e bate: mochila, fabrico e construção são do anfitrião. */
-  private guestBlocked(): boolean {
-    if (coop.isGuest) this.showNotice(t('coop.host_only'));
-    return coop.isGuest;
   }
 
   /** Grava e volta ao menu inicial (a cena de jogo, ao parar, também pára o HUD). */
@@ -700,28 +691,25 @@ export class UIScene extends Phaser.Scene {
     );
     ['ONE', 'TWO', 'THREE', 'FOUR'].forEach((key, index) => {
       keyboard.on(`keydown-${key}`, () => {
-        if (!uiState.modalOpen && !this.guestBlocked()) this.inventory?.useHotbar(index);
+        if (!uiState.modalOpen) this.inventory?.useHotbar(index);
       });
     });
   }
 
   /** Só um painel aberto de cada vez (mochila/baú, crafting ou construção). */
   private toggleInventory(): void {
-    if (this.guestBlocked()) return;
     if (this.crafting?.isOpen) this.crafting.close();
     this.build?.close();
     this.inventory?.toggle();
   }
 
   private toggleCrafting(): void {
-    if (this.guestBlocked()) return;
     if (this.inventory?.isOpen) this.inventory.close();
     this.build?.close();
     this.crafting?.toggleHands();
   }
 
   private toggleBuild(): void {
-    if (this.guestBlocked()) return;
     if (this.inventory?.isOpen) this.inventory.close();
     if (this.crafting?.isOpen) this.crafting.close();
     this.build?.toggle();

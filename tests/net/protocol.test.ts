@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CODE_ALPHABET,
   CODE_LENGTH,
+  isGuestCommand,
   normalizeCode,
   parseGuestMessage,
   randomCode,
@@ -28,24 +29,30 @@ describe('Código do co-op', () => {
 
 describe('Mensagens do convidado', () => {
   it('aceita mensagens válidas', () => {
-    expect(parseGuestMessage({ t: 'act' })).toEqual({ t: 'act' });
-    expect(parseGuestMessage({ t: 'join', weapon: 'machete' })).toEqual({ t: 'join', weapon: 'machete' });
-    expect(parseGuestMessage({ t: 'join' })).toEqual({ t: 'join', weapon: null });
-    expect(parseGuestMessage({ t: 'me', x: 1, y: 2, facing: 'up', moved: 1, sneak: 0 })).toEqual({
-      t: 'me',
-      x: 1,
-      y: 2,
-      facing: 'up',
-      moved: 1,
-      sneak: 0,
-    });
+    expect(parseGuestMessage({ t: 'act', held: 1, tick: 5 })).toEqual({ t: 'act', held: 1, tick: 5 });
+    expect(parseGuestMessage({ t: 'away', on: 1 })).toEqual({ t: 'away', on: 1 });
+    expect(
+      parseGuestMessage({ t: 'me', x: 1, y: 2, facing: 'up', moved: 1, sneak: 0, zone: 'zone_base' }),
+    ).toEqual({ t: 'me', x: 1, y: 2, facing: 'up', moved: 1, sneak: 0, zone: 'zone_base' });
+    expect(
+      parseGuestMessage({ t: 'cmd', seq: 3, sys: 'crafting', m: 'craft', args: ['r_stone_axe', 'hands'] }),
+    ).toEqual({ t: 'cmd', seq: 3, sys: 'crafting', m: 'craft', args: ['r_stone_axe', 'hands'] });
+  });
+
+  it('só aceita comandos da lista (nada de chamar outros métodos)', () => {
+    expect(isGuestCommand('actions', 'move')).toBe(true);
+    expect(isGuestCommand('building', 'place')).toBe(true);
+    expect(isGuestCommand('actions', 'constructor')).toBe(false);
+    expect(isGuestCommand('combat', 'damagePlayer')).toBe(false);
+    expect(parseGuestMessage({ t: 'cmd', seq: 1, sys: 'progression', m: 'gain', args: [9999] })).toBeNull();
   });
 
   it('recusa lixo vindo da rede', () => {
     expect(parseGuestMessage(null)).toBeNull();
     expect(parseGuestMessage('act')).toBeNull();
-    expect(parseGuestMessage({ t: 'me', x: Number.NaN, y: 2, facing: 'up' })).toBeNull();
-    expect(parseGuestMessage({ t: 'me', x: 1, y: 2, facing: 'north' })).toBeNull();
+    expect(parseGuestMessage({ t: 'me', x: Number.NaN, y: 2, facing: 'up', zone: 'z' })).toBeNull();
+    expect(parseGuestMessage({ t: 'me', x: 1, y: 2, facing: 'north', zone: 'z' })).toBeNull();
+    expect(parseGuestMessage({ t: 'join' })).toBeNull();
     expect(parseGuestMessage({ t: 'give', item: 'pistol' })).toBeNull();
   });
 });

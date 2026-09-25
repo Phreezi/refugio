@@ -7,7 +7,7 @@ import { facingFromIntent, moveWithCollision, normalize } from '../systems/movem
 import { respawnVitals, survivalRules, tickSurvival } from '../systems/survival/survival';
 import { eventBus, type EventBus, type GameEvents } from './EventBus';
 import { FixedStep } from './FixedStep';
-import { BASE_ZONE_ID, gameState, type GameState } from './GameState';
+import { BASE_ZONE_ID, gameState, type GameState, type PlayerState } from './GameState';
 import { Building } from './Building';
 import { Combat, type CombatContent } from './Combat';
 import { Fishing } from './Fishing';
@@ -15,7 +15,6 @@ import { Homestead } from './Homestead';
 import { Horde, type HordeContent } from './Horde';
 import { Stats } from './Stats';
 import { Tutorial } from './Tutorial';
-import { createPartner, type Partner } from './Partner';
 import { Progression, type ProgressionContent } from './Progression';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
@@ -24,6 +23,7 @@ import { secondsToTicks } from './Clock';
 import { content } from '../world/content';
 import { arrivalPoint, canTravel, type TravelCost } from '../systems/travel/travel';
 import type { ZoneMap } from '../world/zoneMap';
+import { buildZoneContext } from '../world/zoneContext';
 
 /**
  * Corre a lógica do jogo em passo fixo. As cenas de jogo (Base, Zona) chamam
@@ -35,7 +35,6 @@ export class Simulation {
   private readonly bus: EventBus<GameEvents>;
   private readonly survival = survivalRules(BALANCE);
   private readonly actionCooldownTicks = secondsToTicks(BALANCE.actionCooldownSec);
-  private readonly items: () => ItemDefs;
   readonly actions: PlayerActions;
   readonly interaction: Interaction;
   readonly crafting: Crafting;
@@ -59,13 +58,22 @@ export class Simulation {
   private sneaking = false;
   private previous: Vec2 = ZERO;
   private moved = false;
-  /** Co-op (convidado): em vez de fazer a ação aqui, pede-a ao anfitrião. */
-  remoteAction: (() => void) | null = null;
-  /** O parceiro pediu uma ação (co-op, anfitrião); faz-se no próximo tick. */
-  private partnerActionQueued = false;
-  private partnerNextAction = 0;
-  /** Convidado: ticks locais (o relógio do mundo é o do anfitrião), para o ritmo das ações. */
-  private remoteTicks = 0;
+  private zone: ZoneContext | null = null;
+  /**
+   * Co-op (no ecrã do convidado): o mundo corre no anfitrião; aqui só se anda (e se prevê o
+   * relógio) e a ação é pedida ao anfitrião.
+   */
+  remote: { act(held: boolean, tick: number): void } | null = null;
+  /** Co-op (no anfitrião): a simulação do jogador principal, se esta for a do convidado. */
+  private primary: Simulation | null = null;
+  /** Co-op (no anfitrião): as simulações dos convidados (correm dentro do tick desta). */
+  private readonly secondaries: Simulation[] = [];
+  /** Convidado na mesma zona do anfitrião: partilham inimigos, peças e colisões. */
+  private linked = false;
+  /** Co-op: contexto de uma zona para um convidado que está noutra (substituível nos testes). */
+  contextFor: (zoneId: string) => ZoneContext = buildZoneContext;
+  /** Tick (no ecrã do convidado) em que carregou na ação: a pesca usa-o. */
+  private strikeTick: number | null = null;
 
   /**
    * @param items definições dos itens (lidas quando são precisas: carregam depois do arranque).
@@ -100,7 +108,6 @@ export class Simulation {
   ) {
     this.state = state;
     this.bus = bus;
-    this.items = items;
     this.actions = new PlayerActions(state, bus, items);
     this.progression = new Progression(state, bus, progression);
     this.actions.readNote = (recipe) => this.progression.learn(recipe);
@@ -128,23 +135,131 @@ export class Simulation {
 
   /** Zona onde o jogador está: colisões, recursos, baús… (null = fora de uma cena de jogo). */
   setZone(zone: ZoneContext | null): void {
+    // O convidado ligado a esta zona fica com ela (e com os inimigos que lá estão).
+    for (const secondary of this.secondaries) secondary.unlink();
+    this.linked = false;
+    this.zone = zone;
     this.world = zone?.collision ?? null;
     this.exits = zone?.map.exits ?? [];
     this.leavingTo = null;
     this.fishing.cancel();
     this.building.setZone(zone);
     this.combat.setZone(zone);
+    // Co-op (convidado): os inimigos são os do anfitrião (chegam pela rede).
+    if (this.remote) this.combat.setRemote([]);
     this.horde.setZone(zone);
     if (zone) this.progression.visit(zone.zoneId);
     this.interaction.setZone(zone);
+    this.syncLinks();
+  }
+
+  /** Zona atual (id), ou null. */
+  get zoneId(): string | null {
+    return this.zone?.zoneId ?? null;
+  }
+
+  /** Co-op (anfitrião): junta a simulação de um convidado (corre dentro do tick desta). */
+  attach(secondary: Simulation): void {
+    if (this.secondaries.includes(secondary)) return;
+    secondary.primary = this;
+    this.secondaries.push(secondary);
+    this.syncLinks();
+  }
+
+  /** Co-op (anfitrião): o convidado saiu. */
+  detach(secondary: Simulation): void {
+    const index = this.secondaries.indexOf(secondary);
+    if (index < 0) return;
+    secondary.unlink();
+    secondary.setZone(null);
+    secondary.primary = null;
+    this.secondaries.splice(index, 1);
+  }
+
+  /**
+   * Co-op: cada convidado na mesma zona que o jogador principal partilha a zona dele (inimigos,
+   * peças, colisões); noutra zona, tem a sua (o mundo — baús, recursos, contentores — é sempre
+   * o mesmo).
+   */
+  private syncLinks(): void {
+    for (const secondary of this.secondaries) {
+      const zoneId = secondary.state.data.player.zoneId;
+      if (zoneId === this.zone?.zoneId) {
+        if (!secondary.linked) secondary.linkTo(this);
+      } else if (secondary.linked || secondary.zone?.zoneId !== zoneId) {
+        secondary.unlink();
+        if (secondary.zone?.zoneId !== zoneId) secondary.setZone(this.contextFor(zoneId));
+      }
+    }
+  }
+
+  private linkTo(primary: Simulation): void {
+    const zone = primary.zone;
+    if (!zone) return;
+    this.linked = true;
+    this.zone = zone;
+    this.world = zone.collision;
+    this.exits = zone.map.exits;
+    this.leavingTo = null;
+    this.fishing.cancel();
+    this.combat.link(primary.combat);
+    this.building.link(primary.building);
+    this.progression.visit(zone.zoneId);
+    this.interaction.setZone(zone);
+  }
+
+  private unlink(): void {
+    if (!this.linked) return;
+    this.linked = false;
+    this.combat.unlink();
+    this.building.unlink();
+  }
+
+  /** Co-op: multiplicador de vida e dano dos inimigos que nascem (§Fase 15). */
+  setDifficulty(multiplier: number): void {
+    this.combat.setDifficulty(multiplier);
+    for (const secondary of this.secondaries) secondary.combat.setDifficulty(multiplier);
+  }
+
+  /** Co-op: o jogador está no mapa-mundo ou em pausa (não age e os inimigos ignoram-no). */
+  set away(away: boolean) {
+    this.combat.away = away;
+  }
+
+  get away(): boolean {
+    return this.combat.away;
+  }
+
+  /**
+   * Co-op (anfitrião): onde está o convidado (ele anda no ecrã dele e o anfitrião confia na
+   * posição, como num jogo entre amigos).
+   */
+  setRemotePlayer(x: number, y: number, facing: PlayerState['facing'], moved: boolean, sneak: boolean): void {
+    const player = this.state.data.player;
+    this.previous = { x: player.x, y: player.y };
+    player.x = x;
+    player.y = y;
+    player.facing = facing;
+    this.moved = moved;
+    this.sneaking = sneak;
+    if (moved) this.tutorial.playerMoved();
   }
 
   /**
    * Ação contextual (Espaço/clique/botão). `held` = tecla/botão premido: repete golpes em
    * recursos ao ritmo de `actionCooldownSec`. Um toque rápido também conta (fica em fila).
    */
-  setActionHeld(held: boolean): void {
-    if (held && !this.actionHeld) this.actionQueued = true;
+  setActionHeld(held: boolean, atTick?: number): void {
+    // Co-op (convidado): quem faz a ação é o anfitrião.
+    if (this.remote) {
+      if (held !== this.actionHeld && this.state.hasGame) this.remote.act(held, this.state.data.world.tick);
+      this.actionHeld = held;
+      return;
+    }
+    if (held && !this.actionHeld) {
+      this.actionQueued = true;
+      this.strikeTick = atTick ?? null;
+    }
     this.actionHeld = held;
   }
 
@@ -204,39 +319,6 @@ export class Simulation {
     return this.sneaking;
   }
 
-  /** O boneco do convidado (co-op) no mundo deste jogo, ou null. */
-  get partner(): Partner | null {
-    return this.combat.partner;
-  }
-
-  /** Um convidado entrou (aparece ao pé do jogador) ou saiu (null). */
-  setPartner(weapon: string | null | undefined): void {
-    if (weapon === undefined) {
-      this.combat.partner = null;
-      return;
-    }
-    const { x, y } = this.state.data.player;
-    this.combat.partner = createPartner({ x, y }, BALANCE.statMax, weapon);
-  }
-
-  /** Posição que o convidado mandou (ele anda no ecrã dele; o anfitrião confia nela). */
-  movePartner(x: number, y: number, facing: Partner['facing'], moved: boolean, sneak: boolean): void {
-    const partner = this.combat.partner;
-    if (!partner || partner.downUntil > 0) return;
-    partner.px = partner.x;
-    partner.py = partner.y;
-    partner.x = x;
-    partner.y = y;
-    partner.facing = facing;
-    partner.moved = moved;
-    partner.sneak = sneak;
-  }
-
-  /** O convidado carregou na ação (faz-se no próximo tick, ao ritmo da arma dele). */
-  partnerAction(): void {
-    this.partnerActionQueued = true;
-  }
-
   /** @returns número de ticks executados. */
   update(deltaMs: number): number {
     return this.clock.advance(deltaMs, () => {
@@ -274,20 +356,26 @@ export class Simulation {
   }
 
   private tick(): void {
-    // Co-op (convidado): o mundo corre no anfitrião; aqui só se anda e se pedem ações.
-    if (this.remoteAction) {
+    const world = this.state.data.world;
+    // Co-op (convidado): o mundo corre no anfitrião; aqui só se anda e se prevê o relógio e as
+    // estações (o anfitrião manda o estado certo de vez em quando).
+    if (this.remote) {
+      world.tick += 1;
       this.movePlayer();
-      this.runAction(this.remoteTicks++);
+      this.checkExits();
+      this.crafting.advance(1);
       return;
     }
-    const world = this.state.data.world;
+    // A simulação de um convidado corre dentro do tick do jogador principal.
+    if (this.primary) return;
     world.tick += 1;
     this.state.markDirty(); // o tempo de jogo avançou
     this.movePlayer();
     if (this.moved) this.tutorial.playerMoved();
     this.checkExits();
     this.runAction(world.tick);
-    this.tickPartner(world.tick);
+    for (const secondary of this.secondaries) secondary.tickSecondary(world.tick);
+    if (this.secondaries.length > 0) this.syncLinks();
     this.interaction.tick(world.tick);
     this.combat.tick(this.sneaking);
     this.horde.tick();
@@ -299,31 +387,22 @@ export class Simulation {
     this.bus.emit('world:tick', { tick: world.tick });
   }
 
-  /** Parceiro (co-op): faz a ação pedida e, se caiu, volta ao pé do jogador passado um pouco. */
-  private tickPartner(tick: number): void {
-    const partner = this.combat.partner;
-    if (!partner) return;
-    if (partner.downUntil > 0) {
-      this.partnerActionQueued = false;
-      if (tick < partner.downUntil) return;
-      const { x, y } = this.state.data.player;
-      Object.assign(partner, { x, y, px: x, py: y, hp: BALANCE.statMax, downUntil: 0 });
-      this.bus.emit('partner:revived', {});
-      return;
+  /**
+   * Co-op (anfitrião): um tick do convidado. A posição chega pela rede; o relógio, as estações
+   * e a horda são do mundo (correm uma vez, no principal); na mesma zona, os inimigos também.
+   */
+  private tickSecondary(tick: number): void {
+    if (this.combat.away) return;
+    this.combat.sneaking = this.sneaking;
+    this.runAction(tick);
+    if (!this.linked && this.zone) {
+      this.interaction.tick(tick);
+      this.combat.tick(this.sneaking);
     }
-    if (!this.partnerActionQueued || tick < this.partnerNextAction) return;
-    this.partnerActionQueued = false;
-    const def = partner.weapon ? this.items()[partner.weapon] : undefined;
-    const weapon = def?.damage
-      ? {
-          damage: def.damage,
-          reach: def.reach ?? BALANCE.weaponReachPx,
-          sec: def.attackSec ?? BALANCE.weaponAttackSec,
-        }
-      : { damage: BALANCE.fistDamage, reach: BALANCE.fistReachPx, sec: BALANCE.fistAttackSec };
-    const done = this.interaction.partnerAct(partner, weapon, PLAYER_FOOTPRINT);
-    this.partnerNextAction =
-      tick + (done === 'attack' ? secondsToTicks(weapon.sec) : this.actionCooldownTicks);
+    this.stats.tick();
+    tickSurvival(this.state.data.player, tick, this.survival);
+    this.tickBleeding(tick);
+    if (this.state.data.player.hp <= 0) this.respawn();
   }
 
   /** A sangrar: perde vida devagar até acabar o tempo ou usar uma ligadura (nunca instantâneo). */
@@ -348,16 +427,11 @@ export class Simulation {
   private runAction(tick: number): void {
     if (!(this.actionQueued || this.actionHeld) || tick < this.nextActionTick) return;
     this.actionQueued = false;
-    // Co-op (convidado): a ação é feita pelo anfitrião; aqui só se anima.
-    if (this.remoteAction) {
-      this.remoteAction();
-      this.bus.emit('player:action', { kind: 'swing' });
-      this.nextActionTick = tick + secondsToTicks(BALANCE.weaponAttackSec);
-      return;
-    }
+    const strikeTick = this.strikeTick ?? undefined;
+    this.strikeTick = null;
     // A pescar, o botão de ação é o "puxar" do mini-jogo.
     if (this.fishing.active) {
-      this.fishing.strike();
+      this.fishing.strike(strikeTick);
       this.actionHeld = false;
       this.nextActionTick = tick + this.actionCooldownTicks;
       return;

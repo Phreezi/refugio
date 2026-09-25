@@ -11,6 +11,8 @@ import { Label } from '../ui/text';
 import { uiState } from '../ui/uiState';
 import { content } from '../world/content';
 import { SceneKey } from './keys';
+import { coop } from '../net/coop';
+import type { MainMenuData } from './MainMenuScene';
 import type { ZoneSceneData } from './ZoneScene';
 
 export interface WorldMapData {
@@ -61,9 +63,24 @@ export class WorldMapScene extends Phaser.Scene {
       this.back();
     };
     this.input.keyboard?.on('keydown-ESC', onEsc);
+    // Co-op: no mapa-mundo os inimigos ignoram este jogador (o tempo não pára para o outro).
+    coop.setAway(true);
+    if (coop.isGuest) {
+      coop.onLost = () => {
+        gameState.clear();
+        this.scene.start(SceneKey.MainMenu, { message: 'coop.lost' } satisfies MainMenuData);
+      };
+    }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
+      coop.onLost = null;
     });
+  }
+
+  /** Co-op (anfitrião): o mundo continua a andar para o convidado enquanto se escolhe a zona. */
+  override update(): void {
+    if (coop.isHost && uiState.coop) simulation.update(this.game.loop.rawDelta);
+    coop.update(performance.now());
   }
 
   /** Posição de uma zona no ecrã (worldMapPos 0–100 dentro da área do mapa). */

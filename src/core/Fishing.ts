@@ -54,9 +54,18 @@ export class Fishing {
 
   /** Posição atual do marcador (0–1). */
   get marker(): number {
+    return this.markerAt(this.state.data.world.tick);
+  }
+
+  private markerAt(tick: number): number {
     const session = this.current;
     if (!session) return 0;
-    return fishingMarker(this.state.data.world.tick - session.startTick, this.sweepTicks);
+    return fishingMarker(Math.max(0, tick - session.startTick), this.sweepTicks);
+  }
+
+  /** Co-op (convidado): a pesca corre no anfitrião; aqui só se mostra a sessão dele. */
+  mirror(session: FishingSession | null): void {
+    this.current = session;
   }
 
   /** Começa a pescar (ou enche uma garrafa, se não houver cana). */
@@ -83,11 +92,14 @@ export class Fishing {
     this.bus.emit('action:blocked', { reason: 'needs_rod' });
   }
 
-  /** Carregar no botão: apanha o peixe se o marcador estiver na zona verde. */
-  strike(): void {
+  /**
+   * Carregar no botão: apanha o peixe se o marcador estiver na zona verde.
+   * @param atTick tick em que se carregou (co-op: o do ecrã do convidado).
+   */
+  strike(atTick = this.state.data.world.tick): void {
     const session = this.current;
     if (!session) return;
-    const caught = Math.abs(this.marker - session.zone) <= session.width / 2 || this.hit(session);
+    const caught = Math.abs(this.markerAt(atTick) - session.zone) <= session.width / 2 || this.hit(atTick);
     this.current = null;
     const containers = this.actions.pickupContainers();
     const rod = this.rod(containers);
@@ -116,10 +128,9 @@ export class Fishing {
   }
 
   /** O marcador visto pelo jogador é o do tick anterior ao clique: aceita-se também esse. */
-  private hit(session: FishingSession): boolean {
-    const ticks = this.state.data.world.tick - session.startTick;
-    const before = fishingMarker(Math.max(0, ticks - 1), this.sweepTicks);
-    return Math.abs(before - session.zone) <= session.width / 2;
+  private hit(atTick: number): boolean {
+    const session = this.current;
+    return session !== null && Math.abs(this.markerAt(atTick - 1) - session.zone) <= session.width / 2;
   }
 
   private rod(containers: readonly Container[]): { container: Container; index: number } | null {

@@ -60,5 +60,5 @@
   "playerLightPx": 44,
   "bleedSec": 30,
   "bleedEverySec": 2,
-  "partnerDownSec": 5
+  "coopEnemyMultiplier": 1.5
 }

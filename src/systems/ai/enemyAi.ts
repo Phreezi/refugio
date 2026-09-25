@@ -21,6 +21,10 @@ export interface Enemy {
   /** Onde nasceu: não se afasta mais do que `leashRadius` daqui. */
   home: Vec2;
   hp: number;
+  /** Vida máxima (a do `enemies.json` vezes `power`). */
+  maxHp: number;
+  /** Multiplicador de vida e dano (co-op: `coopEnemyMultiplier`; sozinho: 1). */
+  power: number;
   state: EnemyState;
   /** Ticks que faltam no estado atual (idle, windup, recover…). */
   timer: number;
@@ -71,7 +75,8 @@ export const ATTACK_SLACK_PX = 4;
 /** Distância a que se passeia à volta de casa. */
 const WANDER_RADIUS = 48;
 
-export function createEnemy(uid: number, id: string, def: EnemyDef, at: Vec2): Enemy {
+export function createEnemy(uid: number, id: string, def: EnemyDef, at: Vec2, power = 1): Enemy {
+  const hp = Math.round(def.hp * power);
   return {
     uid,
     id,
@@ -80,7 +85,9 @@ export function createEnemy(uid: number, id: string, def: EnemyDef, at: Vec2): E
     px: at.x,
     py: at.y,
     home: { ...at },
-    hp: def.hp,
+    hp,
+    maxHp: hp,
+    power,
     state: 'idle',
     timer: 0,
     goal: null,
@@ -208,7 +215,7 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
         return null;
       }
       if (walk(enemy, def, enemy.home, def.speed, ctx, 2) || distance(enemy, enemy.home) <= 2) {
-        enemy.hp = def.hp; // desistiu: volta inteiro (como no original)
+        enemy.hp = enemy.maxHp; // desistiu: volta inteiro (como no original)
         startIdle(enemy, ctx);
       }
       return null;

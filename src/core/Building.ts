@@ -29,6 +29,11 @@ export function structureChestId(uid: number): string {
   return `s${String(uid)}`;
 }
 
+interface BuildSiteState {
+  grid: StructureGrid | null;
+  resourceTiles: Map<number, number[]>;
+}
+
 /** Na grelha de colisões, as peças usam chaves negativas (as positivas são objetos do mapa). */
 const collisionKey = (uid: number): number => -uid;
 
@@ -41,10 +46,13 @@ export class Building {
   private readonly state: GameState;
   private readonly bus: EventBus<GameEvents>;
   private readonly actions: PlayerActions;
-  private grid: StructureGrid | null = null;
+  /**
+   * Grelha das peças e recursos do mapa por tile (onde estão por apanhar não se constrói). No
+   * co-op, com os dois jogadores na mesma zona, o convidado usa a do anfitrião.
+   */
+  private site: BuildSiteState = { grid: null, resourceTiles: new Map() };
+  private linked = false;
   private zone: ZoneContext | null = null;
-  /** Recursos do mapa por tile: onde estão por apanhar não se constrói. */
-  private resourceTiles = new Map<number, number[]>();
   /** A peça está desbloqueada (nível)? Por omissão, todas. */
   isUnlocked: (id: string) => boolean = () => true;
   /** Peças colocadas nesta sessão, para o Desfazer (não se grava). */
@@ -56,8 +64,52 @@ export class Building {
     this.actions = actions;
   }
 
+  private get grid(): StructureGrid | null {
+    return this.site.grid;
+  }
+
+  private set grid(grid: StructureGrid | null) {
+    this.site.grid = grid;
+  }
+
+  private get resourceTiles(): Map<number, number[]> {
+    return this.site.resourceTiles;
+  }
+
+  private set resourceTiles(tiles: Map<number, number[]>) {
+    this.site.resourceTiles = tiles;
+  }
+
+  /** Co-op: usa a grelha de `primary` (os dois jogadores na mesma zona). */
+  link(primary: Building): void {
+    this.site = primary.site;
+    this.zone = primary.zone;
+    this.linked = true;
+  }
+
+  /** Co-op: deixa de partilhar (fica com a grelha atual como sua). */
+  unlink(): void {
+    if (!this.linked) return;
+    this.site = { grid: this.site.grid, resourceTiles: this.site.resourceTiles };
+    this.linked = false;
+  }
+
+  /**
+   * Refaz a grelha e as colisões a partir do estado (co-op: o convidado recebeu o mundo do
+   * anfitrião, com peças que podem ter mudado).
+   */
+  resync(): void {
+    const collision = this.zone?.collision;
+    if (collision) for (const record of this.structures()) collision.removeKeyed(collisionKey(record[0]));
+    this.setZone(this.zone);
+  }
+
   /** Só se constrói na base; noutras zonas (e fora do jogo) fica indisponível. */
   setZone(zone: ZoneContext | null): void {
+    if (this.linked) {
+      this.linked = false;
+      this.site = { grid: null, resourceTiles: new Map() };
+    }
     this.zone = zone;
     this.recent = [];
     if (zone?.zoneId !== BASE_ZONE_ID) {

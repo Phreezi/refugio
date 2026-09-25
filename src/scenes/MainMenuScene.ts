@@ -286,7 +286,7 @@ export class MainMenuScene extends Phaser.Scene {
 
   /**
    * Entra no jogo de um amigo: pede o código, liga-se e joga no mundo dele (que não se grava
-   * aqui). Da nossa gravação só vem a arma equipada (o dano do nosso boneco).
+   * aqui) com a personagem do nosso save, que continua a ser gravada cá.
    */
   private joinCoop(save: LoadedSave | null): void {
     if (this.busy) return;
@@ -299,13 +299,11 @@ export class MainMenuScene extends Phaser.Scene {
     }
     this.busy = true;
     this.setStatus('coop.joining');
-    const weapon = save?.state.player.equipment[0]?.[0] ?? null;
-    coop.join(code, weapon).then(
+    // A personagem do save deste jogador vai para o mundo do amigo (e volta com o que ganhar).
+    coop.join(code, save?.state ?? null).then(
       (state) => {
         gameState.load(state, true);
-        simulation.remoteAction = () => {
-          coop.sendAct();
-        };
+        simulation.reset();
         this.scene.start(SceneKey.Zone, { zoneId: state.player.zoneId } satisfies ZoneSceneData);
       },
       (error: unknown) => {

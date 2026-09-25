@@ -314,7 +314,6 @@
   "coop.hud_guest": "Co-op (guest)",
   "coop.hud_waiting": "Co-op {code}: waiting",
   "coop.hud_connected": "Co-op {code}: connected",
-  "coop.host_only": "In co-op, the backpack, crafting and building belong to the host.",
   "coop.join": "Join with code",
   "coop.enter_code": "Friend's code (5 letters/numbers):",
   "coop.bad_code": "Invalid code: it's 5 letters or numbers.",
@@ -323,7 +322,5 @@
   "coop.join_failed": "Couldn't join. Try again.",
   "coop.lost": "The connection to your friend's game ended.",
   "coop.partner_joined": "Your partner joined the game!",
-  "coop.partner_left": "Your partner left.",
-  "coop.partner_down": "Your partner is down! They'll be back shortly.",
-  "coop.you_down": "You're down! You'll be back next to your friend shortly."
+  "coop.partner_left": "Your partner left."
 }
