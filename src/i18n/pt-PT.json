@@ -461,5 +461,16 @@
   "craft.cat.sell": "Vender",
   "craft.buy": "Comprar",
   "craft.sell": "Vender",
-  "menu.slot_short": "{name} · Nv {level}"
+  "menu.slot_short": "{name} · Nv {level}",
+  "inv.enchant": "Encantar ({cost})",
+  "msg.no_coins": "Precisas de {cost} moedas.",
+  "msg.needs_level": "Precisas de nível {level} para equipar isto.",
+  "msg.enchanted": "Encantado: {item} +{level}!",
+  "info.level": "Nível {n}",
+  "info.level_missing": "Precisa de nível {n}!",
+  "skills.reset": "Repor ({cost})",
+  "skills.reset_confirm": "Repor? ({cost})",
+  "skills.reset_done": "Pontos repostos.",
+  "skills.reset_nothing": "Não há pontos gastos.",
+  "hud.coins": "{n}"
 }

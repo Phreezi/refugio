@@ -5,7 +5,7 @@ import { SKILLS } from '../data/types';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -74,8 +74,13 @@ const FACINGS = new Set(['down', 'left', 'right', 'up']);
 /** Slot compacto: null ou [itemId, qtd ≥ 1] / [itemId, qtd, durabilidade ≥ 0]. */
 function validSlot(slot: unknown): boolean {
   if (slot === null) return true;
-  if (!Array.isArray(slot) || slot.length < 2 || slot.length > 3) return false;
-  const [id, qty, durability] = slot as unknown[];
+  if (!Array.isArray(slot) || slot.length < 2 || slot.length > 4) return false;
+  const [id, qty, durability, enchant] = slot as unknown[];
+  if (
+    enchant !== undefined &&
+    !(Number.isInteger(enchant) && (enchant as number) >= 1 && (enchant as number) <= 10)
+  )
+    return false;
   return (
     typeof id === 'string' &&
     id !== '' &&

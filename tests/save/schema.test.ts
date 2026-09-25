@@ -256,6 +256,18 @@ describe('save: migrações', () => {
     expect(() => validateState(bad)).toThrow();
   });
 
+  it('v18 → v19: slots com encantamento (4.º valor) validam-se', () => {
+    const v18 = structuredClone(STATE);
+    const stateJson = JSON.stringify(v18);
+    const text = `{"version":18,"timestamp":9,"checksum":"${checksum(`18|9|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.player.level).toBe(STATE.player.level);
+    const ok = structuredClone(STATE) as unknown as { player: { equipment: unknown[] } };
+    ok.player.equipment[0] = ['machete', 1, 90, 2];
+    expect(() => validateState(ok)).not.toThrow();
+    ok.player.equipment[0] = ['machete', 1, 90, 0];
+    expect(() => validateState(ok)).toThrow();
+  });
+
   it('v17 → v18: talentos vazios; validam-se', () => {
     const v17 = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
     delete v17.player.talents;

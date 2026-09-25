@@ -123,6 +123,9 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     const player = s.player as Record<string, unknown>;
     return { ...s, player: { ...player, talents: {} } };
   },
+  // v18 → v19: os slots de armas e roupa podem ter um 4.º valor, o encantamento (§7.16). Nada
+  // a converter: os saves antigos não têm encantamentos.
+  18: (s) => s,
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

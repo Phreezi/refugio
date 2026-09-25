@@ -53,6 +53,7 @@ function setup() {
 describe('Mochilas (§7.3)', () => {
   it('equipar uma mochila dá espaços; tirá-la passa o que lá estava para espaços livres ou para o chão', () => {
     const { state, sim, tick } = setup();
+    state.data.player.level = 20; // sem limite de nível para equipar (§7.16)
     const player = state.data.player;
     expect(player.inventory.length).toBe(BALANCE.inventorySlots);
     player.inventory[0] = ['small_backpack', 1];

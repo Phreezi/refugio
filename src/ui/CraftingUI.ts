@@ -309,14 +309,25 @@ export class CraftingUI {
   private recipes(): Recipe[] {
     const type = this.station ? stationType(this.station) : HANDS;
     const containers = this.sim.actions.pickupContainers();
-    return this.sim.crafting
-      .recipesFor(type)
-      .filter((r) => r.category === this.tab)
-      .filter(
-        (r) =>
-          !this.canMakeOnly ||
-          (this.sim.progression.isRecipeUnlocked(r) && missingInputs(containers, r).length === 0),
-      );
+    return (
+      this.sim.crafting
+        .recipesFor(type)
+        .filter((r) => r.category === this.tab)
+        .filter(
+          (r) =>
+            !this.canMakeOnly ||
+            (this.sim.progression.isRecipeUnlocked(r) && missingInputs(containers, r).length === 0),
+        )
+        // As que ainda não se sabem fazer ficam no fim (a cinzento), por nível.
+        .map((r, i) => ({ r, i, locked: !this.sim.progression.isRecipeUnlocked(r) }))
+        .sort(
+          (a, b) =>
+            Number(a.locked) - Number(b.locked) ||
+            (a.locked ? a.r.unlockLevel - b.r.unlockLevel : 0) ||
+            a.i - b.i,
+        )
+        .map(({ r }) => r)
+    );
   }
 
   private buildRecipes(x: number, y: number, w: number): void {
@@ -329,11 +340,13 @@ export class CraftingUI {
       .forEach((recipe, i) => {
         const ry = y + i * ROW_H;
         const def = content.items[recipe.output];
+        const locked = !this.sim.progression.isRecipeUnlocked(recipe);
         if (def)
           this.add(
             this.scene.add
               .image(x + PAD, ry + 2, def.icon)
               .setOrigin(0)
+              .setAlpha(locked ? 0.4 : 1)
               .setDepth(DEPTH.content),
           );
         // Tocar no desenho ou no nome diz o que o item faz.
@@ -352,14 +365,17 @@ export class CraftingUI {
         this.label(x + PAD + 20, ry + 1, `${itemName(recipe.output)}${qty}${time}`, {
           size: 8,
           bold: true,
-          color: 'cream',
+          color: locked ? 'stone' : 'cream',
         });
         // Ingredientes: "tem/precisa nome", a vermelho se faltar.
         let ix = x + PAD + 20;
         for (const { item, qty: need } of recipe.inputs) {
           const have = countItem(containers, item);
           const text = `${String(Math.min(have, need))}/${String(need)} ${itemName(item)}`;
-          const lbl = this.label(ix, ry + 12, text, { size: 7, color: have >= need ? 'lime' : 'red' });
+          const lbl = this.label(ix, ry + 12, text, {
+            size: 7,
+            color: locked ? 'stone' : have >= need ? 'lime' : 'red',
+          });
           ix += lbl.text.width + 8;
         }
         const unlocked = this.sim.progression.isRecipeUnlocked(recipe);

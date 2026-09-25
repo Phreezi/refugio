@@ -27,6 +27,7 @@ const HEADER_H = 40;
 const ROW_H = 30;
 const PAD = 8;
 const FOOTER_H = 26;
+const RESET_CONFIRM_MS = 3000;
 
 type Tab = 'use' | TalentBranch;
 const TABS: readonly Tab[] = ['use', ...TALENT_BRANCHES];
@@ -66,6 +67,8 @@ export class SkillsUI {
   private readonly scene: Phaser.Scene;
   private objects: Destroyable[] = [];
   private tab: Tab = 'use';
+  /** Repor os talentos pede um segundo toque até este instante (ms). */
+  private resetConfirmUntil = 0;
   /** Página do separador (quando os talentos não cabem todos). */
   private page = 0;
   private open_ = false;
@@ -157,6 +160,36 @@ export class SkillsUI {
     );
     this.label(x + PAD, y + 5, t('skills.title'), { size: 10, bold: true, color: 'wheat' });
     const points = talentPoints(player.level, player.talents);
+    // Repor os talentos (custa moedas): dois toques para confirmar.
+    const resetCost = simulation.progression.talentResetCost();
+    if (resetCost > 0 && this.tab !== 'use') {
+      const confirming = performance.now() < this.resetConfirmUntil;
+      this.add(
+        new Button(
+          scene,
+          x + PAD + 96,
+          y + 9,
+          t(confirming ? 'skills.reset_confirm' : 'skills.reset', { cost: resetCost }),
+          { width: 76, height: 12, fontSize: 7, style: confirming ? 'danger' : 'secondary' },
+          () => {
+            if (!confirming) {
+              this.resetConfirmUntil = performance.now() + RESET_CONFIRM_MS;
+              this.message = '';
+            } else {
+              this.resetConfirmUntil = 0;
+              const result = simulation.progression.resetTalents();
+              this.message =
+                result === 'no_coins'
+                  ? t('msg.no_coins', { cost: resetCost })
+                  : result === 'ok'
+                    ? t('skills.reset_done')
+                    : t('skills.reset_nothing');
+            }
+            this.rebuildSoon();
+          },
+        ).setDepth(DEPTH.content),
+      );
+    }
     this.label(
       x + w - 24,
       y + 7,

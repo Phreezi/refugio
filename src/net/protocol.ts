@@ -42,13 +42,25 @@ export type EnemyFrame = [number, string, number, number, number, number, string
  * logo (para não esperar pela rede) e no anfitrião, que tem a última palavra.
  */
 export const GUEST_COMMANDS = {
-  actions: ['use', 'move', 'equip', 'unequip', 'split', 'sort', 'storeSimilar', 'takeAll', 'drop', 'destroy'],
+  actions: [
+    'use',
+    'move',
+    'equip',
+    'unequip',
+    'split',
+    'sort',
+    'storeSimilar',
+    'takeAll',
+    'drop',
+    'destroy',
+    'enchant',
+  ],
   crafting: ['craft', 'cancel', 'collect', 'repair'],
   building: ['place', 'undo', 'demolish'],
   fishing: ['cancel'],
   tutorial: ['dismiss'],
   combat: ['selectAmmo', 'cycleAmmo'],
-  progression: ['learnTalent'],
+  progression: ['learnTalent', 'resetTalents'],
   sim: ['travel', 'enterZone'],
 } as const;
 export type CommandSystem = keyof typeof GUEST_COMMANDS;
