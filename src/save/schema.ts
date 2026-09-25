@@ -1,11 +1,11 @@
 import type { GameStateData } from '../core/GameState';
 import { MIGRATIONS, migrate, type Migration } from './migrations';
-import { WEAPON_SKILLS } from '../data/types';
+import { SKILLS } from '../data/types';
 
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -142,7 +142,7 @@ export function validateState(input: unknown): GameStateData {
     const skills = player.skills;
     if (
       !isObject(skills) ||
-      !Object.entries(skills).every(([k, xp]) => (WEAPON_SKILLS as readonly string[]).includes(k) && stat(xp))
+      !Object.entries(skills).every(([k, xp]) => (SKILLS as readonly string[]).includes(k) && stat(xp))
     )
       problems.push('player.skills inválido');
     if (
@@ -158,6 +158,13 @@ export function validateState(input: unknown): GameStateData {
       )
     )
       problems.push('player.quiver inválido');
+    if (
+      !isObject(player.talents) ||
+      !Object.values(player.talents).every(
+        (rank) => typeof rank === 'number' && Number.isInteger(rank) && rank > 0,
+      )
+    )
+      problems.push('player.talents inválido');
     if (typeof player.name !== 'string' || player.name.trim() === '' || player.name.length > 14)
       problems.push('player.name inválido');
   }

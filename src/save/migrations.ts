@@ -117,6 +117,12 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     const player = s.player as Record<string, unknown>;
     return { ...s, player: { ...player, name: 'Sobrevivente' } };
   },
+  // v17 → v18: talentos (§7.15). Os pontos contam-se pelo nível, por isso quem já jogava fica
+  // com todos os pontos dos níveis que tem para gastar.
+  17: (s) => {
+    const player = s.player as Record<string, unknown>;
+    return { ...s, player: { ...player, talents: {} } };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

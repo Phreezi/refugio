@@ -39,6 +39,8 @@ export class PauseUI {
   private coopError = false;
   /** Sair para o menu inicial (a UIScene trata de gravar e mudar de cena). */
   onQuit: () => void = () => undefined;
+  /** Abrir o painel de perícias (UIScene). */
+  onSkills: () => void = () => undefined;
 
   private readonly offCoop: () => void;
 
@@ -106,7 +108,7 @@ export class PauseUI {
     const { width, height } = getView();
     const lines =
       this.view === 'main'
-        ? 5
+        ? 6
         : this.view === 'stats'
           ? 8 + this.skillRows().length
           : this.view === 'coop'
@@ -160,6 +162,13 @@ export class PauseUI {
         'pause.settings',
         () => {
           this.go('settings');
+        },
+      ],
+      [
+        'pause.skills',
+        () => {
+          this.close();
+          this.onSkills();
         },
       ],
       [

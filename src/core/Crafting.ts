@@ -1,3 +1,4 @@
+import { talentOf } from '../data/talents';
 import { BALANCE } from '../data/balance';
 import { HANDS, type ItemDefs, type Recipe, type Recipes, type StationDefs } from '../data/types';
 import {
@@ -84,7 +85,13 @@ export class Crafting {
         containers,
         recipe,
         max,
-        secondsToTicks(recipe.timeSec),
+        // Talento "fabrico rápido" (§7.15) de quem põe o trabalho na fila.
+        Math.max(
+          1,
+          Math.round(
+            secondsToTicks(recipe.timeSec) * (1 - talentOf(this.state.data.player, 'craftSpeedPct') / 100),
+          ),
+        ),
       );
     }
     if (result === 'ok') this.changed();

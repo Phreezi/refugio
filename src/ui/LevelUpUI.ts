@@ -57,8 +57,9 @@ export class LevelUpUI {
     const w = Math.min(220, width - 16);
     const x = Math.round((width - w) / 2);
     const y = 34;
-    const body =
+    const unlocked =
       next.lines.length > 0 ? `${t('level.unlocked')}\n${next.lines.join(', ')}` : t('level.nothing');
+    const body = `${unlocked}\n${t('level.points')}`;
     const add = <T extends { destroy(): void }>(obj: T): T => {
       this.objects.push(obj);
       return obj;

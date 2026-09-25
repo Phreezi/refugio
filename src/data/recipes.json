@@ -533,5 +533,62 @@
     "qty": 1,
     "timeSec": 20,
     "unlockLevel": 7
+  },
+  {
+    "id": "r_pouch",
+    "station": "hands",
+    "category": "tools",
+    "inputs": [
+      ["cloth", 3],
+      ["fiber", 4]
+    ],
+    "output": "pouch",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 2
+  },
+  {
+    "id": "r_small_backpack",
+    "station": "wood_bench",
+    "category": "tools",
+    "inputs": [
+      ["pouch", 1],
+      ["cloth", 4],
+      ["rope", 2]
+    ],
+    "output": "small_backpack",
+    "qty": 1,
+    "timeSec": 20,
+    "unlockLevel": 5
+  },
+  {
+    "id": "r_large_backpack",
+    "station": "workbench",
+    "category": "tools",
+    "inputs": [
+      ["small_backpack", 1],
+      ["leather", 6],
+      ["rope", 3],
+      ["nails", 4]
+    ],
+    "output": "large_backpack",
+    "qty": 1,
+    "timeSec": 40,
+    "unlockLevel": 13
+  },
+  {
+    "id": "r_military_backpack",
+    "station": "workbench",
+    "category": "tools",
+    "inputs": [
+      ["large_backpack", 1],
+      ["leather", 8],
+      ["scrap_metal", 6],
+      ["cloth", 6]
+    ],
+    "output": "military_backpack",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 20
   }
 ]

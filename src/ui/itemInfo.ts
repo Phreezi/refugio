@@ -1,4 +1,5 @@
 import { BALANCE } from '../data/balance';
+import { talentOf } from '../data/talents';
 import { gameState, type PlayerState } from '../core/GameState';
 import { skillOf, type ItemDef } from '../data/types';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
@@ -26,7 +27,13 @@ export function describeItem(id: string, def: ItemDef | undefined): string[] {
     add('info.skill', {
       skill: tKey(`skill.${skill}`),
       level,
-      miss: Math.round(missPct(level, def.ranged !== undefined, BALANCE)),
+      miss: Math.round(
+        Math.max(
+          BALANCE.missPctMin,
+          missPct(level, def.ranged !== undefined, BALANCE) -
+            (gameState.hasGame ? talentOf(gameState.data.player, 'missPts') : 0),
+        ),
+      ),
     });
   }
   if (def.toolKind && def.gatherPower !== undefined)

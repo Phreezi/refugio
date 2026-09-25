@@ -56,6 +56,43 @@ export class PlayerActions {
     return chestContents(data, ref.slice('chest:'.length));
   }
 
+  /** Espaços da mochila: os de base mais os da mochila equipada (§7.3). */
+  inventorySize(): number {
+    const bag = this.state.data.player.equipment[EQUIP_SLOTS.indexOf('backpack')];
+    return BALANCE.inventorySlots + (bag ? (this.items()[bag[0]]?.slots ?? 0) : 0);
+  }
+
+  /**
+   * Ajusta a mochila ao tamanho dado pela mochila equipada (corre a cada tick). Ao encolher, os
+   * itens dos espaços que desaparecem passam para espaços livres (ou juntam-se a stacks); o que
+   * não couber fica numa pilha no chão. Sem sítio onde a largar, espera (nada se perde).
+   */
+  syncBackpack(): void {
+    const inventory = this.state.data.player.inventory;
+    const size = this.inventorySize();
+    if (inventory.length === size) return;
+    if (inventory.length < size) {
+      while (inventory.length < size) inventory.push(null);
+      this.changed();
+      return;
+    }
+    const kept = inventory.slice(0, size);
+    const overflow: Container = [];
+    for (const slot of inventory.slice(size)) {
+      if (!slot) continue;
+      const free = kept.indexOf(null);
+      if (free >= 0) kept[free] = slot;
+      else if (slot[2] === undefined) {
+        const left = addItem([kept], slot[0], slot[1], this.items());
+        if (left > 0) overflow.push([slot[0], left]);
+      } else overflow.push(slot);
+    }
+    if (overflow.length > 0 && !this.dropItems(overflow)) return;
+    inventory.length = 0;
+    inventory.push(...kept);
+    this.changed();
+  }
+
   /** Onde vão parar os itens apanhados: primeiro a mochila, depois a hotbar. */
   pickupContainers(): Container[] {
     const { inventory, hotbar } = this.state.data.player;

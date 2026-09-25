@@ -3,7 +3,10 @@ import { BALANCE } from '../data/balance';
 import type { ItemDefs, LootTables, PropDefs, ResourceDefs, StationDefs, StructureDefs } from '../data/types';
 import { structureArea, structureFeet } from '../systems/building/building';
 import { bestTool, hitPower, maxDrops, rollDrops, wearTool } from '../systems/gathering/gathering';
-import { addItem, spaceFor } from '../systems/inventory/inventory';
+import { addItem, createContainer, spaceFor } from '../systems/inventory/inventory';
+import { gatherExtraPct, gatherPowerBonus, skillLevel, trainSkill } from '../systems/combat/skills';
+import { talentOf } from '../data/talents';
+import { nextRandom } from './Rng';
 import { pickTarget, type Target } from '../systems/interaction/targeting';
 import type { CollisionWorld } from '../systems/movement/CollisionWorld';
 import { footprintRect, type Rect } from '../systems/movement/geometry';
@@ -356,7 +359,16 @@ export class Interaction {
     // A ferramenta pode estar na mochila, na hotbar ou equipada como arma (um machado).
     const toolSources = [...containers, this.state.data.player.equipment];
     const tool = def.tool ? bestTool(toolSources, def.tool, zone.items) : null;
-    const power = hitPower(def, tool);
+    const player = this.state.data.player;
+    const gatherLevel = skillLevel(player.skills.gathering ?? 0, BALANCE);
+    const base = hitPower(def, tool);
+    // Perícia de recolha e talentos: golpes mais fortes (com a ferramenta certa, ou à mão).
+    const power =
+      base === 0
+        ? 0
+        : base +
+          gatherPowerBonus(gatherLevel, BALANCE.gatherPowerEveryLevels) +
+          talentOf(player, 'gatherPower');
     if (power === 0) {
       this.bus.emit('action:blocked', { reason: 'needs_tool', ...(def.tool ? { tool: def.tool } : {}) });
       return;
@@ -370,10 +382,12 @@ export class Interaction {
     }
 
     this.bus.emit('player:action', { kind: 'gather' });
-    if (tool) {
+    if (tool && !this.combat.savesWear()) {
       const toolItem = tool.container[tool.index]?.[0];
       if (wearTool(tool) && toolItem) this.bus.emit('item:broken', { item: toolItem });
     }
+    const up = trainSkill(player.skills, 'gathering', BALANCE);
+    if (up !== null) this.bus.emit('skill:levelUp', { skill: 'gathering', level: up });
     const left = Math.max(0, hp - power);
     this.bus.emit('resource:hit', {
       zoneId: zone.zoneId,
@@ -390,10 +404,24 @@ export class Interaction {
 
     this.nodeHp.delete(placement.objectId);
     const world = this.state.data.world;
-    for (const drop of rollDrops(def, world)) {
-      addItem(containers, drop.item, drop.qty, zone.items);
+    // Mais recursos com a perícia e os talentos; drops especiais com a perícia alta. O que
+    // não couber (só os extras podem não caber) fica numa pilha no chão.
+    const extraPct =
+      gatherExtraPct(gatherLevel, BALANCE.gatherExtraPctPerLevel) + talentOf(player, 'extraDropPct');
+    const drops = rollDrops(def, world).map((drop) => ({
+      ...drop,
+      qty: drop.qty + (nextRandom(world) * 100 < extraPct ? 1 : 0),
+    }));
+    for (const bonus of def.bonus ?? [])
+      if (gatherLevel >= bonus.minSkill && nextRandom(world) * 100 < bonus.pct)
+        drops.push({ item: bonus.item, qty: 1 });
+    const overflow = createContainer(0);
+    for (const drop of drops) {
+      const left = addItem(containers, drop.item, drop.qty, zone.items);
+      if (left > 0) overflow.push([drop.item, left]);
       this.bus.emit('item:gained', { item: drop.item, qty: drop.qty, x: placement.x, y: placement.y });
     }
+    if (overflow.length > 0) this.combat.dropHere(overflow);
     zoneState(this.state.data, zone.zoneId).depleted[String(placement.objectId)] =
       world.tick + secondsToTicks(def.respawnSec);
     zone.collision.setEnabled(placement.objectId, false);

@@ -6,7 +6,8 @@ import { BASE_ZONE_ID, gameState, type PlayerState } from '../core/GameState';
 import { hoursToTicks } from '../core/Homestead';
 import { simulation } from '../core/Simulation';
 import { BALANCE } from '../data/balance';
-import { missPct } from '../systems/combat/skills';
+import { talentOf } from '../data/talents';
+import type { SkillId } from '../data/types';
 import { getView, setupFixedCamera } from '../display/view';
 import { pinchStep, stepWorldZoom } from '../display/worldZoom';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
@@ -22,6 +23,7 @@ import { CraftingUI } from '../ui/CraftingUI';
 import { FishingUI } from '../ui/FishingUI';
 import { LevelUpUI } from '../ui/LevelUpUI';
 import { PauseUI } from '../ui/PauseUI';
+import { SkillsUI, skillEffectText } from '../ui/SkillsUI';
 import { preferences, setPreference } from '../ui/preferences';
 import { autosave } from '../save';
 import { InventoryUI } from '../ui/InventoryUI';
@@ -127,6 +129,11 @@ export class UIScene extends Phaser.Scene {
   /** Botão "Construir": escondido no modo construção (a paleta ocupa o sítio; há o Sair). */
   private buildButton: Button | null = null;
   private autoButton: Button | null = null;
+  /** Talento ativo "Correr" (só aparece depois de o aprender). */
+  private sprintButton: Button | null = null;
+  private sprintVisible = false;
+  private sprintReady = false;
+  private skills: SkillsUI | null = null;
   /** Arma equipada e munição (junto à hotbar): ícone e contagem (até `quiverDisplayMax`). */
   private weaponView: {
     box: Button;
@@ -235,6 +242,10 @@ export class UIScene extends Phaser.Scene {
     this.pause.onQuit = () => {
       this.quitToMenu();
     };
+    this.skills = new SkillsUI(this);
+    this.pause.onSkills = () => {
+      this.skills?.open();
+    };
     this.build.onToggle = (open) => {
       for (const obj of this.actionButton) obj.setVisible(!open);
       this.buildButton?.setVisible(!open);
@@ -267,6 +278,11 @@ export class UIScene extends Phaser.Scene {
       this.events.off('ui:language-changed', onLanguage);
       this.pause?.destroy();
       this.pause = null;
+      this.skills?.destroy();
+      this.skills = null;
+      this.sprintButton = null;
+      this.sprintVisible = false;
+      this.sprintReady = false;
       this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
       moveInput.joystick = { x: 0, y: 0 };
       uiState.actionHeld = false;
@@ -327,6 +343,19 @@ export class UIScene extends Phaser.Scene {
     const pad = (n: number): string => String(n).padStart(2, '0');
     this.clock?.setText(t('hud.clock', { day: clock.day, time: `${pad(clock.hour)}:${pad(clock.minute)}` }));
     this.hordeLabel?.setText(this.hordeStatus());
+    if (this.sprintButton) {
+      const learned = talentOf(player, 'sprint') > 0;
+      const visible = learned && !uiState.modalOpen && !buildMode.active;
+      const ready = simulation.sprintState.cooldown === 0;
+      if (visible !== this.sprintVisible) {
+        this.sprintVisible = visible;
+        this.sprintButton.setVisible(visible);
+      }
+      if (ready !== this.sprintReady) {
+        this.sprintReady = ready;
+        this.sprintButton.setStyle(ready ? 'primary' : 'secondary');
+      }
+    }
     this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
     this.beginnerLabel?.setVisible(simulation.combat.beginner && !uiState.modalOpen);
     this.renderBossBar();
@@ -509,14 +538,7 @@ export class UIScene extends Phaser.Scene {
         this.showNotice(t('msg.seeds_hint'));
       }),
       eventBus.on('skill:levelUp', ({ skill, level }) => {
-        const ranged = skill === 'archery' || skill === 'firearms';
-        this.showNotice(
-          t('skill.level_up', {
-            skill: tKey(`skill.${skill}`),
-            level,
-            miss: Math.round(missPct(level, ranged, BALANCE)),
-          }),
-        );
+        this.showNotice(`${tKey(`skill.${skill}`)}: ${skillEffectText(skill as SkillId, level)}`);
       }),
       eventBus.on('horde:started', ({ size }) => {
         this.showNotice(t('horde.started', { n: size }));
@@ -732,6 +754,20 @@ export class UIScene extends Phaser.Scene {
         this.toggleAutoAttack();
       },
     ).setDepth(70);
+    // Correr (talento ativo): por cima do "Auto"; só aparece depois de aprendido.
+    const autoY = fitsRow ? hotbar.y + hotbar.h / 2 : touch ? cy - ACTION_RADIUS - 16 : hotbar.y - 12;
+    const autoH = fitsRow ? hotbar.h : 16;
+    this.sprintButton = new Button(
+      this,
+      touch && !fitsRow ? cx : width - 4 - autoW / 2,
+      Math.round(autoY - autoH / 2 - 11),
+      t('hud.sprint'),
+      { width: autoW, height: 16, fontSize: 8, style: 'secondary' },
+      () => {
+        this.sprint();
+      },
+    ).setDepth(70);
+    this.sprintButton.setVisible(false);
 
     if (!touch) return;
     const ring = this.add.circle(cx, cy, ACTION_RADIUS + 1, paletteNumber('ink'), 0.5).setDepth(5);
@@ -782,9 +818,18 @@ export class UIScene extends Phaser.Scene {
     keyboard.on('keydown-F', () => {
       this.toggleAutoAttack();
     });
+    keyboard.on('keydown-K', () => {
+      if (this.pause?.isOpen) return;
+      if (!this.skills?.isOpen) this.closePanels();
+      this.skills?.toggle();
+    });
+    keyboard.on('keydown-Q', () => {
+      if (!uiState.modalOpen) this.sprint();
+    });
     keyboard.on('keydown-ESC', () => {
       // Esc fecha o que estiver aberto; sem nada aberto, abre (ou fecha) o menu de pausa.
       if (this.pause?.isOpen) this.pause.close();
+      else if (this.skills?.isOpen) this.skills.close();
       else if (this.inventory?.isOpen) this.inventory.close();
       else if (this.crafting?.isOpen) this.crafting.close();
       else if (this.build?.isOpen) this.build.close();
@@ -827,6 +872,19 @@ export class UIScene extends Phaser.Scene {
         if (!uiState.modalOpen) this.inventory?.useHotbar(index);
       });
     });
+  }
+
+  /** Fecha a mochila, o fabrico e a construção (antes de abrir as perícias). */
+  private closePanels(): void {
+    if (this.inventory?.isOpen) this.inventory.close();
+    if (this.crafting?.isOpen) this.crafting.close();
+    this.build?.close();
+  }
+
+  /** Talento ativo "Correr" (Q ou botão). */
+  private sprint(): void {
+    const result = simulation.sprint();
+    if (result === 'cooldown') this.showNotice(t('msg.sprint_cooldown'));
   }
 
   /** Só um painel aberto de cada vez (mochila/baú, crafting ou construção). */
@@ -887,7 +945,7 @@ export class UIScene extends Phaser.Scene {
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
       const p = this.toGame(pointer);
-      if (this.pause?.isOpen) return; // o menu de pausa tapa tudo
+      if (this.pause?.isOpen || this.skills?.isOpen) return; // o menu de pausa tapa tudo
       // 1) Interface: painéis, hotbar, botões.
       if (this.crafting?.pointerDown(p.x, p.y)) return;
       if (this.inventory?.pointerDown(p.x, p.y, pointer.id)) return;

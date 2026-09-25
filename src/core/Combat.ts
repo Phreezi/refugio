@@ -1,5 +1,6 @@
 import { PLAYER_FOOTPRINT } from '../config';
 import { BALANCE } from '../data/balance';
+import { talentOf } from '../data/talents';
 import {
   ammoFits,
   skillOf,
@@ -502,10 +503,17 @@ export class Combat {
     const player = this.state.data.player;
     const skill = skillOf(this.equippedWeaponDef());
     const level = skillLevel(player.skills[skill] ?? 0, BALANCE);
-    const miss = this.roll() * 100 < missPct(level, ranged, BALANCE) * factor;
+    const pct = Math.max(BALANCE.missPctMin, missPct(level, ranged, BALANCE) - talentOf(player, 'missPts'));
+    const miss = this.roll() * 100 < pct * factor;
     const up = trainSkill(player.skills, skill, BALANCE);
     if (up !== null) this.bus.emit('skill:levelUp', { skill, level: up });
     return miss;
+  }
+
+  /** Talento "mãos cuidadosas": sorteia se este golpe não gasta a arma. */
+  savesWear(): boolean {
+    const pct = talentOf(this.state.data.player, 'wearSavePct');
+    return pct > 0 && this.roll() * 100 < pct;
   }
 
   /** Arma equipada que conta (com durabilidade), ou undefined (punhos). */
@@ -960,12 +968,12 @@ export class Combat {
       this.bus.emit('enemy:missed', { x: enemy.x, y: enemy.y - BODY_HEIGHT });
       return true;
     }
-    const { damage } = this.weapon();
+    const damage = Math.round(this.weapon().damage * (1 + talentOf(player, 'meleeDamagePct') / 100));
     const equipment = player.equipment;
     const weaponBefore = equipment[0];
     const broken =
       weaponBefore && this.content().items[weaponBefore[0]]?.damage !== undefined
-        ? this.beginner
+        ? this.beginner || this.savesWear()
           ? []
           : wearSlots(equipment, [0])
         : [];
@@ -1016,7 +1024,11 @@ export class Combat {
     if (amount <= 0 || this.playerInvulnerable) return;
     const player = this.state.data.player;
     const { items } = this.content();
-    const dealt = reduceDamage(amount, armorPct(player.equipment, items, BALANCE.maxArmorReductionPct));
+    const armor = Math.min(
+      BALANCE.maxArmorReductionPct,
+      armorPct(player.equipment, items, BALANCE.maxArmorReductionPct) + talentOf(player, 'armorPct'),
+    );
+    const dealt = reduceDamage(amount, armor);
     player.hp = Math.max(0, player.hp - dealt);
     if (bleedPct > 0 && nextRandom(this.state.data.world) * 100 < bleedPct) {
       if (player.bleed === 0) this.bus.emit('player:bleeding', {});

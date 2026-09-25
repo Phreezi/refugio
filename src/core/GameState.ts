@@ -2,6 +2,7 @@ import { BALANCE } from '../data/balance';
 import { EQUIP_SLOTS } from '../data/types';
 import type { StructureRecord } from '../systems/building/building';
 import type { Skills } from '../systems/combat/skills';
+import type { Talents } from '../systems/progression/talents';
 import type { GameStatsCounters } from './Stats';
 import { createStationState, type StationState } from '../systems/crafting/crafting';
 import { createContainer, type Container } from '../systems/inventory/inventory';
@@ -35,8 +36,10 @@ export interface PlayerState {
   look: CharacterLook;
   /** Nome da personagem (e do jogo na lista do menu; aparece no co-op). */
   name: string;
-  /** Experiência de cada perícia de combate (§7.8: quanto mais alta, menos se falha). */
+  /** Experiência de cada perícia (combate §7.8: menos falhanços; recolha §7.15: mais recursos). */
   skills: Skills;
+  /** Pontos gastos em cada talento (§7.15). */
+  talents: Talents;
   /**
    * Munição "dentro" da arma à distância equipada (aljava): [item, quantidade] sem limite de
    * stack. Não ocupa espaço na mochila; ao trocar de arma volta para a mochila (o que não
@@ -164,6 +167,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       look: 'boy',
       name: DEFAULT_PLAYER_NAME,
       skills: {},
+      talents: {},
       quiver: [],
     },
     world: { tick: 0, rng: seed >>> 0 },
