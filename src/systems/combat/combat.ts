@@ -1,7 +1,7 @@
 import { randomInt, type RngState } from '../../core/Rng';
 import type { EnemyDef, ItemDefs, RangedDef } from '../../data/types';
 import type { ItemStack } from '../gathering/gathering';
-import type { Container } from '../inventory/inventory';
+import { enchantOf, type Container } from '../inventory/inventory';
 
 // Combate corpo a corpo (CLAUDE.md §7.8), lógica pura: estatísticas da arma, armadura e drops.
 
@@ -16,6 +16,10 @@ export interface WeaponStats {
 }
 
 export interface CombatBalance {
+  /** % de dano a mais por nível de encantamento da arma. */
+  enchantDamagePct: number;
+  /** Defesa (%) a mais por nível de encantamento de cada peça de roupa. */
+  enchantArmor: number;
   fistDamage: number;
   fistAttackSec: number;
   fistReachPx: number;
@@ -32,7 +36,7 @@ export function weaponStats(equipment: Container, defs: ItemDefs, balance: Comba
     return { damage: balance.fistDamage, attackSec: balance.fistAttackSec, reach: balance.fistReachPx };
   }
   return {
-    damage: def.damage,
+    damage: Math.round(def.damage * (1 + (enchantOf(slot) * balance.enchantDamagePct) / 100)),
     attackSec: def.attackSec ?? balance.weaponAttackSec,
     reach: def.reach ?? balance.weaponReachPx,
     ...(def.ranged ? { ranged: def.ranged } : {}),
@@ -40,11 +44,12 @@ export function weaponStats(equipment: Container, defs: ItemDefs, balance: Comba
 }
 
 /** % de dano evitado pelas peças de armadura equipadas (até ao máximo). */
-export function armorPct(equipment: Container, defs: ItemDefs, maxPct: number): number {
+export function armorPct(equipment: Container, defs: ItemDefs, maxPct: number, enchantArmor = 0): number {
   let total = 0;
   for (const slot of equipment) {
     if (!slot || (slot[2] !== undefined && slot[2] <= 0)) continue;
-    total += defs[slot[0]]?.armor ?? 0;
+    const armor = defs[slot[0]]?.armor;
+    if (armor !== undefined) total += armor + enchantOf(slot) * enchantArmor;
   }
   return Math.min(maxPct, total);
 }

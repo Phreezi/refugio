@@ -1028,7 +1028,8 @@ export class Combat {
     const { items } = this.content();
     const armor = Math.min(
       BALANCE.maxArmorReductionPct,
-      armorPct(player.equipment, items, BALANCE.maxArmorReductionPct) + talentOf(player, 'armorPct'),
+      armorPct(player.equipment, items, BALANCE.maxArmorReductionPct, BALANCE.enchantArmor) +
+        talentOf(player, 'armorPct'),
     );
     const dealt = reduceDamage(amount, armor);
     player.hp = Math.max(0, player.hp - dealt);

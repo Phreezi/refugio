@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import type { EnemyDefs, Recipe, Recipes, ResourceDefs, StructureDefs, ZoneDefs } from '../data/types';
-import { countItem } from '../systems/inventory/inventory';
+import { countItem, removeItem } from '../systems/inventory/inventory';
+import { COIN } from './PlayerActions';
 import { addXp } from '../systems/progression/progression';
 import { learnTalent, type LearnCheck } from '../systems/progression/talents';
 import { TALENTS, talentOf } from '../data/talents';
@@ -182,6 +183,28 @@ export class Progression {
       this.bus.emit('talent:learned', { talent: id, rank: player.talents[id] ?? 0 });
     }
     return result;
+  }
+
+  /** Moedas para repor os talentos (devolve todos os pontos). */
+  talentResetCost(): number {
+    const spent = Object.values(this.state.data.player.talents).reduce((sum, rank) => sum + rank, 0);
+    return spent * BALANCE.talentResetCostPerPoint;
+  }
+
+  /** Repõe os talentos (§7.15), pagando em moedas. */
+  resetTalents(): 'ok' | 'nothing' | 'no_coins' {
+    if (!this.state.hasGame) return 'nothing';
+    const cost = this.talentResetCost();
+    if (cost === 0) return 'nothing';
+    const player = this.state.data.player;
+    const containers = [player.inventory, player.hotbar];
+    if (countItem(containers, COIN) < cost) return 'no_coins';
+    removeItem(containers, COIN, cost);
+    player.talents = {};
+    this.state.markDirty();
+    this.bus.emit('talents:reset', {});
+    this.bus.emit('inventory:changed', {});
+    return 'ok';
   }
 
   /** O que passa a estar disponível exatamente no nível `level`. */

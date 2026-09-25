@@ -1137,5 +1137,46 @@
     "timeSec": 0,
     "unlockLevel": 1,
     "xp": 0
+  },
+  {
+    "id": "r_health_potion",
+    "station": "campfire",
+    "category": "food",
+    "inputs": [
+      ["berries", 5],
+      ["water_clean", 1],
+      ["fiber", 1]
+    ],
+    "output": "health_potion",
+    "qty": 1,
+    "timeSec": 15,
+    "unlockLevel": 6
+  },
+  {
+    "id": "r_energy_drink",
+    "station": "campfire",
+    "category": "food",
+    "inputs": [
+      ["berries", 3],
+      ["tomato", 1],
+      ["water_clean", 1]
+    ],
+    "output": "energy_drink",
+    "qty": 1,
+    "timeSec": 10,
+    "unlockLevel": 8
+  },
+  {
+    "id": "r_big_health_potion",
+    "station": "workbench",
+    "category": "food",
+    "inputs": [
+      ["health_potion", 2],
+      ["chemicals", 1]
+    ],
+    "output": "big_health_potion",
+    "qty": 1,
+    "timeSec": 30,
+    "unlockLevel": 18
   }
 ]

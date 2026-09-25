@@ -269,6 +269,7 @@ describe('Combate', () => {
 describe('Equipamento', () => {
   it('equipar troca com o que estava; só entra o que é desse slot', () => {
     const { state, sim } = setup(map([]));
+    state.data.player.level = 20; // sem limite de nível para equipar (§7.16)
     const { player } = state.data;
     player.inventory[0] = ['wooden_club', 1, 90];
     player.inventory[1] = ['cloth_shirt', 1, 150];

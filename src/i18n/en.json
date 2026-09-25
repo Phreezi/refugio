@@ -461,5 +461,16 @@
   "craft.cat.sell": "Sell",
   "craft.buy": "Buy",
   "craft.sell": "Sell",
-  "menu.slot_short": "{name} · Lv {level}"
+  "menu.slot_short": "{name} · Lv {level}",
+  "inv.enchant": "Enchant ({cost})",
+  "msg.no_coins": "You need {cost} coins.",
+  "msg.needs_level": "You need level {level} to equip this.",
+  "msg.enchanted": "Enchanted: {item} +{level}!",
+  "info.level": "Level {n}",
+  "info.level_missing": "Needs level {n}!",
+  "skills.reset": "Reset ({cost})",
+  "skills.reset_confirm": "Reset? ({cost})",
+  "skills.reset_done": "Points reset.",
+  "skills.reset_nothing": "No points spent.",
+  "hud.coins": "{n}"
 }

@@ -1,8 +1,14 @@
 import { EQUIP_SLOTS, equipSlotOf, type ItemDefs } from '../data/types';
 import { BALANCE } from '../data/balance';
+
+/** Moeda (§7.16): paga encantamentos, trocas e repor talentos. */
+export const COIN = 'coin';
 import {
   addItem,
+  countItem,
+  enchantOf,
   moveSlot,
+  removeItem,
   sortContainer,
   splitSlot,
   storeSimilar,
@@ -146,12 +152,25 @@ export class PlayerActions {
     return item === undefined || equipSlotOf(this.items()[item]) === EQUIP_SLOTS[index];
   }
 
+  /** Nível que falta para equipar o item (null = pode). */
+  levelNeeded(item: string | undefined): number | null {
+    const level = item ? this.items()[item]?.level : undefined;
+    return level !== undefined && level > this.state.data.player.level ? level : null;
+  }
+
   move(from: SlotRef, to: SlotRef): boolean {
     // No equipamento só entra o que é desse slot (nos dois sentidos, se for uma troca).
     const source = this.container(from.container)[from.index];
     const target = this.container(to.container)[to.index];
     if (to.container === 'equipment' && !this.fitsEquipment(source?.[0], to.index)) return false;
     if (from.container === 'equipment' && !this.fitsEquipment(target?.[0], from.index)) return false;
+    // Nível mínimo para equipar (§7.16).
+    const entering = to.container === 'equipment' ? source : from.container === 'equipment' ? target : null;
+    const needed = this.levelNeeded(entering?.[0]);
+    if (needed !== null) {
+      this.bus.emit('action:blocked', { reason: 'needs_level', level: needed });
+      return false;
+    }
     const moved = moveSlot(
       this.container(from.container),
       from.index,
@@ -196,6 +215,41 @@ export class PlayerActions {
     container[ref.index] = null;
     this.changed();
     return true;
+  }
+
+  /** Pode-se encantar o item? (armas e roupa, com durabilidade). */
+  enchantable(item: string): boolean {
+    const def = this.items()[item];
+    return def?.durability !== undefined && (def.damage !== undefined || def.armor !== undefined);
+  }
+
+  /** Moedas que custa o próximo encantamento do slot (null = não dá ou já está no máximo). */
+  enchantCost(ref: SlotRef): number | null {
+    const slot = this.container(ref.container)[ref.index];
+    if (!slot || !this.enchantable(slot[0])) return null;
+    const level = enchantOf(slot);
+    return level >= BALANCE.enchantMax ? null : BALANCE.enchantCostBase * 2 ** level;
+  }
+
+  /**
+   * Encanta a arma/roupa do slot (+1 nível, até `enchantMax`), pagando em moedas: mais dano
+   * nas armas e mais defesa na roupa (§7.16).
+   */
+  enchant(ref: SlotRef): 'ok' | 'max' | 'no_coins' | 'invalid' {
+    const container = this.container(ref.container);
+    const slot = container[ref.index];
+    if (!slot || !this.enchantable(slot[0])) return 'invalid';
+    const cost = this.enchantCost(ref);
+    if (cost === null) return 'max';
+    const containers = this.pickupContainers();
+    if (countItem(containers, COIN) < cost) return 'no_coins';
+    removeItem(containers, COIN, cost);
+    const durability = slot[2] ?? this.items()[slot[0]]?.durability ?? 1;
+    const level = enchantOf(slot) + 1;
+    container[ref.index] = [slot[0], slot[1], durability, level];
+    this.changed();
+    this.bus.emit('item:enchanted', { item: slot[0], level });
+    return 'ok';
   }
 
   /** Destrói o slot inteiro (sem volta: a interface pede confirmação). */

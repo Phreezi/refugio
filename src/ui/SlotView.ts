@@ -42,6 +42,8 @@ export class SlotView {
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly icon: Phaser.GameObjects.Image;
   private readonly qty: Label;
+  /** "+N" das armas e roupa encantadas. */
+  private readonly enchant: Label;
   private readonly wearBg: Phaser.GameObjects.Rectangle;
   private readonly wear: Phaser.GameObjects.Rectangle;
   private readonly key: Label | null;
@@ -100,6 +102,14 @@ export class SlotView {
     this.key = keyHint
       ? new Label(scene, x + 2, y + 1, keyHint, { size: 6, color: 'stone_light', stroke: true })
       : null;
+    this.enchant = new Label(
+      scene,
+      x + 2,
+      y + size,
+      '',
+      { size: 6 + 2 * (scale - 1), bold: true, color: 'gold', stroke: true },
+      [0, 1],
+    );
   }
 
   update(slot: Slot | null, items: ItemDefs, selected: boolean): void {
@@ -110,6 +120,8 @@ export class SlotView {
     this.pips.forEach((pip, i) => pip.setVisible(i < pips));
     // Os slots de equipamento dizem o que levam só quando estão vazios.
     if (this.ref.container === 'equipment') this.key?.setVisible(!slot);
+    const enchant = slot?.[3] ?? 0;
+    this.enchant.setText(enchant > 0 ? `+${String(enchant)}` : '');
     if (!slot || !def) {
       this.icon.setVisible(false);
       this.qty.setText('');
@@ -139,6 +151,7 @@ export class SlotView {
     for (const obj of [this.frame, this.bg, this.icon, this.wearBg, this.wear]) obj.setDepth(depth);
     for (const pip of this.pips) pip.setDepth(depth + 1);
     this.qty.setDepth(depth + 1);
+    this.enchant.setDepth(depth + 1);
     this.key?.setDepth(depth + 1);
     return this;
   }
@@ -146,6 +159,7 @@ export class SlotView {
   destroy(): void {
     for (const obj of [this.frame, this.bg, this.icon, this.wearBg, this.wear, ...this.pips]) obj.destroy();
     this.qty.destroy();
+    this.enchant.destroy();
     this.key?.destroy();
   }
 }

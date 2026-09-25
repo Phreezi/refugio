@@ -29,6 +29,7 @@ import { InventoryUI } from '../ui/InventoryUI';
 import { Label } from '../ui/text';
 import { uiState } from '../ui/uiState';
 import { xpToNext } from '../systems/progression/progression';
+import { countItem } from '../systems/inventory/inventory';
 import { SceneKey } from './keys';
 
 /** Raio do joystick virtual e do manípulo, em píxeis de jogo. */
@@ -100,6 +101,7 @@ export class UIScene extends Phaser.Scene {
   private fishing: FishingUI | null = null;
   private levelUp: LevelUpUI | null = null;
   private levelLabel: Label | null = null;
+  private coinLabel: Label | null = null;
   /** Barra do chefe (em cima, ao centro), só com um chefe na zona. */
   private bossBar: {
     label: Label;
@@ -297,6 +299,7 @@ export class UIScene extends Phaser.Scene {
       this.levelUp?.destroy();
       this.levelUp = null;
       this.levelLabel = null;
+      this.coinLabel = null;
       this.hordeLabel = null;
       this.coopLabel = null;
       this.bleedLabel = null;
@@ -334,6 +337,7 @@ export class UIScene extends Phaser.Scene {
     }
     // Nível e XP (barra fina por baixo das outras).
     this.levelLabel?.setText(t('level.short', { level: player.level }));
+    this.coinLabel?.setText(String(countItem([player.inventory, player.hotbar], 'coin')));
     if (this.xpFill) {
       const need = xpToNext(player.level, BALANCE.xpCurve);
       const full = player.level >= BALANCE.maxLevel;
@@ -503,7 +507,13 @@ export class UIScene extends Phaser.Scene {
         this.showNotice(uiState.pendingNotice);
         if (zoneId === gameState.data.player.zoneId) uiState.pendingNotice = null;
       }),
-      eventBus.on('action:blocked', ({ reason, tool, item, hours }) => {
+      eventBus.on('item:enchanted', ({ item, level }) => {
+        this.showNotice(t('msg.enchanted', { item: itemName(item), level }));
+      }),
+      eventBus.on('talents:reset', () => {
+        this.showNotice(t('skills.reset_done'));
+      }),
+      eventBus.on('action:blocked', ({ reason, tool, item, hours, level }) => {
         if (reason === 'inventory_full') this.showNotice(t('msg.inventory_full'));
         else if (reason === 'door_blocked') this.showNotice(t('build.problem.door_blocked'));
         else if (reason === 'needs_rod') this.showNotice(t('fish.needs'));
@@ -512,6 +522,7 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'crop_growing')
           this.showNotice(t('farm.growing', { hours: Math.max(1, hours ?? 1) }));
         else if (reason === 'nothing_yet') this.showNotice(t('farm.nothing_yet'));
+        else if (reason === 'needs_level') this.showNotice(t('msg.needs_level', { level: level ?? 1 }));
         else if (reason === 'no_ammo') this.showNotice(t('msg.no_ammo', { item: itemName(item ?? '') }));
         else if (reason === 'needs_item')
           this.showNotice(t('msg.needs_item', { item: itemName(item ?? '') }));
@@ -594,6 +605,16 @@ export class UIScene extends Phaser.Scene {
     });
     const y = HUD_MARGIN + STATS.length * BAR_SPACING;
     this.levelLabel = new Label(this, HUD_MARGIN, y - 2, '', { size: 7, color: 'gold', bold: true });
+    // Moedas (§7.16): à direita da barra de XP.
+    this.add
+      .image(BAR_X + BAR_WIDTH + 5, y + 2, 'icon_coin')
+      .setOrigin(0, 0.5)
+      .setScale(0.5);
+    this.coinLabel = new Label(this, BAR_X + BAR_WIDTH + 15, y - 2, '', {
+      size: 7,
+      color: 'gold',
+      bold: true,
+    });
     this.add.rectangle(BAR_X - 1, y, BAR_WIDTH + 2, 4, paletteNumber('ink')).setOrigin(0);
     this.xpFill = this.add.rectangle(BAR_X, y + 1, 0, 2, paletteNumber('gold')).setOrigin(0);
     this.bleedLabel = new Label(this, HUD_MARGIN, y + 6, t('hud.bleeding'), {

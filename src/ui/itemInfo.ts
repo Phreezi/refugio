@@ -9,14 +9,20 @@ import { missPct, skillLevel } from '../systems/combat/skills';
  * O que um item faz, em linhas curtas (tocar no desenho ou no nome, no fabrico e na mochila):
  * dano e rapidez das armas, alcance, defesa, efeitos ao comer/beber, durabilidade, espaço…
  */
-export function describeItem(id: string, def: ItemDef | undefined): string[] {
+export function describeItem(id: string, def: ItemDef | undefined, enchant = 0): string[] {
   if (!def) return [itemName(id)];
   const lines: string[] = [];
   const add = (key: MessageKey, vars: Record<string, string | number> = {}): void => {
     lines.push(t(key, vars));
   };
+  if (def.level !== undefined) {
+    const level = gameState.hasGame ? gameState.data.player.level : 1;
+    add(level >= def.level ? 'info.level' : 'info.level_missing', { n: def.level });
+  }
   if (def.damage !== undefined) {
-    add('info.damage', { n: def.damage });
+    add('info.damage', {
+      n: Math.round(def.damage * (1 + (enchant * BALANCE.enchantDamagePct) / 100)),
+    });
     const sec = def.attackSec ?? BALANCE.weaponAttackSec;
     add('info.speed', { n: (Math.round((1 / sec) * 10) / 10).toFixed(1) });
     if (def.ranged)
@@ -38,7 +44,7 @@ export function describeItem(id: string, def: ItemDef | undefined): string[] {
   }
   if (def.toolKind && def.gatherPower !== undefined)
     add(def.toolKind === 'axe' ? 'info.axe' : 'info.pickaxe', { n: def.gatherPower });
-  if (def.armor !== undefined) add('info.armor', { n: def.armor });
+  if (def.armor !== undefined) add('info.armor', { n: def.armor + enchant * BALANCE.enchantArmor });
   if (def.slots !== undefined) add('info.slots', { n: def.slots });
   const effects = def.effects;
   if (effects?.hp) add('info.hp', { n: effects.hp });

@@ -12,13 +12,14 @@ import { content } from '../world/content';
 import { Button, CLOSE_ICON, type ButtonStyle } from './Button';
 import { SLOT_GAP, SLOT_SIZE, SlotView, slotSize } from './SlotView';
 import { describeItem } from './itemInfo';
+import { enchantOf } from '../systems/inventory/inventory';
 import { Label, measureTextWidth } from './text';
 import { panelTop, REOPEN_GUARD_MS, uiState } from './uiState';
 
 const DEPTH = { hud: 10, dim: 50, panel: 60, slots: 62, hotbar: 70, ghost: 100 } as const;
 const PAD = 8;
 const TITLE_H = 14;
-const INFO_H = 48;
+const INFO_H = 64;
 /** Tempo para confirmar "Destruir" (segundo toque). */
 const DESTROY_CONFIRM_MS = 3000;
 /** Botões da barra de baixo, abaixo do nome e da descrição. */
@@ -238,7 +239,14 @@ export class InventoryUI {
         return true;
       }
       if (target && target !== press.view) {
-        if (!this.actions.move(press.view.ref, target.ref) && target.ref.container === 'equipment')
+        const source = this.actions.container(press.view.ref.container)[press.view.ref.index];
+        // Nível a menos: a mensagem vem do próprio aviso (action:blocked).
+        const levelProblem = this.actions.levelNeeded(source?.[0]) !== null;
+        if (
+          !this.actions.move(press.view.ref, target.ref) &&
+          target.ref.container === 'equipment' &&
+          !levelProblem
+        )
           this.scene.events.emit('ui:message', t('msg.equip_wrong'));
         this.selected = null;
         if (this.isOpen) this.buildPanel();
@@ -512,11 +520,15 @@ export class InventoryUI {
     const def = slot ? content.items[slot[0]] : undefined;
 
     if (slot && def && selected) {
-      const name = add(new Label(scene, x, y, itemName(slot[0]), { size: 8, bold: true, color: 'cream' }));
+      const enchant = enchantOf(slot);
+      const title = enchant > 0 ? `${itemName(slot[0])} +${String(enchant)}` : itemName(slot[0]);
+      const name = add(
+        new Label(scene, x, y, title, { size: 8, bold: true, color: enchant > 0 ? 'gold' : 'cream' }),
+      );
       name.setDepth(DEPTH.slots);
       // O que o item faz (dano, defesa, efeitos…), curto, por baixo do nome (até 2 linhas).
       add(
-        new Label(scene, x, y + 11, describeItem(slot[0], def).join(' · '), {
+        new Label(scene, x, y + 11, describeItem(slot[0], def, enchant).join(' · '), {
           size: 7,
           color: 'stone_light',
           wrap: w,
@@ -524,9 +536,14 @@ export class InventoryUI {
       ).setDepth(DEPTH.slots);
       // Botões da largura do texto, lado a lado.
       let left = x;
-      const by = y + INFO_BUTTONS_DY;
+      let by = y + INFO_BUTTONS_DY;
       const action = (label: string, onClick: () => void, style: ButtonStyle = 'secondary'): void => {
         const bw = Math.max(40, Math.ceil(measureTextWidth(label, 8, true) / 2) * 2 + 12);
+        // Sem espaço na linha, passa para a de baixo.
+        if (left > x && left + bw > x + w) {
+          left = x;
+          by += 17;
+        }
         add(new Button(scene, left + bw / 2, by, label, { ...small, width: bw, style }, onClick)).setDepth(
           DEPTH.slots,
         );
@@ -559,6 +576,15 @@ export class InventoryUI {
       }
       // Largar no chão (volta-se a apanhar com a ação) e destruir (2 toques), só do que é nosso.
       const mine = ['inventory', 'hotbar', 'equipment'].includes(selected.container);
+      // Encantar (armas e roupa): paga-se em moedas; cada nível custa o dobro.
+      const cost = mine ? this.actions.enchantCost(selected) : null;
+      if (cost !== null) {
+        action(t('inv.enchant', { cost }), () => {
+          const result = this.actions.enchant(selected);
+          if (result === 'no_coins') scene.events.emit('ui:message', t('msg.no_coins', { cost }));
+          this.rebuildSoon();
+        });
+      }
       if (mine && !this.other) {
         action(t('inv.drop'), () => {
           this.actions.drop(selected);

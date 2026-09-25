@@ -89,5 +89,10 @@
   "noAmmoWarnSec": 3,
   "sprintDrainMultiplier": 5,
   "gatherExtraMaxPct": 60,
-  "talentCapPct": 75
+  "talentCapPct": 75,
+  "enchantMax": 5,
+  "enchantCostBase": 20,
+  "enchantDamagePct": 15,
+  "enchantArmor": 2,
+  "talentResetCostPerPoint": 10
 }

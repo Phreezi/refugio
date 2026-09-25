@@ -4,7 +4,15 @@ import type { ItemDefs } from '../../data/types';
 // null ou um array compacto [itemId, quantidade] / [itemId, 1, durabilidade] (§10.5).
 // Funções mutáveis: alteram os contentores recebidos (que são parte do GameState).
 
-export type Slot = [itemId: string, qty: number] | [itemId: string, qty: number, durability: number];
+export type Slot =
+  | [itemId: string, qty: number]
+  | [itemId: string, qty: number, durability: number]
+  | [itemId: string, qty: number, durability: number, enchant: number];
+
+/** Nível de encantamento do slot (0 = nenhum). */
+export function enchantOf(slot: Slot | null | undefined): number {
+  return slot?.[3] ?? 0;
+}
 export type Container = (Slot | null)[];
 
 export function createContainer(size: number): Container {

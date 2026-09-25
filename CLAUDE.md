@@ -505,6 +505,10 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - **Moedas** (`coin`, item empilhável até 9999): caem dos inimigos (`drops` em `enemies.json`) e aparecem em contentores (`lootTables.json`).
 - **Banca de comércio** (`market_stall`, peça construída na base, nível 3; estação com `trade: true`): separadores **Comprar** (`category: "buy"`: flechas, munições, poções, ligaduras, sementes, materiais) e **Vender** (`"sell"`: recursos → moedas). O comerciante do acampamento também compra e vende algumas coisas. As trocas são receitas instantâneas (`isTradeCategory`).
 - **Poções**: de vida (+35), de vida grande (+80) e bebida energética (fome/sede).
+- **Nível mínimo para equipar** (`level` em `items.json`: machete 5, ferro 10, besta 12, pistola 20, mochilas…); abaixo dele não se equipa (aviso). A informação do item diz o nível.
+- **Encantar** armas e roupa (botão "Encantar (N)" na mochila): paga-se em moedas (`enchantCostBase` × 2^nível), até `enchantMax` (+5); cada nível dá +`enchantDamagePct`% de dano na arma ou +`enchantArmor`% de defesa na roupa. O slot guarda o nível como 4.º valor (`[item, qtd, durabilidade, encantamento]`, save v19); os slots mostram "+N".
+- **Repor talentos** no painel de perícias ("Repor (N)", dois toques): custa `talentResetCostPerPoint` moedas por ponto gasto.
+- O HUD mostra as moedas ao lado da barra de XP. No fabrico, as receitas de nível acima aparecem no fim, a cinzento, com os ingredientes.
 
 ---
 
@@ -1143,4 +1147,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Níveis até 999 com curva que abranda depois do 25; perícias até 50; 24 talentos | Pedido do jogador: um jogo que dure muito ou não tenha fim |
 | 2026-09-25 | Paredes/portas/janelas 16×32 com volume; tiles de água (com espuma na margem, desenhada em runtime), estrada, soalho, betão, muro, rochedo e terra redesenhados; veados mais lentos (50 px/s); cadáveres a cinzento; texto do que se apanha desvanece em 5 s; avisos 5 s | Pedidos do jogador |
 | 2026-09-25 | Menu inicial: botões sempre ao centro da página; a lista de jogos à direita só se couber no espaço livre, senão numa linha de 3; em ecrãs baixos (< 250 px de jogo) o título encolhe | Pedido do jogador: no browser do Tesla os botões sobrepunham-se e, em ecrã inteiro, ficavam alinhados pelo espaço vazio |
+| 2026-09-25 | Save v19: encantamento como 4.º valor do slot; moedas pagam encantamentos e repor talentos; nível mínimo para equipar | Pedido do jogador (Etapa D). O slot compacto mantém-se e os saves antigos não mudam |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |
