@@ -125,9 +125,8 @@ describe('Bunker (Fase 10)', () => {
     boss.hp = 1;
     sim.combat.attack(boss.uid);
     expect(events).toContain('boss:boss_warden');
-    // O cartão fica no corpo: apanha-se ao passar por cima.
-    const corpse = sim.combat.corpses[0];
-    Object.assign(state.data.player, { x: corpse?.x, y: corpse?.y });
+    // O cartão fica no corpo: abre-se e apanha-se.
+    sim.combat.takeBag(sim.combat.bags().findIndex((b) => b.corpse === 'boss_warden'));
     sim.update(FIXED_STEP_MS);
     expect(countItem([state.data.player.inventory, state.data.player.hotbar], 'military_keycard')).toBe(1);
     enter('zone_bunker_4');

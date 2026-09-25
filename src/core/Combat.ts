@@ -73,19 +73,6 @@ interface EnemyPool {
   /** Quem derrotou um inimigo que ainda vai rebentar (inchado): recebe os drops. */
   killers: WeakMap<Enemy, Combat>;
   /** Corpos no chão (ficam `corpseSec`), com as flechas que se podem reaproveitar. */
-  corpses: Corpse[];
-}
-
-/** Corpo de um inimigo derrotado. Não se grava. */
-export interface Corpse {
-  uid: number;
-  enemy: string;
-  x: number;
-  y: number;
-  /** Tick em que desaparece. */
-  until: number;
-  /** O que se apanha ao passar por cima: os drops e as flechas que não partiram (item → qtd). */
-  items: Record<string, number>;
 }
 
 function createPool(nextUid = 1, nextShot = 1): EnemyPool {
@@ -96,7 +83,6 @@ function createPool(nextUid = 1, nextShot = 1): EnemyPool {
     nextShot,
     trapReady: new Map(),
     killers: new WeakMap(),
-    corpses: [],
   };
 }
 
@@ -580,48 +566,6 @@ export class Combat {
     return this.roll() * 100 < pct;
   }
 
-  /** Corpos no chão da zona (para desenhar). */
-  get corpses(): readonly Corpse[] {
-    return this.pool.corpses;
-  }
-
-  /**
-   * Corpos: desaparecem ao fim de `corpseSec`; ao passar por cima apanham-se as flechas que lá
-   * ficaram (para a aljava, se servirem na arma, ou para a mochila; o que não couber fica).
-   */
-  tickCorpses(): void {
-    const zone = this.zone;
-    if (!zone) return;
-    const tick = this.state.data.world.tick;
-    const player = this.state.data.player;
-    let full = false;
-    for (const corpse of this.pool.corpses) {
-      if (Math.hypot(corpse.x - player.x, corpse.y - player.y) > BALANCE.groundPickupPx + 4) continue;
-      const kept: Record<string, number> = {};
-      for (const [item, qty] of Object.entries(corpse.items)) {
-        const left = this.giveAmmo(item, qty);
-        if (left < qty) this.bus.emit('item:gained', { item, qty: qty - left, x: corpse.x, y: corpse.y });
-        if (left > 0) {
-          kept[item] = left;
-          full = true;
-        }
-      }
-      // Apanhado tudo, o corpo desaparece (numa nuvem de fumo).
-      corpse.items = kept;
-      if (Object.keys(kept).length === 0) corpse.until = tick;
-    }
-    if (full) this.bus.emit('action:blocked', { reason: 'inventory_full' });
-    const gone = this.pool.corpses.filter((c) => c.until <= tick);
-    if (gone.length === 0) return;
-    this.pool.corpses = this.pool.corpses.filter((c) => c.until > tick);
-    for (const corpse of gone) {
-      // O que ficou por apanhar passa para uma pilha no chão (nada se perde).
-      const left = Object.entries(corpse.items).map(([item, qty]): [string, number] => [item, qty]);
-      if (left.length > 0) this.dropBag(zone.zoneId, corpse.x, corpse.y, left, false);
-      this.bus.emit('corpse:gone', { uid: corpse.uid, x: corpse.x, y: corpse.y });
-    }
-  }
-
   /** Munição que serve na arma equipada vai para a aljava; a outra para a mochila. @returns o que sobrou. */
   giveAmmo(item: string, qty: number): number {
     const base = this.weapon().ranged?.ammo;
@@ -1072,7 +1016,9 @@ export class Combat {
     // A morte junta tudo na mesma mochila; itens largados juntam-se a uma pilha mesmo ao lado.
     const existing = death
       ? bags.find((bag) => bag.death)
-      : bags.find((bag) => !bag.death && Math.hypot(bag.x - x, bag.y - y) <= BALANCE.groundPickupPx);
+      : bags.find(
+          (bag) => !bag.death && !bag.corpse && Math.hypot(bag.x - x, bag.y - y) <= BALANCE.groundPickupPx,
+        );
     const bag = existing ?? { x: Math.round(x), y: Math.round(y), items: [], expiresAt, death };
     for (const slot of kept) {
       const free = bag.items.indexOf(null);
@@ -1082,10 +1028,55 @@ export class Combat {
     bag.x = Math.round(x);
     bag.y = Math.round(y);
     bag.expiresAt = expiresAt;
-    if (!existing) bags.push(bag);
+    if (!existing) {
+      bags.push(bag);
+      this.capGround(zoneId);
+    }
     this.state.markDirty();
     this.bus.emit('bag:changed', { zoneId });
     return bag;
+  }
+
+  /**
+   * O corpo de um inimigo: uma "mochila" no chão com os drops, desenhada como o inimigo a
+   * cinzento; dura `corpseDays` dias de jogo (se o jogador sair e voltar) ou até se esvaziar.
+   */
+  private corpseBag(zoneId: string, enemy: Enemy, items: Container): void {
+    const bags = zoneState(this.state.data, zoneId).bags;
+    bags.push({
+      x: Math.round(enemy.x),
+      y: Math.round(enemy.y),
+      items,
+      expiresAt: this.now() + BALANCE.corpseDays * BALANCE.dayLengthSec * 1000,
+      death: false,
+      corpse: enemy.id,
+    });
+    this.capGround(zoneId);
+    this.state.markDirty();
+    this.bus.emit('bag:changed', { zoneId });
+  }
+
+  /**
+   * No máximo `groundThingsMax` coisas no chão por zona (corpos, pilhas e itens soltos): as mais
+   * antigas desaparecem (as mochilas da morte nunca).
+   */
+  capGround(zoneId: string): void {
+    const zone = zoneState(this.state.data, zoneId);
+    let excess = zone.bags.length + zone.ground.length - BALANCE.groundThingsMax;
+    if (excess <= 0) return;
+    const ground = Math.min(excess, zone.ground.length);
+    if (ground > 0) {
+      zone.ground.splice(0, ground);
+      excess -= ground;
+      this.bus.emit('ground:changed', { zoneId });
+    }
+    while (excess > 0) {
+      const oldest = zone.bags.findIndex((bag) => !bag.death);
+      if (oldest < 0) break;
+      zone.bags.splice(oldest, 1);
+      excess -= 1;
+    }
+    this.bus.emit('bag:changed', { zoneId });
   }
 
   /** Larga itens no chão onde está o jogador (pilha que se abre com a ação). */
@@ -1103,6 +1094,9 @@ export class Combat {
     const zone = zoneState(this.state.data, zoneId);
     const kept = zone.bags.filter((bag) => bag.items.some((slot) => slot !== null));
     if (kept.length === zone.bags.length) return;
+    // Um corpo vazio desaparece numa nuvem de fumo.
+    for (const bag of zone.bags)
+      if (bag.corpse && !kept.includes(bag)) this.bus.emit('corpse:gone', { uid: 0, x: bag.x, y: bag.y });
     zone.bags = kept;
     this.state.markDirty();
     this.bus.emit('bag:changed', { zoneId });
@@ -1143,20 +1137,15 @@ export class Combat {
     const def = this.content().enemies[enemy.id];
     this.enemies = this.enemies.filter((e) => e !== enemy);
     // O corpo fica no chão, na posição em que estava, com os drops e as flechas espetadas:
-    // apanha-se tudo ao passar por cima (quem passar primeiro, no co-op).
+    // abre-se com a ação (como uma mochila) e desaparece quando se apanhar tudo.
     const items: Record<string, number> = { ...enemy.arrows };
     if (def) {
       for (const drop of rollEnemyDrops(def, this.state.data.world))
         items[drop.item] = (items[drop.item] ?? 0) + drop.qty;
     }
-    this.pool.corpses.push({
-      uid: enemy.uid,
-      enemy: enemy.id,
-      x: enemy.x,
-      y: enemy.y,
-      until: this.state.data.world.tick + secondsToTicks(BALANCE.corpseSec),
-      items,
-    });
+    const slots: Container = Object.entries(items).map(([item, qty]): [string, number] => [item, qty]);
+    if (zone && slots.length > 0) this.corpseBag(zone.zoneId, enemy, slots);
+    else this.bus.emit('corpse:gone', { uid: enemy.uid, x: enemy.x, y: enemy.y });
     by.bus.emit('enemy:killed', { uid: enemy.uid, enemy: enemy.id, x: enemy.x, y: enemy.y });
     if (!def || !zone) return;
     if (def.boss) {

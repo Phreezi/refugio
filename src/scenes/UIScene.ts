@@ -27,9 +27,11 @@ import { preferences, setPreference } from '../ui/preferences';
 import { autosave } from '../save';
 import { InventoryUI } from '../ui/InventoryUI';
 import { Label } from '../ui/text';
+import { SLOT_SIZE } from '../ui/SlotView';
 import { uiState } from '../ui/uiState';
 import { xpToNext } from '../systems/progression/progression';
 import { countItem } from '../systems/inventory/inventory';
+import { missingInputs } from '../systems/crafting/crafting';
 import { SceneKey } from './keys';
 
 /** Raio do joystick virtual e do manípulo, em píxeis de jogo. */
@@ -48,8 +50,6 @@ const ACTION_RADIUS = 20;
 /** Barras do HUD (px de jogo; pares, porque as Shapes não são arredondadas). */
 const HUD_MARGIN = 6;
 const BAR_X = 34;
-/** Caixa da arma equipada, por cima da hotbar (px). */
-const WEAPON_BOX = 20;
 /** Abaixo desta largura (ecrã ao alto), a dica do tutorial vai para baixo das barras. */
 const NARROW_HUD_WIDTH = 420;
 const HINT_Y_NARROW = 60;
@@ -94,6 +94,8 @@ export class UIScene extends Phaser.Scene {
   private bars: StatBar[] = [];
   private clock: Label | null = null;
   private notice: Label | null = null;
+  /** O que o aviso atual faz se se tocar nele (ou Enter). */
+  private noticeAction: (() => void) | null = null;
   private noticeTimer: Phaser.Time.TimerEvent | null = null;
   private inventory: InventoryUI | null = null;
   private crafting: CraftingUI | null = null;
@@ -138,11 +140,8 @@ export class UIScene extends Phaser.Scene {
   private skills: SkillsUI | null = null;
   /** Arma equipada e munição (junto à hotbar): ícone e contagem (até `quiverDisplayMax`). */
   private weaponView: {
-    box: Button;
-    icon: Phaser.GameObjects.Image;
     ammo: Phaser.GameObjects.Image;
     count: Label;
-    item: string | null;
     ammoItem: string | null;
   } | null = null;
   /** Ponteiro que está a segurar a ação (botão de toque ou clique no mundo). */
@@ -234,6 +233,10 @@ export class UIScene extends Phaser.Scene {
       { size: 9, color: 'wheat', bold: true, stroke: true, align: 'center', wrap: width - 32 },
       [0.5, 0.5],
     ).setDepth(90);
+    // Tocar no aviso faz o que ele propõe (ex.: fazer o machado que falta).
+    this.notice.text.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
+      this.runNoticeAction();
+    });
 
     this.inventory = new InventoryUI(this, simulation.actions);
     this.crafting = new CraftingUI(this, simulation);
@@ -251,6 +254,8 @@ export class UIScene extends Phaser.Scene {
     this.build.onToggle = (open) => {
       for (const obj of this.actionButton) obj.setVisible(!open);
       this.buildButton?.setVisible(!open);
+      // No modo construção, o Auto não fica por cima dos botões Colocar/Sair.
+      this.autoButton?.setVisible(!open);
     };
     this.createButtons();
     this.createSpeedButton();
@@ -371,22 +376,16 @@ export class UIScene extends Phaser.Scene {
     const view = this.weaponView;
     if (!view) return;
     const slot = gameState.data.player.equipment[0];
-    const item = slot?.[0] ?? null;
-    const def = item ? content.items[item] : undefined;
-    const visible = def !== undefined && !uiState.modalOpen;
-    view.box.setVisible(visible);
-    view.icon.setVisible(visible);
-    if (item !== view.item && def) view.icon.setTexture(def.icon);
-    view.item = item;
-    const ranged = def?.ranged !== undefined;
+    const def = slot ? content.items[slot[0]] : undefined;
+    const visible = def?.ranged !== undefined && !uiState.modalOpen && !buildMode.active;
     // A munição em uso (ícone e quantas há dessa); a vermelho se acabou.
-    const active = ranged ? simulation.combat.activeAmmo() : null;
+    const active = visible ? simulation.combat.activeAmmo() : null;
     const ammoDef = active ? content.items[active.item] : undefined;
-    view.count.setVisible(visible && ranged);
+    view.count.setVisible(visible);
     view.ammo.setVisible(visible && ammoDef !== undefined);
     if (ammoDef && active && active.item !== view.ammoItem) view.ammo.setTexture(ammoDef.icon);
     view.ammoItem = active?.item ?? null;
-    if (ranged) {
+    if (visible) {
       const qty = active?.qty ?? 0;
       view.count.setText(String(Math.min(qty, BALANCE.quiverDisplayMax))).setColor(qty > 0 ? 'cream' : 'red');
     }
@@ -485,10 +484,59 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** Mensagem curta no centro-alto do ecrã (substitui a anterior). */
-  private showNotice(text: string): void {
+  private showNotice(text: string, action: (() => void) | null = null): void {
+    this.noticeAction = action;
     this.notice?.setText(text).setVisible(true);
     this.noticeTimer?.remove();
-    this.noticeTimer = this.time.delayedCall(NOTICE_MS, () => this.notice?.setVisible(false));
+    this.noticeTimer = this.time.delayedCall(NOTICE_MS, () => {
+      this.notice?.setVisible(false);
+      this.noticeAction = null;
+    });
+  }
+
+  /** Faz a ação do aviso que está no ecrã (toque no aviso ou Enter). */
+  private runNoticeAction(): void {
+    const action = this.noticeAction;
+    if (!action || !this.notice?.text.visible) return;
+    this.noticeAction = null;
+    this.notice.setVisible(false);
+    action();
+  }
+
+  /**
+   * Falta a ferramenta para recolher: se der para a fazer nas mãos, o aviso propõe fazê-la
+   * (toque no aviso ou Enter); senão diz o que é preciso.
+   */
+  private needsTool(tool: 'axe' | 'pickaxe'): void {
+    const base = t(tool === 'pickaxe' ? 'msg.needs_pickaxe' : 'msg.needs_axe');
+    const player = gameState.data.player;
+    const containers = [player.inventory, player.hotbar];
+    const recipes = content.recipes
+      .filter((r) => r.station === 'hands' && content.items[r.output]?.toolKind === tool)
+      .filter((r) => simulation.progression.isRecipeUnlocked(r))
+      .sort(
+        (a, b) => (content.items[b.output]?.gatherPower ?? 0) - (content.items[a.output]?.gatherPower ?? 0),
+      );
+    const recipe = recipes.find((r) => missingInputs(containers, r).length === 0);
+    if (recipe) {
+      const key = this.sys.game.device.input.touch ? 'msg.make_tool_touch' : 'msg.make_tool_keys';
+      this.showNotice(`${base}\n${t(key, { item: itemName(recipe.output) })}`, () => {
+        const result = simulation.crafting.craft(recipe.id, null);
+        this.showNotice(
+          result === 'ok'
+            ? t('craft.crafted', {
+                qty: recipe.qty,
+                item: itemName(recipe.output),
+                total: countItem(containers, recipe.output),
+              })
+            : t(result === 'no_space' ? 'msg.inventory_full' : 'craft.missing'),
+        );
+      });
+      return;
+    }
+    const cheapest = recipes[recipes.length - 1];
+    const needs = cheapest?.inputs.map(({ item, qty }) => `${String(qty)} ${itemName(item)}`).join(' + ');
+    this.showNotice(needs ? `${base}\n${t('msg.tool_needs', { needs })}` : base);
   }
 
   private listenForMessages(): () => void {
@@ -497,7 +545,11 @@ export class UIScene extends Phaser.Scene {
         this.updateCoopLabel();
         // Anfitrião: o parceiro entrou ou saiu.
         if (coop.isHost && coop.connected !== this.coopWasConnected)
-          this.showNotice(t(coop.connected ? 'coop.partner_joined' : 'coop.partner_left'));
+          this.showNotice(
+            coop.connected
+              ? t('coop.partner_joined_name', { name: coop.partnerName ?? '?' })
+              : t('coop.partner_left'),
+          );
         this.coopWasConnected = coop.connected;
       }),
       eventBus.on('player:died', ({ zoneId, bag }) => {
@@ -526,7 +578,7 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'no_ammo') this.showNotice(t('msg.no_ammo', { item: itemName(item ?? '') }));
         else if (reason === 'needs_item')
           this.showNotice(t('msg.needs_item', { item: itemName(item ?? '') }));
-        else this.showNotice(t(tool === 'pickaxe' ? 'msg.needs_pickaxe' : 'msg.needs_axe'));
+        else this.needsTool(tool === 'pickaxe' ? 'pickaxe' : 'axe');
       }),
       eventBus.on('dungeon:checkpoint', ({ floor }) => {
         this.showNotice(t('msg.checkpoint', { floor }));
@@ -727,31 +779,19 @@ export class UIScene extends Phaser.Scene {
       },
     ).setDepth(70);
 
-    // Arma equipada e munição: por cima do último slot da hotbar.
-    const boxX = hotbar.x + hotbar.w - WEAPON_BOX;
-    const boxY = hotbar.y - WEAPON_BOX - 4;
-    // Tocar na arma passa à munição seguinte da aljava.
-    const box = new Button(
-      this,
-      boxX + WEAPON_BOX / 2,
-      boxY + WEAPON_BOX / 2,
-      '',
-      { width: WEAPON_BOX, height: WEAPON_BOX, style: 'secondary' },
-      () => {
-        simulation.combat.cycleAmmo();
-      },
-    ).setDepth(70);
-    const icon = this.add.image(boxX + WEAPON_BOX / 2, boxY + WEAPON_BOX / 2, 'icon_short_bow').setDepth(71);
-    const ammo = this.add.image(boxX - 9, boxY + WEAPON_BOX / 2, 'icon_arrow').setDepth(71);
+    // Munição em uso: por cima do slot da arma (o último, à direita da hotbar); tocar no slot
+    // passa à seguinte.
+    const slotCx = hotbar.x + hotbar.w - SLOT_SIZE / 2;
+    const ammo = this.add.image(slotCx - 6, hotbar.y - 8, 'icon_arrow').setDepth(71);
     const count = new Label(
       this,
-      boxX - 18,
-      boxY + WEAPON_BOX / 2,
+      slotCx + 3,
+      hotbar.y - 8,
       '',
       { size: 8, bold: true, color: 'cream', stroke: true },
-      [1, 0.5],
+      [0, 0.5],
     ).setDepth(71);
-    this.weaponView = { box, icon, ammo, count, item: null, ammoItem: null };
+    this.weaponView = { ammo, count, ammoItem: null };
 
     // Ataque automático (canto inferior direito; com toque, por cima do botão de ação).
     const touch = this.sys.game.device.input.touch;
@@ -844,6 +884,9 @@ export class UIScene extends Phaser.Scene {
     });
     keyboard.on('keydown-F', () => {
       this.toggleAutoAttack();
+    });
+    keyboard.on('keydown-ENTER', (event: KeyboardEvent) => {
+      if (!event.repeat) this.runNoticeAction();
     });
     keyboard.on('keydown-K', () => {
       if (this.pause?.isOpen) return;
@@ -1020,7 +1063,7 @@ export class UIScene extends Phaser.Scene {
         const now = distance();
         const step = pinchStep(pinchDistance, now);
         if (step !== 0) {
-          stepWorldZoom(step, getView().zoom);
+          stepWorldZoom(step, getView().zoom, getView().height > getView().width);
           pinchDistance = now;
         }
         return;

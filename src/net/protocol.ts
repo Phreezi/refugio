@@ -6,7 +6,8 @@ import type { CharacterLook, GameStateData, PlayerState } from '../core/GameStat
 import type { Facing } from '../systems/movement/movement';
 
 /** Letras e números sem os que se confundem (0/O, 1/I/L): 31 símbolos. */
-export const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+/** Sem O, I e L (confundem-se com 0 e 1: ao escrever, contam como eles). */
+export const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTUVWXYZ';
 export const CODE_LENGTH = 5;
 /** Prefixo do id no servidor de sinalização (para não colidir com outras apps). */
 export const PEER_PREFIX = 'refugio-coop-';
@@ -19,9 +20,9 @@ export function randomCode(random: () => number = Math.random): string {
   return code;
 }
 
-/** Normaliza o que o jogador escreveu (minúsculas, espaços e hífenes). */
+/** Normaliza o que o jogador escreveu (minúsculas, espaços, hífenes; O = 0, I/L = 1). */
 export function normalizeCode(input: string): string | null {
-  const code = input.trim().toUpperCase().replace(/[\s-]/g, '');
+  const code = input.trim().toUpperCase().replace(/[\s-]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
   if (code.length !== CODE_LENGTH) return null;
   return /^[A-Z0-9]+$/.test(code) && code.split('').every((ch) => CODE_ALPHABET.includes(ch)) ? code : null;
 }
@@ -71,7 +72,7 @@ export type HostMessage =
    * O mundo com a personagem do convidado (depois dos comandos até `ack`). `warp` muda quando
    * o anfitrião muda o convidado de sítio (ao entrar, ao morrer): só aí conta a posição.
    */
-  | { t: 'snap'; state: GameStateData; ack: number; warp: number }
+  | { t: 'snap'; state: GameStateData; ack: number; warp: number; host?: string }
   /** 10×/s: o anfitrião (se estiver na mesma zona), a vida/fome/sede, os inimigos, a pesca. */
   | {
       t: 'frame';

@@ -256,6 +256,21 @@ describe('save: migrações', () => {
     expect(() => validateState(bad)).toThrow();
   });
 
+  it('v19 → v20: pilhas no chão com corpo (id do inimigo) validam-se', () => {
+    const v19 = structuredClone(STATE);
+    const stateJson = JSON.stringify(v19);
+    const text = `{"version":19,"timestamp":9,"checksum":"${checksum(`19|9|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.player.level).toBe(STATE.player.level);
+    const ok = structuredClone(STATE) as unknown as { zones: Record<string, { bags: unknown[] }> };
+    const zone = Object.values(ok.zones)[0];
+    if (zone) {
+      zone.bags = [{ x: 1, y: 2, items: [['coin', 3]], expiresAt: 5, death: false, corpse: 'wolf' }];
+      expect(() => validateState(ok)).not.toThrow();
+      zone.bags = [{ x: 1, y: 2, items: [], expiresAt: 5, death: false, corpse: 3 }];
+      expect(() => validateState(ok)).toThrow();
+    }
+  });
+
   it('v18 → v19: slots com encantamento (4.º valor) validam-se', () => {
     const v18 = structuredClone(STATE);
     const stateJson = JSON.stringify(v18);

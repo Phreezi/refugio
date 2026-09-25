@@ -57,7 +57,6 @@
   "missNearFactor": 0.5,
   "groundPickupPx": 10,
   "groundItemsMax": 200,
-  "corpseSec": 60,
   "beginnerUntilDay": 4,
   "quiverDisplayMax": 999,
   "playerInvulnSec": 0.6,
@@ -94,5 +93,7 @@
   "enchantCostBase": 20,
   "enchantDamagePct": 15,
   "enchantArmor": 2,
-  "talentResetCostPerPoint": 10
+  "talentResetCostPerPoint": 10,
+  "corpseDays": 1,
+  "groundThingsMax": 300
 }

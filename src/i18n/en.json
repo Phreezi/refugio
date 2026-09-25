@@ -472,5 +472,10 @@
   "skills.reset_confirm": "Reset? ({cost})",
   "skills.reset_done": "Points reset.",
   "skills.reset_nothing": "No points spent.",
-  "hud.coins": "{n}"
+  "hud.coins": "{n}",
+  "coop.partner_joined_name": "{name} joined your game!",
+  "coop.joined": "You joined {name}'s game!",
+  "msg.make_tool_touch": "Tap here to make {item}.",
+  "msg.make_tool_keys": "Press Enter (or click here) to make {item}.",
+  "msg.tool_needs": "Made with {needs}."
 }

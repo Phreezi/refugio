@@ -8,6 +8,9 @@ describe('zoomLevels', () => {
     expect(zoomLevels(2)).toEqual([2, 1]);
     expect(zoomLevels(1)).toEqual([1]);
     expect(zoomLevels(6)).toEqual([6, 5, 4, 3]);
+    // Ao alto: um nível abaixo no mais perto e mais um para afastar.
+    expect(zoomLevels(4, true)).toEqual([3, 2, 1]);
+    expect(zoomLevels(3, true)).toEqual([2, 1]);
   });
 
   it('com zoom fracionário (ecrã minúsculo) não há alternativas', () => {

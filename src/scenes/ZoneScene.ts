@@ -134,7 +134,6 @@ export class ZoneScene extends Phaser.Scene {
   private bagSprites: Phaser.GameObjects.Image[] = [];
   private groundSprites: Phaser.GameObjects.Image[] = [];
   /** Corpos no chão, pelo uid do inimigo. */
-  private corpseSprites = new Map<number, Phaser.GameObjects.Sprite | Phaser.GameObjects.Image>();
   /** Véu escuro da noite, com as luzes "apagadas" nele. */
   private night: Phaser.GameObjects.RenderTexture | null = null;
   /** A sair da zona (fade em curso): o jogador fica parado. */
@@ -143,6 +142,8 @@ export class ZoneScene extends Phaser.Scene {
   private player: Phaser.GameObjects.Sprite | null = null;
   /** O outro jogador no co-op (o parceiro, ou o anfitrião visto pelo convidado). */
   private other: Phaser.GameObjects.Sprite | null = null;
+  /** Co-op: nomes por cima dos jogadores. */
+  private nameTags: Partial<Record<'self' | 'other', Label>> = {};
   private keys: MoveKeys | null = null;
   /** Sprites dos recursos, pelo id do objeto no Tiled (para golpes, esconder e reaparecer). */
   private resourceSprites = new Map<number, Phaser.GameObjects.Image>();
@@ -269,7 +270,6 @@ export class ZoneScene extends Phaser.Scene {
       this.night = null;
       this.bagSprites = [];
       this.groundSprites = [];
-      this.corpseSprites.clear();
       this.marker = null;
       this.ghost = null;
       this.ghostArea = null;
@@ -280,6 +280,7 @@ export class ZoneScene extends Phaser.Scene {
       coop.onLost = null;
       this.player = null;
       this.other = null;
+      this.nameTags = {};
       this.keys = null;
     });
   }
@@ -584,11 +585,8 @@ export class ZoneScene extends Phaser.Scene {
         if (!view) return;
         view.bar.destroy();
         view.barBack.destroy();
-        // O corpo fica no chão, na posição em que estava, a cinzento (morto), até `corpse:gone`.
-        const frame = view.sprite.frame.name;
-        view.sprite.setTexture(grayTexture(this, view.sprite.texture.key), frame);
-        view.sprite.setDepth(view.sprite.y - 12);
-        this.corpseSprites.set(uid, view.sprite);
+        // O corpo passa a ser desenhado como uma "mochila" no chão (renderBags), a cinzento.
+        view.sprite.destroy();
       }),
       on('enemy:exploded', ({ x, y, radius }) => {
         const blast = this.add
@@ -629,10 +627,7 @@ export class ZoneScene extends Phaser.Scene {
       on('inventory:changed', () => {
         this.renderContainers();
       }),
-      on('corpse:gone', ({ uid, x, y }) => {
-        const sprite = this.corpseSprites.get(uid);
-        this.corpseSprites.delete(uid);
-        sprite?.destroy();
+      on('corpse:gone', ({ x, y }) => {
         this.smoke(Math.round(x), Math.round(y));
       }),
       on('ground:changed', ({ zoneId }) => {
@@ -887,9 +882,16 @@ export class ZoneScene extends Phaser.Scene {
   /** Mochilas no chão da zona (redesenhadas quando mudam). */
   private renderBags(): void {
     for (const sprite of this.bagSprites) sprite.destroy();
-    this.bagSprites = simulation.combat
-      .bags()
-      .map((bag) => this.add.image(bag.x, bag.y, 'bag_dropped').setOrigin(0.5, 1).setDepth(bag.y));
+    this.bagSprites = simulation.combat.bags().map((bag) => {
+      // Corpo de um inimigo: o próprio inimigo, a cinzento (morto); senão, a mochila.
+      const enemy = bag.corpse ? content.enemies[bag.corpse] : undefined;
+      if (enemy && this.textures.exists(enemy.sprite))
+        return this.add
+          .image(bag.x, bag.y, grayTexture(this, enemy.sprite), 0)
+          .setOrigin(0.5, 1)
+          .setDepth(bag.y - 12);
+      return this.add.image(bag.x, bag.y, 'bag_dropped').setOrigin(0.5, 1).setDepth(bag.y);
+    });
   }
 
   /** Nuvem de fumo (o corpo de um inimigo a desaparecer): círculos cinzentos que sobem e se apagam. */
@@ -954,7 +956,7 @@ export class ZoneScene extends Phaser.Scene {
    */
   private applyCameraZoom(mapWidth: number, mapHeight: number): void {
     const view = getView();
-    const zoom = worldZoomFor(view.zoom);
+    const zoom = worldZoomFor(view.zoom, view.height > view.width);
     const visibleWidth = (view.width * view.zoom) / zoom;
     const visibleHeight = (view.height * view.zoom) / zoom;
     const bx = Math.min(0, (mapWidth - visibleWidth) / 2);
@@ -978,15 +980,15 @@ export class ZoneScene extends Phaser.Scene {
       // Um "clique" da roda gera vários eventos (sobretudo em touchpads): um passo por 150 ms.
       if (event.deltaY === 0 || this.time.now - lastWheel < WHEEL_COOLDOWN_MS) return;
       lastWheel = this.time.now;
-      stepWorldZoom(event.deltaY < 0 ? 1 : -1, getView().zoom);
+      stepWorldZoom(event.deltaY < 0 ? 1 : -1, getView().zoom, getView().height > getView().width);
     };
     // passive: false — só assim o preventDefault impede o zoom da página.
     canvas.addEventListener('wheel', onWheel, { passive: false });
     const zoomIn = (): void => {
-      stepWorldZoom(1, getView().zoom);
+      stepWorldZoom(1, getView().zoom, getView().height > getView().width);
     };
     const zoomOut = (): void => {
-      stepWorldZoom(-1, getView().zoom);
+      stepWorldZoom(-1, getView().zoom, getView().height > getView().width);
     };
     for (const key of ['PLUS', 'NUMPAD_ADD']) this.input.keyboard?.on(`keydown-${key}`, zoomIn);
     for (const key of ['MINUS', 'NUMPAD_SUBTRACT']) this.input.keyboard?.on(`keydown-${key}`, zoomOut);
@@ -1156,10 +1158,35 @@ export class ZoneScene extends Phaser.Scene {
   }
 
   /** O outro jogador do co-op (se estiver nesta zona): posição interpolada, andar, golpe. */
+  /** Co-op: nome por cima de cada jogador (null esconde). */
+  private nameTag(who: 'self' | 'other', name: string | null, x: number, y: number): void {
+    const existing = this.nameTags[who];
+    if (!name) {
+      existing?.text.setVisible(false);
+      return;
+    }
+    const tag =
+      existing ??
+      new Label(
+        this,
+        0,
+        0,
+        name,
+        { size: 6, bold: true, color: who === 'self' ? 'wheat' : 'sky', stroke: true },
+        [0.5, 1],
+      );
+    this.nameTags[who] = tag;
+    tag.setText(name);
+    tag.text.setVisible(true);
+    tag.setPosition(Math.round(x), Math.round(y) - 33);
+    tag.setDepth(LAYER_DEPTH.decor_high + 1);
+  }
+
   private renderOther(): void {
     const view = coop.otherAvatar(this.zoneId);
     if (!view) {
       this.other?.setVisible(false);
+      this.nameTag('other', null, 0, 0);
       return;
     }
     this.other ??= this.add
@@ -1176,6 +1203,7 @@ export class ZoneScene extends Phaser.Scene {
     const x = this.toScreenGrid(view.px + (view.x - view.px) * a);
     const y = this.toScreenGrid(view.py + (view.y - view.py) * a);
     other.setVisible(true).setPosition(x, y).setDepth(y);
+    this.nameTag('other', coop.partnerName, x, y);
     const sinceAttack = now - coop.otherAttackAt;
     if (sinceAttack < ATTACK_MS) {
       const [raised, extended] = CHARACTER_COLUMNS.attack;
@@ -1206,6 +1234,7 @@ export class ZoneScene extends Phaser.Scene {
     const x = this.toScreenGrid(previous.x + (state.x - previous.x) * alpha);
     const y = this.toScreenGrid(previous.y + (state.y - previous.y) * alpha);
     player.setPosition(x, y).setDepth(y);
+    this.nameTag('self', coop.connected ? gameState.data.player.name : null, x, y);
     // A aparência pode mudar no menu de pausa.
     const texture = PLAYER_TEXTURES[state.look];
     if (player.texture.key !== texture) player.stop().setTexture(texture);

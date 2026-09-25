@@ -5,7 +5,7 @@ import { SKILLS } from '../data/types';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -114,7 +114,8 @@ function validBag(value: unknown): boolean {
     finite(value.y) &&
     validContainer(value.items) &&
     finite(value.expiresAt) &&
-    typeof value.death === 'boolean'
+    typeof value.death === 'boolean' &&
+    (value.corpse === undefined || typeof value.corpse === 'string')
   );
 }
 

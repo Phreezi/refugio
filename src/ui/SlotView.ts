@@ -112,6 +112,12 @@ export class SlotView {
     );
   }
 
+  /** Fundo de outra cor (o slot da arma ao lado da hotbar). */
+  setAccent(color: PaletteColor): this {
+    this.bg.setFillStyle(paletteNumber(color));
+    return this;
+  }
+
   update(slot: Slot | null, items: ItemDefs, selected: boolean): void {
     const def = slot ? items[slot[0]] : undefined;
     const rarity = def?.rarity ?? 'common';
