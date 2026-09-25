@@ -7,7 +7,7 @@ import { getView } from '../display/view';
 import { coop } from '../net/coop';
 import { getLanguage, LANGUAGES, setLanguage, t, type MessageKey } from '../i18n';
 import { Button } from './Button';
-import { preferences, setPreference, UI_SIZES, VOLUME_STEPS } from './preferences';
+import { preferences, setPreference } from './preferences';
 import { sfx } from '../audio/sfx';
 import { Label } from './text';
 import { uiState } from './uiState';
@@ -100,7 +100,7 @@ export class PauseUI {
   private build(): void {
     this.clear();
     const { width, height } = getView();
-    const lines = this.view === 'main' ? 5 : this.view === 'stats' ? 8 : this.view === 'coop' ? 5 : 8;
+    const lines = this.view === 'main' ? 5 : this.view === 'stats' ? 8 : this.view === 'coop' ? 5 : 7;
     const h = Math.min(height - 8, 34 + lines * ROW + 10);
     const x = Math.round((width - W) / 2);
     const y = Math.max(4, Math.round((height - h) / 2));
@@ -189,6 +189,59 @@ export class PauseUI {
     });
   }
 
+  /** Volume: barra deslizante (tocar ou arrastar); ouve-se um som ao largar. */
+  private volumeSlider(x: number, y: number): void {
+    this.label(x + 10, y + 1, t('pause.volume'), { size: 8, color: 'cream' });
+    const width = 72;
+    const left = x + W - 10 - width;
+    const top = y + 5;
+    const track = this.add(
+      this.scene.add
+        .rectangle(left, top - 4, width, 10, paletteNumber('night'), 0.001)
+        .setOrigin(0)
+        .setDepth(DEPTH.content)
+        .setInteractive({ useHandCursor: true }),
+    );
+    this.add(
+      this.scene.add
+        .rectangle(left, top, width, 2, paletteNumber('shadow'))
+        .setOrigin(0)
+        .setDepth(DEPTH.content),
+    );
+    const fill = this.add(
+      this.scene.add.rectangle(left, top, 0, 2, paletteNumber('gold')).setOrigin(0).setDepth(DEPTH.content),
+    );
+    const knob = this.add(
+      this.scene.add
+        .rectangle(left, top - 3, 4, 8, paletteNumber('cream'))
+        .setOrigin(0)
+        .setDepth(DEPTH.content),
+    );
+    const value = this.label(left - 4, y + 1, '', { size: 8, color: 'gold' }, [1, 0]);
+    const show = (volume: number): void => {
+      const px = Math.round(volume * width);
+      fill.width = px;
+      knob.setX(Math.min(left + width - 4, left + px - 2 < left ? left : left + px - 2));
+      value.setText(`${String(Math.round(volume * 100))}%`);
+    };
+    const pick = (pointer: Phaser.Input.Pointer): void => {
+      const px = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y).x;
+      const volume = Math.max(0, Math.min(1, Math.round(((px - left) / width) * 20) / 20));
+      setPreference('volume', volume);
+      show(volume);
+    };
+    show(preferences().volume);
+    track.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pick(pointer);
+    });
+    track.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.isDown) pick(pointer);
+    });
+    track.on('pointerup', () => {
+      sfx.play('pickup'); // ouve-se o volume novo
+    });
+  }
+
   private buildSettings(x: number, top: number): void {
     const prefs = preferences();
     const onOff = (on: boolean): string => t(on ? 'pause.on' : 'pause.off');
@@ -204,17 +257,7 @@ export class PauseUI {
       uiState.reopenPause = 'settings';
       this.scene.events.emit('ui:language-changed');
     });
-    this.setting(x, next(), t('pause.volume'), `${String(Math.round(prefs.volume * 100))}%`, () => {
-      const i = VOLUME_STEPS.findIndex((v) => v >= prefs.volume - 0.01);
-      setPreference('volume', VOLUME_STEPS[(i + 1) % VOLUME_STEPS.length] ?? 0.6);
-      sfx.play('pickup'); // ouve-se logo o volume novo
-    });
-    this.setting(x, next(), t('pause.ui_size'), t(`pause.size.${prefs.uiSize}`), () => {
-      const i = UI_SIZES.indexOf(prefs.uiSize);
-      setPreference('uiSize', UI_SIZES[(i + 1) % UI_SIZES.length] ?? 'normal');
-      uiState.reopenPause = 'settings';
-      window.dispatchEvent(new Event('resize')); // a escala recalcula-se com o alvo novo
-    });
+    this.volumeSlider(x, next());
     this.setting(x, next(), t('pause.damage_numbers'), onOff(prefs.damageNumbers), () => {
       setPreference('damageNumbers', !prefs.damageNumbers);
     });

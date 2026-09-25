@@ -275,6 +275,7 @@ export class ZoneScene extends Phaser.Scene {
     // No modo construção, Espaço/clique colocam peças (UIScene) em vez da ação contextual.
     const actionKey = !buildMode.active && (this.keys?.action.some((key) => key.isDown) ?? false);
     simulation.setActionHeld(!blocked && !buildMode.active && (actionKey || uiState.actionHeld));
+    simulation.autoAttack = preferences().autoAttack && !blocked && !buildMode.active;
     // rawDelta = tempo real entre frames; o delta "suavizado" do Phaser fica limitado a
     // 16,7 ms com a janela sem foco, o que atrasaria o relógio do jogo.
     // Velocidade do jogo (x1/x2/x3): mais tempo de jogo por frame (no máx. 5 ticks por frame).

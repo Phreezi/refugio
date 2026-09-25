@@ -91,9 +91,35 @@ export class Label {
   }
 
   private align(): void {
-    this.text.setPosition(
-      Math.round(this.anchor.x - this.originX * this.text.width),
-      Math.round(this.anchor.y - this.originY * this.text.height),
-    );
+    let y = this.anchor.y - this.originY * this.text.height;
+    // Centrado na vertical (botões): pelo meio das maiúsculas, e não da caixa do texto, que tem
+    // espaço para acentos e descendentes (e muda de fonte para fonte: no Windows é outra).
+    if (this.originY === 0.5 && !this.text.text.includes('\n')) {
+      const cap = capHeight(this.text.style.fontStyle, this.text.style.fontSize);
+      if (cap > 0) y = this.anchor.y - (this.text.getTextMetrics().ascent - cap / 2);
+    }
+    this.text.setPosition(Math.round(this.anchor.x - this.originX * this.text.width), Math.round(y));
   }
+}
+
+const capHeights = new Map<string, number>();
+
+/** Altura das maiúsculas (px) da fonte da interface neste tamanho (medida uma vez no browser). */
+function capHeight(fontStyle: string, fontSize: string | number): number {
+  const size = typeof fontSize === 'number' ? `${String(fontSize)}px` : fontSize;
+  const key = `${fontStyle} ${size}`;
+  const cached = capHeights.get(key);
+  if (cached !== undefined) return cached;
+  let cap = 0;
+  try {
+    const context = document.createElement('canvas').getContext('2d');
+    if (context) {
+      context.font = `${fontStyle} ${size} ${UI_FONT}`;
+      cap = context.measureText('H').actualBoundingBoxAscent;
+    }
+  } catch {
+    cap = 0;
+  }
+  capHeights.set(key, cap);
+  return cap;
 }

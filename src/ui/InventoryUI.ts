@@ -10,8 +10,9 @@ import { itemName, t } from '../i18n';
 import { content } from '../world/content';
 import { Button, CLOSE_ICON } from './Button';
 import { SLOT_GAP, SLOT_SIZE, SlotView, slotSize } from './SlotView';
+import { describeItem } from './itemInfo';
 import { Label } from './text';
-import { uiState } from './uiState';
+import { REOPEN_GUARD_MS, uiState } from './uiState';
 
 const DEPTH = { hud: 10, dim: 50, panel: 60, slots: 62, hotbar: 70, ghost: 100 } as const;
 const PAD = 8;
@@ -67,6 +68,8 @@ export class InventoryUI {
   private readonly scene: Phaser.Scene;
   private readonly actions: PlayerActions;
   private readonly hotbar: SlotView[] = [];
+  /** Quando o painel fechou (ms): ver `REOPEN_GUARD_MS`. */
+  private closedAt = -Infinity;
   private panelSlots: SlotView[] = [];
   private panelObjects: { destroy(): void }[] = [];
   private panelRect: Rect | null = null;
@@ -121,7 +124,8 @@ export class InventoryUI {
 
   toggle(): void {
     if (this.isOpen) this.close();
-    else this.open(null);
+    // O toque no botão que fecha o painel (toque "fora") não o volta a abrir.
+    else if (performance.now() - this.closedAt > REOPEN_GUARD_MS) this.open(null);
   }
 
   open(other: `chest:${string}` | `loot:${string}` | null): void {
@@ -132,6 +136,7 @@ export class InventoryUI {
   }
 
   close(): void {
+    if (this.panelRect) this.closedAt = performance.now();
     this.clearPanel();
     this.panelRect = null;
     this.other = null;
@@ -402,9 +407,17 @@ export class InventoryUI {
     const def = slot ? content.items[slot[0]] : undefined;
 
     if (slot && def && selected) {
-      add(new Label(scene, x, y, itemName(slot[0]), { size: 8, bold: true, color: 'cream' })).setDepth(
-        DEPTH.slots,
-      );
+      const name = add(new Label(scene, x, y, itemName(slot[0]), { size: 8, bold: true, color: 'cream' }));
+      name.setDepth(DEPTH.slots);
+      // O que o item faz (dano, defesa, efeitos…), ao lado do nome.
+      const infoX = x + Math.ceil(name.text.width) + 8;
+      add(
+        new Label(scene, infoX, y + 1, describeItem(slot[0], def).join(' · '), {
+          size: 7,
+          color: 'stone_light',
+          wrap: Math.max(40, w - (infoX - x)),
+        }),
+      ).setDepth(DEPTH.slots);
       let bx = x + small.width / 2;
       const by = y + 20;
       if (def.type === 'consumable' || def.type === 'note') {

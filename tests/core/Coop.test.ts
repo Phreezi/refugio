@@ -183,3 +183,15 @@ describe('Co-op: dois jogadores no mesmo mundo', () => {
     expect(borrowed.data.player.xp).toBe(0);
   });
 });
+
+describe('Ataque automático', () => {
+  it('com o "Auto" ligado bate sozinho no inimigo ao alcance; desligado, não', () => {
+    const { hostSim, events, run } = setup([{ id: 'walker', x: 112, y: 240 }]);
+    for (const enemy of hostSim.combat.list) enemy.hp = 1;
+    run(0.2);
+    expect(events).not.toContain('host:killed');
+    hostSim.autoAttack = true;
+    run(0.5);
+    expect(events).toContain('host:killed');
+  });
+});

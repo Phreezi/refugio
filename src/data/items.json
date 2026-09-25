@@ -198,7 +198,7 @@
     "type": "tool",
     "stack": 1,
     "rarity": "common",
-    "durability": 60
+    "durability": 12
   },
   "stone_axe": {
     "name": "item.stone_axe",

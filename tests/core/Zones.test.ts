@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FIXED_STEP_MS, PLAYER_FOOTPRINT } from '../../src/config';
 import { EventBus, type GameEvents } from '../../src/core/EventBus';
+import { secondsToTicks } from '../../src/core/Clock';
 import { BASE_ZONE_ID, GameState } from '../../src/core/GameState';
 import { fishingMarker } from '../../src/core/Fishing';
 import { advanceRespawns } from '../../src/core/offline';
@@ -232,7 +233,8 @@ describe('Pesca e água do lago', () => {
         sim.update(FIXED_STEP_MS);
       }
       sim.fishing.strike();
-      for (let i = 0; i < 10; i++) sim.update(FIXED_STEP_MS);
+      // Entre lançamentos espera-se `fishCooldownSec` (a pesca não é uma fábrica de XP).
+      for (let i = 0; i < secondsToTicks(BALANCE.fishCooldownSec) + 2; i++) sim.update(FIXED_STEP_MS);
     };
     tryOnce(true);
     tryOnce(false);

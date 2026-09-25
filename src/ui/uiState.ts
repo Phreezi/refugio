@@ -2,6 +2,12 @@
  * Estado da interface partilhado entre a UIScene (que recebe os toques) e a cena de jogo.
  * Não é estado do jogo: não se grava.
  */
+/**
+ * Tocar fora de um painel fecha-o; se esse toque foi no botão que o abre, o botão não o deve
+ * reabrir logo a seguir (ms).
+ */
+export const REOPEN_GUARD_MS = 300;
+
 export const uiState = {
   /** Botão de ação (toque) ou clique no mundo premido. */
   actionHeld: false,

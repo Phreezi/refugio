@@ -208,6 +208,7 @@ class Coop {
       const moved = message.moved === 1;
       const sneak = message.sneak === 1;
       sim.setRemotePlayer(message.x, message.y, message.facing, moved, sneak);
+      sim.autoAttack = message.auto === 1;
       this.other = this.avatar(message.x, message.y, message.facing, moved, sneak, message.zone);
     } else if (message.t === 'act') sim.setActionHeld(message.held === 1, message.tick);
     else if (message.t === 'away') sim.away = message.on === 1;
@@ -620,6 +621,7 @@ class Coop {
         moved: simulation.playerMoved ? 1 : 0,
         sneak: simulation.playerSneaking ? 1 : 0,
         zone: p.zoneId,
+        auto: simulation.autoAttack ? 1 : 0,
       });
     }
   }
