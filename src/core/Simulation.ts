@@ -456,6 +456,14 @@ export class Simulation {
       this.nextActionTick = tick + this.actionCooldownTicks;
       return;
     }
+    // Com o ataque automático, a ação manual apanha/abre o que estiver à frente (mesmo a meio
+    // de um combate); só sem nada disso é que ataca.
+    if (this.autoAttack && this.interaction.currentTarget(PLAYER_FOOTPRINT, true)) {
+      const done = this.interaction.act(PLAYER_FOOTPRINT, true);
+      this.nextActionTick = tick + this.actionCooldownTicks;
+      if (done !== 'resource') this.actionHeld = false;
+      return;
+    }
     // Arma à distância: dispara no inimigo mais perto (se houver); senão, a ação normal. Com a
     // ação premida, a mira fica presa ao mesmo inimigo até se largar.
     const shot = this.combat.shoot(this.actionHeld);
@@ -484,7 +492,15 @@ export class Simulation {
     const target = weapon.ranged
       ? this.combat.nearestInRange(weapon.ranged.range)
       : this.combat.nearestInReach(PLAYER_FOOTPRINT, weapon.reach);
-    if (!target) return;
+    if (!target) {
+      // Sem inimigos: recolhe sozinho o recurso à frente (árvores, pedras, bagas…).
+      const ahead = this.interaction.currentTarget(PLAYER_FOOTPRINT, true);
+      if (ahead?.data.type === 'resource') {
+        this.interaction.act(PLAYER_FOOTPRINT, true);
+        this.nextActionTick = tick + this.actionCooldownTicks;
+      }
+      return;
+    }
     if (weapon.ranged) {
       // Sem munição não insiste (nem avisa a cada tick).
       if (this.combat.shoot() === 'shot') this.nextActionTick = tick + this.combat.attackTicks();

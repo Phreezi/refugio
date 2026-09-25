@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FIXED_STEP_MS, PLAYER_FOOTPRINT } from '../../src/config';
+import { secondsToTicks } from '../../src/core/Clock';
 import { EventBus, type GameEvents } from '../../src/core/EventBus';
 import { BASE_ZONE_ID, GameState } from '../../src/core/GameState';
 import { Simulation } from '../../src/core/Simulation';
@@ -156,18 +157,40 @@ describe('Combate', () => {
     expect(events.filter((e) => e === 'killed:zombie_walker')).toHaveLength(3);
     expect(events.some((e) => e.startsWith('died'))).toBe(false);
     expect(player.hp).toBeGreaterThan(50);
-    expect(player.equipment[0]?.[2]).toBeLessThan(100); // a moca gastou-se
+    expect(player.equipment[0]?.[2]).toBe(100); // proteção de principiante: não gasta até ao dia 4
   });
 
-  it('matar dá os drops (veado: carne e couro)', () => {
-    const { state, sim, events } = setup(map([{ id: 'deer', x: 250, y: 240 }]));
+  it('matar deixa os drops no corpo; apanham-se ao passar por cima e o corpo desaparece', () => {
+    const { state, sim, events, run } = setup(map([{ id: 'deer', x: 250, y: 240 }]));
     const deer = sim.combat.list[0];
     if (!deer) throw new Error('sem veado');
     deer.hp = 1;
     expect(sim.combat.attack(deer.uid)).toBe(true);
     expect(events).toContain('killed:deer');
+    expect(countItem([state.data.player.inventory], 'raw_meat')).toBe(0);
+    const corpse = sim.combat.corpses[0];
+    Object.assign(state.data.player, { x: corpse?.x, y: corpse?.y });
+    run(0.1);
+    expect(sim.combat.corpses).toHaveLength(0);
     expect(countItem([state.data.player.inventory], 'raw_meat')).toBeGreaterThanOrEqual(2);
     expect(countItem([state.data.player.inventory], 'leather')).toBe(1);
+  });
+
+  it('a proteção de principiante acaba às 00:00 do dia 4: daí em diante as armas gastam-se', () => {
+    const { state, sim } = setup(map([{ id: 'walker', x: 250, y: 240 }]));
+    const player = state.data.player;
+    sim.combat.roll = () => 0.99;
+    player.equipment[0] = ['wooden_club', 1, 80];
+    const walker = sim.combat.list[0];
+    if (!walker) throw new Error('sem arrastado');
+    walker.hp = 1000;
+    sim.combat.attack(walker.uid);
+    expect(player.equipment[0][2]).toBe(80);
+    // Dia 1 começa às 6h: o dia 4 às 00:00 é 2 dias e 18 h depois.
+    state.data.world.tick = secondsToTicks(((2 * 24 + 18) / 24) * BALANCE.dayLengthSec);
+    expect(sim.combat.beginner).toBe(false);
+    sim.combat.attack(walker.uid);
+    expect(player.equipment[0][2]).toBe(79);
   });
 
   it('ao morrer: a mochila fica no chão, hotbar e equipamento ficam, e volta à base', () => {
@@ -490,11 +513,16 @@ describe('Aljava e corpos', () => {
     player.inventory[1] = ['stone_arrow', 40];
     player.hotbar[2] = ['arrow', 500];
     run(0.1);
+    // A melhor entra primeiro (fica em uso).
     expect(player.quiver).toEqual([
-      ['arrow', 1499],
       ['stone_arrow', 40],
+      ['arrow', 1499],
     ]);
     expect(sim.combat.ammoCount()).toBe(1539);
+    expect(sim.combat.activeAmmo()).toEqual({ item: 'stone_arrow', qty: 40 });
+    sim.combat.cycleAmmo();
+    expect(sim.combat.activeAmmo()).toEqual({ item: 'arrow', qty: 1499 });
+    sim.combat.selectAmmo('stone_arrow');
     // Tira o arco com a mochila quase cheia: o que não couber fica numa pilha no chão.
     player.inventory.fill(['wood', 50]);
     player.inventory[0] = null;
@@ -502,12 +530,9 @@ describe('Aljava e corpos', () => {
     player.equipment[0] = null;
     run(0.1);
     expect(player.quiver).toEqual([]);
-    expect(player.inventory[0]).toEqual(['arrow', 999]);
+    expect(player.inventory[0]).toEqual(['stone_arrow', 40]);
     const pile = state.data.zones[ZONE]?.bags[0]?.items ?? [];
-    expect(pile).toEqual([
-      ['arrow', 500],
-      ['stone_arrow', 40],
-    ]);
+    expect(pile).toEqual([['arrow', 1499]]);
   });
 
   it('o arco usa primeiro a flecha com mais dano; as que não partem apanham-se do corpo', () => {
@@ -516,8 +541,8 @@ describe('Aljava e corpos', () => {
     const player = state.data.player;
     player.equipment[0] = ['short_bow', 1, 100];
     player.quiver = [
-      ['arrow', 5],
       ['iron_arrow', 1],
+      ['arrow', 5],
     ];
     const walker = sim.combat.list[0];
     if (!walker) throw new Error('sem arrastado');
@@ -531,7 +556,7 @@ describe('Aljava e corpos', () => {
     run(1);
     expect(sim.combat.list).toHaveLength(0);
     const corpse = sim.combat.corpses[0];
-    expect(corpse?.arrows).toEqual({ iron_arrow: 1, arrow: 1 });
+    expect(corpse?.items).toMatchObject({ iron_arrow: 1, arrow: 1 });
     player.x = corpse?.x ?? 0;
     player.y = corpse?.y ?? 0;
     run(0.1);

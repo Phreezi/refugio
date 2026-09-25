@@ -9,7 +9,7 @@ import type { Simulation } from '../core/Simulation';
 import { HANDS, RECIPE_CATEGORIES, type Recipe, type RecipeCategory } from '../data/types';
 import { getView } from '../display/view';
 import { itemName, t, tKey } from '../i18n';
-import { describeItem } from './itemInfo';
+import { describeItem, ownedCount } from './itemInfo';
 import { missingInputs, outputCount } from '../systems/crafting/crafting';
 import { countItem } from '../systems/inventory/inventory';
 import { content } from '../world/content';
@@ -79,7 +79,11 @@ export class CraftingUI {
         if (this.isOpen) this.rebuildSoon();
       }),
       eventBus.on('craft:finished', ({ stationKey, item }) => {
-        if (stationKey !== HANDS) scene.events.emit('ui:message', t('craft.done', { item: itemName(item) }));
+        if (stationKey !== HANDS)
+          scene.events.emit(
+            'ui:message',
+            t('craft.done', { item: itemName(item), total: ownedCount(gameState.data.player, item) }),
+          );
         if (this.isOpen) this.rebuildSoon();
       }),
     ];
@@ -379,7 +383,13 @@ export class CraftingUI {
             } else if (recipe.category === 'trade')
               this.message(t('craft.traded', { item: itemName(recipe.output) }));
             else if (recipe.station === HANDS)
-              this.message(t('craft.crafted', { item: itemName(recipe.output) }));
+              this.message(
+                t('craft.crafted', {
+                  qty: recipe.qty,
+                  item: itemName(recipe.output),
+                  total: ownedCount(gameState.data.player, recipe.output),
+                }),
+              );
             this.build();
           },
           ok,

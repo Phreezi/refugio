@@ -1,5 +1,5 @@
 import { BALANCE } from '../data/balance';
-import { gameState } from '../core/GameState';
+import { gameState, type PlayerState } from '../core/GameState';
 import { skillOf, type ItemDef } from '../data/types';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
 import { missPct, skillLevel } from '../systems/combat/skills';
@@ -49,4 +49,13 @@ export function describeItem(id: string, def: ItemDef | undefined): string[] {
   if (def.durability !== undefined) add('info.durability', { n: def.durability });
   if (lines.length === 0) add(def.type === 'resource' ? 'info.material' : 'info.none');
   return lines;
+}
+
+/** Quantos `item` o jogador tem (mochila, hotbar e aljava). */
+export function ownedCount(player: PlayerState, item: string): number {
+  let total = 0;
+  for (const container of [player.inventory, player.hotbar])
+    for (const slot of container) if (slot?.[0] === item) total += slot[1];
+  for (const [id, qty] of player.quiver) if (id === item) total += qty;
+  return total;
 }

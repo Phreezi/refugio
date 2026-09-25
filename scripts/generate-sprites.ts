@@ -2380,37 +2380,35 @@ const RANGED_ICONS: Sprite[] = [
       img.set(9, 6, c('orange'));
     },
   },
-  ...(['stone_arrow', 'iron_arrow'] as const).map((file): Sprite => ({
+  // Flechas: a mesma haste de madeira e penas; só a ponta muda (madeira, pedra, ferro).
+  ...(
+    [
+      ['arrow', 'bark', 'wood'],
+      ['stone_arrow', 'stone_dark', 'stone'],
+      ['iron_arrow', 'stone_light', 'ice'],
+    ] as const
+  ).map(([file, tipDark, tipLight]): Sprite => ({
     file,
     width: 16,
     height: 16,
     outline: 'ink',
     paint: (img) => {
-      // Duas flechas com ponta maior (pedra cinzenta ou ferro claro).
-      const tip = file === 'stone_arrow' ? c('stone_dark') : c('ice');
-      for (const o of [0, 5]) {
-        for (let i = 0; i < 8; i++) img.set(1 + i + o, 13 - i, c('wood_light'));
-        img.fill(9 + o, 4, 2, 2, tip);
-        img.set(10 + o, 3, tip);
-        img.set(1 + o, 13, c('cream'));
-      }
-    },
-  })),
-  {
-    file: 'arrow',
-    width: 16,
-    height: 16,
-    outline: 'ink',
-    paint: (img) => {
-      for (let i = 0; i < 10; i++) img.set(3 + i, 12 - i, c('wood_light'));
-      // Ponta de pedra e penas.
-      img.fill(12, 2, 2, 2, c('stone'));
-      img.set(13, 2, c('stone_light'));
+      for (let i = 0; i < 9; i++) img.set(3 + i, 12 - i, c('wood'));
+      // Penas.
       img.set(2, 12, c('cream'));
       img.set(3, 13, c('cream'));
       img.set(2, 13, c('red'));
+      // Ponta (triângulo 4×4, luz em cima).
+      img.fill(11, 2, 3, 3, c(tipDark));
+      img.set(14, 1, c(tipLight));
+      img.set(13, 1, c(tipLight));
+      img.set(13, 2, c(tipLight));
+      img.set(12, 2, c(tipLight));
+      img.set(14, 2, c(tipDark));
+      img.set(11, 4, c(tipDark));
+      img.set(10, 3, c(tipDark));
     },
-  },
+  })),
 ];
 
 const outDir = new URL('public/assets/sprites/', ROOT);

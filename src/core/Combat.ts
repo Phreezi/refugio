@@ -22,7 +22,7 @@ import {
 import { addItem, createContainer, removeItem, type Container } from '../systems/inventory/inventory';
 import type { Rect } from '../systems/movement/geometry';
 import { moveWithCollision, normalize } from '../systems/movement/movement';
-import { secondsToTicks, TICKS_PER_SECOND } from './Clock';
+import { beginnerProtected, secondsToTicks, TICKS_PER_SECOND } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
 import { zoneState, type GameState, type GroundBag } from './GameState';
 import type { ZoneContext } from './Interaction';
@@ -83,8 +83,8 @@ export interface Corpse {
   y: number;
   /** Tick em que desaparece. */
   until: number;
-  /** Flechas por apanhar (item → quantidade). */
-  arrows: Record<string, number>;
+  /** O que se apanha ao passar por cima: os drops e as flechas que não partiram (item → qtd). */
+  items: Record<string, number>;
 }
 
 function createPool(nextUid = 1, nextShot = 1): EnemyPool {
@@ -365,11 +365,16 @@ export class Combat {
     const ammoDef = this.content().items[ammo];
     const player = this.state.data.player;
     const equipment = player.equipment;
-    for (const item of wearSlots(equipment, [0])) this.bus.emit('item:broken', { item });
+    if (!this.beginner) for (const item of wearSlots(equipment, [0])) this.bus.emit('item:broken', { item });
     const from = { x: player.x, y: player.y - SHOT_HEIGHT };
     const body = this.bodyArea(target);
     let dir = normalize({ x: body.x + body.w / 2 - from.x, y: body.y + body.h / 2 - from.y });
-    const miss = this.trainAndRollMiss(true);
+    // Mais perto, falha-se menos: a `missNearFactor` da falha encostado, a toda ao alcance máximo.
+    const closeness = Math.min(1, Math.hypot(target.x - player.x, target.y - player.y) / ranged.range);
+    const miss = this.trainAndRollMiss(
+      true,
+      BALANCE.missNearFactor + (1 - BALANCE.missNearFactor) * closeness,
+    );
     if (miss) {
       // Falha: o tiro sai desviado (para um lado ou para o outro) e passa pelo alvo.
       const deg = BALANCE.missSpreadDeg * (1 + this.roll()) * (this.roll() < 0.5 ? -1 : 1);
@@ -493,11 +498,11 @@ export class Combat {
    * Perícia da arma equipada: ganha 1 de experiência (avisa se subir de nível) e sorteia se
    * este golpe/tiro falha (§7.8).
    */
-  private trainAndRollMiss(ranged: boolean): boolean {
+  private trainAndRollMiss(ranged: boolean, factor = 1): boolean {
     const player = this.state.data.player;
     const skill = skillOf(this.equippedWeaponDef());
     const level = skillLevel(player.skills[skill] ?? 0, BALANCE);
-    const miss = this.roll() * 100 < missPct(level, ranged, BALANCE);
+    const miss = this.roll() * 100 < missPct(level, ranged, BALANCE) * factor;
     const up = trainSkill(player.skills, skill, BALANCE);
     if (up !== null) this.bus.emit('skill:levelUp', { skill, level: up });
     return miss;
@@ -550,6 +555,16 @@ export class Combat {
     return true;
   }
 
+  /** Proteção de principiante (até às 00:00 do dia 4): a arma não gasta usos. */
+  get beginner(): boolean {
+    return beginnerProtected(
+      this.state.data.world.tick,
+      BALANCE.dayLengthSec,
+      BALANCE.dayStartHour,
+      BALANCE.beginnerUntilDay,
+    );
+  }
+
   /** Parte (sorteio com `pct`% de probabilidade)? */
   breaks(pct: number): boolean {
     return this.roll() * 100 < pct;
@@ -565,23 +580,35 @@ export class Combat {
    * ficaram (para a aljava, se servirem na arma, ou para a mochila; o que não couber fica).
    */
   tickCorpses(): void {
-    if (!this.zone) return;
+    const zone = this.zone;
+    if (!zone) return;
     const tick = this.state.data.world.tick;
-    const gone = this.pool.corpses.filter((c) => c.until <= tick);
-    if (gone.length > 0) {
-      this.pool.corpses = this.pool.corpses.filter((c) => c.until > tick);
-      for (const corpse of gone) this.bus.emit('corpse:gone', { uid: corpse.uid });
-    }
     const player = this.state.data.player;
+    let full = false;
     for (const corpse of this.pool.corpses) {
       if (Math.hypot(corpse.x - player.x, corpse.y - player.y) > BALANCE.groundPickupPx + 4) continue;
       const kept: Record<string, number> = {};
-      for (const [item, qty] of Object.entries(corpse.arrows)) {
+      for (const [item, qty] of Object.entries(corpse.items)) {
         const left = this.giveAmmo(item, qty);
         if (left < qty) this.bus.emit('item:gained', { item, qty: qty - left, x: corpse.x, y: corpse.y });
-        if (left > 0) kept[item] = left;
+        if (left > 0) {
+          kept[item] = left;
+          full = true;
+        }
       }
-      corpse.arrows = kept;
+      // Apanhado tudo, o corpo desaparece (numa nuvem de fumo).
+      corpse.items = kept;
+      if (Object.keys(kept).length === 0) corpse.until = tick;
+    }
+    if (full) this.bus.emit('action:blocked', { reason: 'inventory_full' });
+    const gone = this.pool.corpses.filter((c) => c.until <= tick);
+    if (gone.length === 0) return;
+    this.pool.corpses = this.pool.corpses.filter((c) => c.until > tick);
+    for (const corpse of gone) {
+      // O que ficou por apanhar passa para uma pilha no chão (nada se perde).
+      const left = Object.entries(corpse.items).map(([item, qty]): [string, number] => [item, qty]);
+      if (left.length > 0) this.dropBag(zone.zoneId, corpse.x, corpse.y, left, false);
+      this.bus.emit('corpse:gone', { uid: corpse.uid, x: corpse.x, y: corpse.y });
     }
   }
 
@@ -610,13 +637,15 @@ export class Combat {
   private takeAmmo(base: string): string | null {
     const items = this.content().items;
     const quiver = this.state.data.player.quiver;
-    const best = quiver
-      .filter(([item]) => ammoFits(item, items[item], base))
-      .sort((a, b) => (items[b[0]]?.ammoDamage ?? 0) - (items[a[0]]?.ammoDamage ?? 0))[0];
-    if (best) {
-      best[1] -= 1;
-      if (best[1] <= 0) quiver.splice(quiver.indexOf(best), 1);
-      return best[0];
+    // A primeira da aljava é a que está em uso; quando acaba, passa a ser a mais forte.
+    const active = quiver.find(([item]) => ammoFits(item, items[item], base));
+    if (active) {
+      active[1] -= 1;
+      if (active[1] <= 0) {
+        quiver.splice(quiver.indexOf(active), 1);
+        this.sortQuiver();
+      }
+      return active[0];
     }
     const containers = this.actions.pickupContainers();
     for (const container of containers) {
@@ -652,6 +681,7 @@ export class Combat {
       changed = true;
     }
     if (base !== undefined) {
+      const wasEmpty = player.quiver.length === 0;
       for (const container of this.actions.pickupContainers()) {
         container.forEach((slot, i) => {
           if (!slot || !ammoFits(slot[0], items[slot[0]], base)) return;
@@ -660,13 +690,24 @@ export class Combat {
           changed = true;
         });
       }
+      // Ao equipar a arma entra primeiro a melhor munição.
+      if (changed && wasEmpty) this.sortQuiver();
     }
     if (!changed) return;
     this.state.markDirty();
     this.bus.emit('inventory:changed', {});
   }
 
-  /** Munição da arma equipada (aljava + mochila), para o HUD. */
+  /** Munição em uso na arma equipada (a primeira da aljava) e quantas há, para o HUD. */
+  activeAmmo(): { item: string; qty: number } | null {
+    const base = this.weapon().ranged?.ammo;
+    if (!base) return null;
+    const items = this.content().items;
+    const active = this.state.data.player.quiver.find(([item]) => ammoFits(item, items[item], base));
+    return active ? { item: active[0], qty: active[1] } : null;
+  }
+
+  /** Munição de todos os tipos da arma equipada (aljava + mochila). */
   ammoCount(): number {
     const base = this.weapon().ranged?.ammo;
     if (!base) return 0;
@@ -677,6 +718,38 @@ export class Combat {
     for (const container of this.actions.pickupContainers())
       for (const slot of container) if (slot && ammoFits(slot[0], items[slot[0]], base)) total += slot[1];
     return total;
+  }
+
+  /** Escolhe a munição em uso (passa para o início da aljava). @returns false se não estiver lá. */
+  selectAmmo(item: string): boolean {
+    const quiver = this.state.data.player.quiver;
+    const index = quiver.findIndex(([id]) => id === item);
+    if (index < 0) return false;
+    if (index > 0) {
+      const [entry] = quiver.splice(index, 1);
+      if (entry) quiver.unshift(entry);
+      this.state.markDirty();
+      this.bus.emit('inventory:changed', {});
+    }
+    return true;
+  }
+
+  /** Passa à munição seguinte da aljava (o botão da arma no HUD). */
+  cycleAmmo(): void {
+    const quiver = this.state.data.player.quiver;
+    if (quiver.length < 2) return;
+    const first = quiver.shift();
+    if (first) quiver.push(first);
+    this.state.markDirty();
+    this.bus.emit('inventory:changed', {});
+  }
+
+  /** Aljava da mais forte para a mais fraca. */
+  private sortQuiver(): void {
+    const items = this.content().items;
+    this.state.data.player.quiver.sort(
+      (a, b) => (items[b[0]]?.ammoDamage ?? 0) - (items[a[0]]?.ammoDamage ?? 0),
+    );
   }
 
   /** Apanha a munição do chão por onde o jogador passa (o que não couber fica lá). */
@@ -892,7 +965,9 @@ export class Combat {
     const weaponBefore = equipment[0];
     const broken =
       weaponBefore && this.content().items[weaponBefore[0]]?.damage !== undefined
-        ? wearSlots(equipment, [0])
+        ? this.beginner
+          ? []
+          : wearSlots(equipment, [0])
         : [];
     for (const item of broken) this.bus.emit('item:broken', { item });
     const died = hitEnemy(
@@ -1051,14 +1126,20 @@ export class Combat {
     const zone = this.zone;
     const def = this.content().enemies[enemy.id];
     this.enemies = this.enemies.filter((e) => e !== enemy);
-    // O corpo fica no chão um bocado (com as flechas espetadas para apanhar ao passar).
+    // O corpo fica no chão, na posição em que estava, com os drops e as flechas espetadas:
+    // apanha-se tudo ao passar por cima (quem passar primeiro, no co-op).
+    const items: Record<string, number> = { ...enemy.arrows };
+    if (def) {
+      for (const drop of rollEnemyDrops(def, this.state.data.world))
+        items[drop.item] = (items[drop.item] ?? 0) + drop.qty;
+    }
     this.pool.corpses.push({
       uid: enemy.uid,
       enemy: enemy.id,
       x: enemy.x,
       y: enemy.y,
       until: this.state.data.world.tick + secondsToTicks(BALANCE.corpseSec),
-      arrows: { ...enemy.arrows },
+      items,
     });
     by.bus.emit('enemy:killed', { uid: enemy.uid, enemy: enemy.id, x: enemy.x, y: enemy.y });
     if (!def || !zone) return;
@@ -1068,20 +1149,6 @@ export class Combat {
         this.state.data.world.tick + secondsToTicks(days * BALANCE.dayLengthSec);
       by.bus.emit('boss:defeated', { enemy: enemy.id });
     }
-    const containers = by.actions.pickupContainers();
-    const leftovers = createContainer(0);
-    for (const drop of rollEnemyDrops(def, this.state.data.world)) {
-      const left = addItem(containers, drop.item, drop.qty, this.content().items);
-      if (drop.qty - left > 0)
-        by.bus.emit('item:gained', { item: drop.item, qty: drop.qty - left, x: enemy.x, y: enemy.y });
-      if (left > 0) leftovers.push([drop.item, left]);
-    }
-    // O que não coube fica numa mochila no chão, no sítio do inimigo.
-    if (leftovers.length > 0) {
-      by.dropBag(zone.zoneId, enemy.x, enemy.y, leftovers, false);
-      by.bus.emit('action:blocked', { reason: 'inventory_full' });
-    }
     by.state.markDirty();
-    by.bus.emit('inventory:changed', {});
   }
 }
