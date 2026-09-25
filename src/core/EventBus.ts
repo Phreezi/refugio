@@ -41,6 +41,8 @@ export interface GameEvents {
   'bag:changed': { zoneId: string };
   /** O jogador pisou uma saída: vai para a zona `to` (null = abre o mapa-mundo). */
   'zone:change': { from: string; to: string | null; exit: { x: number; y: number } };
+  /** Mundo contínuo (Etapa E): passou a borda para a zona vizinha; (x, y) já nas coordenadas dela. */
+  'zone:cross': { from: string; to: string; x: number; y: number };
   /** O jogador fez a ação contextual (para a animação de ataque/recolha). */
   'player:action': { kind: 'gather' | 'use' | 'open' | 'swing' | 'attack' };
   /** Um recurso levou um golpe (hp restante; 0 = apanhado). */
@@ -74,6 +76,7 @@ export interface GameEvents {
       | 'needs_item'
       | 'no_ammo'
       | 'needs_level'
+      | 'zone_level'
       | 'food_only';
     tool?: string;
     /** needs_item: o item que falta; no_ammo: a munição da arma. */

@@ -585,6 +585,7 @@ export class UIScene extends Phaser.Scene {
           this.showNotice(t('farm.growing', { hours: Math.max(1, hours ?? 1) }));
         else if (reason === 'nothing_yet') this.showNotice(t('farm.nothing_yet'));
         else if (reason === 'needs_level') this.showNotice(t('msg.needs_level', { level: level ?? 1 }));
+        else if (reason === 'zone_level') this.showNotice(t('msg.zone_level', { level: level ?? 1 }));
         else if (reason === 'food_only') this.showNotice(t('msg.food_only'));
         else if (reason === 'no_ammo') this.showNotice(t('msg.no_ammo', { item: itemName(item ?? '') }));
         else if (reason === 'needs_item')

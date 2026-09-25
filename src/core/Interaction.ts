@@ -40,6 +40,11 @@ export interface ZoneContext {
   respawnDays?: number;
   /** Multiplicador de inimigos à noite (zones.json; omisso = 1). */
   nightEnemyMultiplier?: number;
+  /**
+   * Mundo contínuo (Etapa E): a zona vizinha que tem o ponto (px, em coordenadas desta zona,
+   * fora dela) e o mesmo ponto nas coordenadas dela. Omisso = a zona não está no mundo contínuo.
+   */
+  neighborAt?: (x: number, y: number) => { zoneId: string; x: number; y: number } | null;
 }
 
 /**

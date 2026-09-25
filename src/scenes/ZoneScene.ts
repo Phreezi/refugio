@@ -106,7 +106,12 @@ const ENEMY_BAR = 12;
 export interface ZoneSceneData {
   /** Zona a mostrar (omisso = a zona onde o jogador está no GameState). */
   zoneId?: string;
+  /** Mundo contínuo: entrou-se a andar pela borda (sem fade; a vista já era a mesma). */
+  seamless?: boolean;
 }
+
+/** Mundo contínuo (Etapa E): desenham-se as zonas a menos disto (tiles) da zona atual. */
+const NEIGHBOR_MARGIN_TILES = 40;
 
 interface EnemyView {
   sprite: Phaser.GameObjects.Image;
@@ -175,6 +180,8 @@ export class ZoneScene extends Phaser.Scene {
     this.hurtUntil = 0;
     const zone = content.zoneMap(this.zoneId);
     this.createMap();
+    // Mundo contínuo: as zonas à volta também se veem (só as que estão perto).
+    const bounds = this.createNeighbors();
 
     // Recursos, obstáculos e baús: pés no ponto do mapa (arredondado: posições inteiras), Y-sort.
     const place = (p: { x: number; y: number }, sprite: string): Phaser.GameObjects.Image => {
@@ -216,7 +223,7 @@ export class ZoneScene extends Phaser.Scene {
     camera.setBackgroundColor(PALETTE.ink);
     camera.startFollow(this.player, true);
     const applyZoom = (): void => {
-      this.applyCameraZoom(zone.width * zone.tileSize, zone.height * zone.tileSize);
+      this.applyCameraZoom(bounds);
       this.createNightLayer();
     };
     applyZoom();
@@ -246,7 +253,7 @@ export class ZoneScene extends Phaser.Scene {
     this.renderGround();
     this.renderContainers();
     const offFeedback = this.listenForFeedback();
-    camera.fadeIn(FADE_MS);
+    if (!data.seamless) camera.fadeIn(FADE_MS);
     autosave.start();
     this.scene.launch(SceneKey.UI, {});
 
@@ -640,6 +647,14 @@ export class ZoneScene extends Phaser.Scene {
       on('bag:changed', ({ zoneId }) => {
         if (zoneId === this.zoneId) this.renderBags();
       }),
+      // Mundo contínuo: passou a borda — a mesma vista, agora a partir da zona vizinha.
+      on('zone:cross', ({ to, x, y }) => {
+        if (this.leaving) return;
+        this.leaving = true;
+        simulation.crossTo(to, content.zoneMap(to), x, y);
+        uiState.pendingNotice = tKey(content.zones[to]?.name ?? to);
+        this.scene.restart({ zoneId: to, seamless: true } satisfies ZoneSceneData);
+      }),
       on('zone:change', ({ from, to, exit }) => {
         if (to === null) {
           // Saída para o mapa-mundo: o jogador fica na saída até escolher para onde vai.
@@ -963,16 +978,86 @@ export class ZoneScene extends Phaser.Scene {
    * tem tamanho par, por isso cada píxel de jogo cai em píxeis inteiros do dispositivo.
    * Se se vê mais do que o mapa, os limites alargam-se para o mapa ficar centrado.
    */
-  private applyCameraZoom(mapWidth: number, mapHeight: number): void {
+  private applyCameraZoom(area: { x: number; y: number; w: number; h: number }): void {
     const view = getView();
     const zoom = worldZoomFor(view.zoom, view.height > view.width);
     const visibleWidth = (view.width * view.zoom) / zoom;
     const visibleHeight = (view.height * view.zoom) / zoom;
-    const bx = Math.min(0, (mapWidth - visibleWidth) / 2);
-    const by = Math.min(0, (mapHeight - visibleHeight) / 2);
+    const bx = area.x + Math.min(0, (area.w - visibleWidth) / 2);
+    const by = area.y + Math.min(0, (area.h - visibleHeight) / 2);
     const camera = this.cameras.main;
     camera.setZoom(zoom);
-    camera.setBounds(bx, by, Math.max(mapWidth, visibleWidth), Math.max(mapHeight, visibleHeight));
+    camera.setBounds(bx, by, Math.max(area.w, visibleWidth), Math.max(area.h, visibleHeight));
+  }
+
+  /**
+   * Mundo contínuo (Etapa E): desenha as zonas vizinhas (chão, obstáculos, recursos e, na base,
+   * as peças construídas) à volta da atual, nas posições do mundo. Só se veem (a lógica é só a
+   * da zona atual); ao passar a borda, a cena recomeça na vizinha com a mesma vista.
+   * @returns a área (px, coordenadas desta zona) com mapas desenhados — os limites da câmara.
+   */
+  private createNeighbors(): { x: number; y: number; w: number; h: number } {
+    const map = content.zoneMap(this.zoneId);
+    const size = map.tileSize;
+    let x0 = 0;
+    let y0 = 0;
+    let x1 = map.width * size;
+    let y1 = map.height * size;
+    const here = content.world.rect(this.zoneId);
+    if (here) {
+      const tick = gameState.data.world.tick;
+      for (const rect of content.world.near(this.zoneId, NEIGHBOR_MARGIN_TILES)) {
+        const ox = (rect.x - here.x) * size;
+        const oy = (rect.y - here.y) * size;
+        const tilemap = this.make.tilemap({ key: zoneMapKey(rect.zoneId) });
+        const tileset = tilemap.addTilesetImage(BASE_TILESET_NAME, TILESET_TEXTURE);
+        if (!tileset) continue;
+        for (const name of TILE_LAYERS)
+          tilemap.createLayer(name, tileset, ox, oy).setDepth(LAYER_DEPTH[name]);
+        this.drawShore(tilemap, tileset.firstgid, ox, oy);
+        const other = content.zoneMap(rect.zoneId);
+        const depleted = gameState.data.zones[rect.zoneId]?.depleted ?? {};
+        const place = (p: { x: number; y: number }, sprite: string): void => {
+          const x = Math.round(p.x + ox);
+          const y = Math.round(p.y + oy);
+          this.add.image(x, y, sprite).setOrigin(0.5, 1).setDepth(y);
+        };
+        for (const p of other.resources) {
+          const def = content.resources[p.id];
+          const back = depleted[String(p.objectId)];
+          if (def && (back === undefined || back <= tick)) place(p, def.sprite);
+        }
+        for (const p of other.props) {
+          const def = content.props[p.id];
+          if (def) place(p, def.sprite);
+        }
+        const chestSprite = content.props.chest?.sprite;
+        if (chestSprite) for (const p of other.chests) place(p, chestSprite);
+        for (const p of other.containers) {
+          const def = content.lootTables[p.id];
+          if (def) place(p, def.sprite);
+        }
+        // A casa construída na base vê-se dos caminhos.
+        if (rect.zoneId === BASE_ZONE_ID) {
+          for (const [, id, tx, ty, rot, state] of gameState.data.base.structures) {
+            const def = content.structures[id];
+            if (!def) continue;
+            const feet = structureFeet(def, tx, ty, size);
+            const flat = !def.solid && !def.footprint;
+            const y = feet.y + oy;
+            this.add
+              .image(feet.x + ox, y, structureSprite(def, rot, state === 1))
+              .setOrigin(0.5, 1)
+              .setDepth(def.layer === 'floor' ? FOUNDATION_DEPTH : flat ? FLAT_DEPTH : y);
+          }
+        }
+        x0 = Math.min(x0, ox);
+        y0 = Math.min(y0, oy);
+        x1 = Math.max(x1, ox + other.width * size);
+        y1 = Math.max(y1, oy + other.height * size);
+      }
+    }
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
 
   /**
@@ -1020,7 +1105,7 @@ export class ZoneScene extends Phaser.Scene {
    * Margens da água: espuma clara onde a água toca terra a norte e nos lados, e uma sombra
    * escura por baixo da margem (a terra fica "acima" da água). Um único Graphics estático.
    */
-  private drawShore(map: Phaser.Tilemaps.Tilemap, firstgid: number): void {
+  private drawShore(map: Phaser.Tilemaps.Tilemap, firstgid: number, ox = 0, oy = 0): void {
     const water = firstgid + baseTileIndex('water');
     const isWater = (x: number, y: number): boolean => {
       if (x < 0 || y < 0 || x >= map.width || y >= map.height) return true;
@@ -1033,8 +1118,8 @@ export class ZoneScene extends Phaser.Scene {
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         if (!isWater(x, y)) continue;
-        const px = x * size;
-        const py = y * size;
+        const px = ox + x * size;
+        const py = oy + y * size;
         if (!isWater(x, y - 1)) {
           g.fillStyle(bank, 1).fillRect(px, py, size, 2); // sombra da margem
           g.fillStyle(foam, 1).fillRect(px, py + 2, size, 1);

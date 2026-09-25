@@ -504,5 +504,16 @@
   "map.teleport_off": "Sem poste ativado nesta zona",
   "map.teleport_go": "Ir",
   "map.teleport_hint": "Escolhe um poste ativado (a base está sempre).",
-  "fridge.ordered": "Encomendado: {item} (chega à porta de casa)"
+  "fridge.ordered": "Encomendado: {item} (chega à porta de casa)",
+  "zone.route_1": "Caminho 1",
+  "zone.route_2": "Caminho 2",
+  "zone.route_3": "Caminho 3",
+  "zone.route_4": "Caminho 4",
+  "zone.route_5": "Caminho 5",
+  "zone.route_6": "Caminho 6",
+  "zone.route_7": "Caminho 7",
+  "zone.route_8": "Caminho 8",
+  "zone.route_9": "Caminho 9",
+  "zone.route_10": "Caminho 10",
+  "msg.zone_level": "Mais à frente é perigoso: precisas de nível {level} para passar."
 }

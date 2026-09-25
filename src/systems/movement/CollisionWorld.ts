@@ -15,6 +15,11 @@ export class CollisionWorld {
   /** Obstáculos com chave (ex.: id do objeto de um recurso), que se podem desligar. */
   private readonly keyed = new Map<number, Rect>();
   private readonly disabled = new Set<number>();
+  /**
+   * Mundo contínuo (Etapa E): o que há fora do mapa — o tile da zona vizinha (sólido ou não).
+   * null = fora do mapa é tudo sólido.
+   */
+  outside: ((tx: number, ty: number) => boolean) | null = null;
 
   constructor(
     widthTiles: number,
@@ -87,9 +92,10 @@ export class CollisionWorld {
     return this.heightTiles * this.tileSize;
   }
 
-  /** Tile sólido? Fora do mapa conta como sólido. */
+  /** Tile sólido? Fora do mapa conta como sólido (ou o da zona vizinha, no mundo contínuo). */
   isSolidTile(tx: number, ty: number): boolean {
-    if (tx < 0 || ty < 0 || tx >= this.widthTiles || ty >= this.heightTiles) return true;
+    if (tx < 0 || ty < 0 || tx >= this.widthTiles || ty >= this.heightTiles)
+      return this.outside ? this.outside(tx, ty) : true;
     return this.solid[ty * this.widthTiles + tx] === true;
   }
 

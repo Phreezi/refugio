@@ -4,7 +4,157 @@
     "name": "zone.base",
     "map": "maps/base.json",
     "danger": 0,
-    "worldMapPos": [50, 50]
+    "worldMapPos": [50, 50],
+    "world": [0, 0]
+  },
+  "zone_route_1": {
+    "name": "zone.route_1",
+    "map": "maps/route_1.json",
+    "danger": 1,
+    "worldMapPos": [30, 30],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 1,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -16]
+  },
+  "zone_route_2": {
+    "name": "zone.route_2",
+    "map": "maps/route_2.json",
+    "danger": 1,
+    "worldMapPos": [75, 35],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 1,
+    "unlockLevel": 2,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -64]
+  },
+  "zone_route_3": {
+    "name": "zone.route_3",
+    "map": "maps/route_3.json",
+    "danger": 1,
+    "worldMapPos": [35, 75],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 1,
+    "unlockLevel": 3,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -128]
+  },
+  "zone_route_4": {
+    "name": "zone.route_4",
+    "map": "maps/route_4.json",
+    "danger": 2,
+    "worldMapPos": [85, 70],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 2,
+    "unlockLevel": 6,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -168]
+  },
+  "zone_route_5": {
+    "name": "zone.route_5",
+    "map": "maps/route_5.json",
+    "danger": 2,
+    "worldMapPos": [62, 82],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 2,
+    "unlockLevel": 8,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -248]
+  },
+  "zone_route_6": {
+    "name": "zone.route_6",
+    "map": "maps/route_6.json",
+    "danger": 2,
+    "worldMapPos": [12, 48],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 2,
+    "unlockLevel": 10,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -344]
+  },
+  "zone_route_7": {
+    "name": "zone.route_7",
+    "map": "maps/route_7.json",
+    "danger": 3,
+    "worldMapPos": [88, 16],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 3,
+    "unlockLevel": 14,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -408]
+  },
+  "zone_route_8": {
+    "name": "zone.route_8",
+    "map": "maps/route_8.json",
+    "danger": 3,
+    "worldMapPos": [18, 78],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 3,
+    "unlockLevel": 16,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -472]
+  },
+  "zone_route_9": {
+    "name": "zone.route_9",
+    "map": "maps/route_9.json",
+    "danger": 4,
+    "worldMapPos": [95, 45],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 4,
+    "unlockLevel": 20,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -568]
+  },
+  "zone_route_10": {
+    "name": "zone.route_10",
+    "map": "maps/route_10.json",
+    "danger": 4,
+    "worldMapPos": [8, 14],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 4,
+    "unlockLevel": 25,
+    "nightEnemyMultiplier": 1.5,
+    "hidden": true,
+    "world": [48, -664]
   },
   "zone_pine_forest": {
     "name": "zone.pine_forest",
@@ -16,7 +166,8 @@
       "thirst": 0
     },
     "respawnDays": 1,
-    "nightEnemyMultiplier": 1.5
+    "nightEnemyMultiplier": 1.5,
+    "world": [68, -16]
   },
   "zone_farm": {
     "name": "zone.farm",
@@ -29,7 +180,8 @@
     },
     "respawnDays": 1,
     "unlockLevel": 2,
-    "nightEnemyMultiplier": 1.5
+    "nightEnemyMultiplier": 1.5,
+    "world": [68, -64]
   },
   "zone_lake": {
     "name": "zone.lake",
@@ -42,7 +194,8 @@
     },
     "respawnDays": 1,
     "unlockLevel": 3,
-    "nightEnemyMultiplier": 1.5
+    "nightEnemyMultiplier": 1.5,
+    "world": [68, -128]
   },
   "zone_road": {
     "name": "zone.road",
@@ -55,7 +208,8 @@
     },
     "respawnDays": 2,
     "unlockLevel": 6,
-    "nightEnemyMultiplier": 1.5
+    "nightEnemyMultiplier": 1.5,
+    "world": [68, -168]
   },
   "zone_village": {
     "name": "zone.village",
@@ -68,7 +222,8 @@
     },
     "respawnDays": 2,
     "unlockLevel": 8,
-    "nightEnemyMultiplier": 1.5
+    "nightEnemyMultiplier": 1.5,
+    "world": [68, -248]
   },
   "zone_deep_forest": {
     "name": "zone.deep_forest",
@@ -81,7 +236,8 @@
     },
     "respawnDays": 2,
     "unlockLevel": 10,
-    "nightEnemyMultiplier": 1.5
+    "nightEnemyMultiplier": 1.5,
+    "world": [68, -344]
   },
   "zone_industrial": {
     "name": "zone.industrial",
@@ -94,7 +250,8 @@
     },
     "respawnDays": 3,
     "unlockLevel": 14,
-    "nightEnemyMultiplier": 1.5
+    "nightEnemyMultiplier": 1.5,
+    "world": [68, -408]
   },
   "zone_hospital": {
     "name": "zone.hospital",
@@ -107,7 +264,8 @@
     },
     "respawnDays": 3,
     "unlockLevel": 16,
-    "nightEnemyMultiplier": 1.5
+    "nightEnemyMultiplier": 1.5,
+    "world": [68, -472]
   },
   "zone_bunker": {
     "name": "zone.bunker",
@@ -199,7 +357,8 @@
     "unlockLevel": 20,
     "nightEnemyMultiplier": 1.5,
     "requiresItem": "military_keycard",
-    "hint": "map.military_hint"
+    "hint": "map.military_hint",
+    "world": [68, -568]
   },
   "zone_city": {
     "name": "zone.city",
@@ -212,7 +371,8 @@
     },
     "respawnDays": 4,
     "unlockLevel": 25,
-    "nightEnemyMultiplier": 1.5
+    "nightEnemyMultiplier": 1.5,
+    "world": [68, -664]
   },
   "zone_plane_crash": {
     "name": "zone.plane_crash",
