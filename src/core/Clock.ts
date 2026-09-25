@@ -21,6 +21,19 @@ export function secondsToTicks(seconds: number): number {
  * Hora do dia a partir dos ticks decorridos (CLAUDE.md §5.2: 1 dia de jogo = `dayLengthSec` reais).
  * Um jogo novo começa às `startHour` do dia 1; o dia muda à meia-noite.
  */
+/**
+ * Proteção de principiante: até às 00:00 do dia `beginnerUntilDay` as armas não gastam usos
+ * (as primeiras ~72 h de jogo de uma conta nova).
+ */
+export function beginnerProtected(
+  tick: number,
+  dayLengthSec: number,
+  startHour: number,
+  untilDay: number,
+): boolean {
+  return clockAt(tick, dayLengthSec, startHour).day < untilDay;
+}
+
 export function clockAt(tick: number, dayLengthSec: number, startHour: number): ClockTime {
   const elapsedDays = tick / TICKS_PER_SECOND / dayLengthSec;
   const totalMinutes = Math.floor(startHour * 60 + elapsedDays * MINUTES_PER_DAY);

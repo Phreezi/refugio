@@ -580,8 +580,8 @@ export class ZoneScene extends Phaser.Scene {
         if (!view) return;
         view.bar.destroy();
         view.barBack.destroy();
-        // O corpo fica no chão um bocado (de pernas para o ar, escurecido) até `corpse:gone`.
-        view.sprite.setFlipY(true).setTint(0x8a7f7a);
+        // O corpo fica no chão, na posição em que estava (escurecido), até `corpse:gone`.
+        view.sprite.setTint(0x8a7f7a);
         view.sprite.setDepth(view.sprite.y - 12);
         this.corpseSprites.set(uid, view.sprite);
       }),
@@ -624,18 +624,11 @@ export class ZoneScene extends Phaser.Scene {
       on('inventory:changed', () => {
         this.renderContainers();
       }),
-      on('corpse:gone', ({ uid }) => {
+      on('corpse:gone', ({ uid, x, y }) => {
         const sprite = this.corpseSprites.get(uid);
         this.corpseSprites.delete(uid);
-        if (!sprite) return;
-        this.tweens.add({
-          targets: sprite,
-          alpha: 0,
-          duration: 400,
-          onComplete: () => {
-            sprite.destroy();
-          },
-        });
+        sprite?.destroy();
+        this.smoke(Math.round(x), Math.round(y));
       }),
       on('ground:changed', ({ zoneId }) => {
         if (zoneId === this.zoneId) this.renderGround();
@@ -884,6 +877,32 @@ export class ZoneScene extends Phaser.Scene {
     this.bagSprites = simulation.combat
       .bags()
       .map((bag) => this.add.image(bag.x, bag.y, 'bag_dropped').setOrigin(0.5, 1).setDepth(bag.y));
+  }
+
+  /** Nuvem de fumo (o corpo de um inimigo a desaparecer): círculos cinzentos que sobem e se apagam. */
+  private smoke(x: number, y: number): void {
+    const puffs: [number, number, number][] = [
+      [-4, -4, 5],
+      [4, -6, 4],
+      [0, -10, 6],
+      [-3, -14, 4],
+      [5, -13, 3],
+    ];
+    for (const [dx, dy, r] of puffs) {
+      const puff = this.add
+        .circle(x + dx, y + dy, r, paletteNumber('stone_light'), 0.8)
+        .setDepth(LAYER_DEPTH.decor_high + 1);
+      this.tweens.add({
+        targets: puff,
+        y: y + dy - 8,
+        scale: 1.6,
+        alpha: 0,
+        duration: 550,
+        onComplete: () => {
+          puff.destroy();
+        },
+      });
+    }
   }
 
   /** Texto que sobe e desaparece (ex.: "+2 Madeira", "-10"). */

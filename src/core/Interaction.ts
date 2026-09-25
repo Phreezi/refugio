@@ -250,10 +250,15 @@ export class Interaction {
   }
 
   /** Alvo atual da ação contextual (também para a UI o destacar). */
-  currentTarget(footprint: { width: number; height: number }): Target<TargetData> | null {
+  currentTarget(
+    footprint: { width: number; height: number },
+    ignoreEnemies = false,
+  ): Target<TargetData> | null {
     if (!this.zone) return null;
     const player = this.state.data.player;
     const from = { x: player.x, y: player.y - footprint.height / 2 };
+    // Com o ataque automático, a ação manual serve para o resto (apanhar, abrir…).
+    if (ignoreEnemies) return pickTarget(from, player.facing, this.targets(), BALANCE.actionReachPx);
     // Arma à distância: o alvo é o inimigo da mira (o preso, ou o mais perto ao alcance, §7.8).
     const aimed = this.combat.aimTarget();
     if (aimed) {
@@ -269,9 +274,12 @@ export class Interaction {
    * Faz a ação contextual.
    * @returns o tipo de ação feita (para a animação), ou null se não houver zona.
    */
-  act(footprint: { width: number; height: number }): TargetData['type'] | 'swing' | null {
+  act(
+    footprint: { width: number; height: number },
+    ignoreEnemies = false,
+  ): TargetData['type'] | 'swing' | null {
     if (!this.zone) return null;
-    const target = this.currentTarget(footprint);
+    const target = this.currentTarget(footprint, ignoreEnemies);
     if (!target) {
       this.bus.emit('player:action', { kind: 'swing' });
       return 'swing';

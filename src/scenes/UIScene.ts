@@ -113,6 +113,9 @@ export class UIScene extends Phaser.Scene {
     null;
   /** "A sangrar" (por baixo da barra de XP), a piscar. */
   private bleedLabel: Label | null = null;
+  /** Proteção de principiante (armas sem desgaste até ao dia 4). */
+  private beginnerLabel: Label | null = null;
+  private seedHintShown = false;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
   private hordeLabel: Label | null = null;
   /** Estado do co-op (código / ligado / convidado). */
@@ -126,10 +129,12 @@ export class UIScene extends Phaser.Scene {
   private autoButton: Button | null = null;
   /** Arma equipada e munição (junto à hotbar): ícone e contagem (até `quiverDisplayMax`). */
   private weaponView: {
-    box: Phaser.GameObjects.Rectangle;
+    box: Button;
     icon: Phaser.GameObjects.Image;
+    ammo: Phaser.GameObjects.Image;
     count: Label;
     item: string | null;
+    ammoItem: string | null;
   } | null = null;
   /** Ponteiro que está a segurar a ação (botão de toque ou clique no mundo). */
   private actionPointer: number | null = null;
@@ -279,6 +284,7 @@ export class UIScene extends Phaser.Scene {
       this.hordeLabel = null;
       this.coopLabel = null;
       this.bleedLabel = null;
+      this.beginnerLabel = null;
       this.bossBar = null;
       this.hint = null;
       this.hurtEdges = null;
@@ -322,6 +328,7 @@ export class UIScene extends Phaser.Scene {
     this.clock?.setText(t('hud.clock', { day: clock.day, time: `${pad(clock.hour)}:${pad(clock.minute)}` }));
     this.hordeLabel?.setText(this.hordeStatus());
     this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
+    this.beginnerLabel?.setVisible(simulation.combat.beginner && !uiState.modalOpen);
     this.renderBossBar();
     this.renderHint();
     this.renderWeapon();
@@ -340,12 +347,16 @@ export class UIScene extends Phaser.Scene {
     if (item !== view.item && def) view.icon.setTexture(def.icon);
     view.item = item;
     const ranged = def?.ranged !== undefined;
+    // A munição em uso (ícone e quantas há dessa); a vermelho se acabou.
+    const active = ranged ? simulation.combat.activeAmmo() : null;
+    const ammoDef = active ? content.items[active.item] : undefined;
     view.count.setVisible(visible && ranged);
+    view.ammo.setVisible(visible && ammoDef !== undefined);
+    if (ammoDef && active && active.item !== view.ammoItem) view.ammo.setTexture(ammoDef.icon);
+    view.ammoItem = active?.item ?? null;
     if (ranged) {
-      const total = simulation.combat.ammoCount();
-      view.count
-        .setText(String(Math.min(total, BALANCE.quiverDisplayMax)))
-        .setColor(total > 0 ? 'cream' : 'red');
+      const qty = active?.qty ?? 0;
+      view.count.setText(String(Math.min(qty, BALANCE.quiverDisplayMax))).setColor(qty > 0 ? 'cream' : 'red');
     }
   }
 
@@ -491,6 +502,12 @@ export class UIScene extends Phaser.Scene {
       eventBus.on('player:bleeding', () => {
         this.showNotice(t('msg.bleeding'));
       }),
+      // Sementes: como se planta (uma vez por sessão).
+      eventBus.on('item:gained', ({ item }) => {
+        if (this.seedHintShown || !content.items[item]?.plant) return;
+        this.seedHintShown = true;
+        this.showNotice(t('msg.seeds_hint'));
+      }),
       eventBus.on('skill:levelUp', ({ skill, level }) => {
         const ranged = skill === 'archery' || skill === 'firearms';
         this.showNotice(
@@ -561,6 +578,11 @@ export class UIScene extends Phaser.Scene {
       size: 7,
       color: 'red',
       bold: true,
+      stroke: true,
+    }).setVisible(false);
+    this.beginnerLabel = new Label(this, HUD_MARGIN, y + 15, t('hud.beginner'), {
+      size: 7,
+      color: 'lime',
       stroke: true,
     }).setVisible(false);
   }
@@ -665,20 +687,28 @@ export class UIScene extends Phaser.Scene {
     // Arma equipada e munição: por cima do último slot da hotbar.
     const boxX = hotbar.x + hotbar.w - WEAPON_BOX;
     const boxY = hotbar.y - WEAPON_BOX - 4;
-    const box = this.add
-      .rectangle(boxX, boxY, WEAPON_BOX, WEAPON_BOX, paletteNumber('night'), 0.85)
-      .setOrigin(0)
-      .setDepth(70);
+    // Tocar na arma passa à munição seguinte da aljava.
+    const box = new Button(
+      this,
+      boxX + WEAPON_BOX / 2,
+      boxY + WEAPON_BOX / 2,
+      '',
+      { width: WEAPON_BOX, height: WEAPON_BOX, style: 'secondary' },
+      () => {
+        simulation.combat.cycleAmmo();
+      },
+    ).setDepth(70);
     const icon = this.add.image(boxX + WEAPON_BOX / 2, boxY + WEAPON_BOX / 2, 'icon_short_bow').setDepth(71);
+    const ammo = this.add.image(boxX - 9, boxY + WEAPON_BOX / 2, 'icon_arrow').setDepth(71);
     const count = new Label(
       this,
-      boxX - 3,
+      boxX - 18,
       boxY + WEAPON_BOX / 2,
       '',
       { size: 8, bold: true, color: 'cream', stroke: true },
       [1, 0.5],
     ).setDepth(71);
-    this.weaponView = { box, icon, count, item: null };
+    this.weaponView = { box, icon, ammo, count, item: null, ammoItem: null };
 
     // Ataque automático (canto inferior direito; com toque, por cima do botão de ação).
     const touch = this.sys.game.device.input.touch;

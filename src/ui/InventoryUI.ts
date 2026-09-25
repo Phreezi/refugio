@@ -3,6 +3,7 @@ import { paletteNumber } from '../assets/palette';
 import { eventBus, type OtherContainerRef } from '../core/EventBus';
 import { gameState } from '../core/GameState';
 import type { ContainerRef, PlayerActions, SlotRef } from '../core/PlayerActions';
+import { simulation } from '../core/Simulation';
 import { BALANCE } from '../data/balance';
 import { equipSlotOf } from '../data/types';
 import { getView } from '../display/view';
@@ -200,6 +201,16 @@ export class InventoryUI {
       this.ghost?.destroy();
       this.ghost = null;
       const target = this.slotAt(x, y);
+      const rect = this.panelRect;
+      const outside =
+        rect !== null && (x < rect.x || y < rect.y || x > rect.x + rect.w || y > rect.y + rect.h);
+      // Arrastar para fora do painel larga o item no chão.
+      if (!target && outside && ['inventory', 'hotbar', 'equipment'].includes(press.view.ref.container)) {
+        this.actions.drop(press.view.ref);
+        this.selected = null;
+        if (this.isOpen) this.buildPanel();
+        return true;
+      }
       if (target && target !== press.view) {
         if (!this.actions.move(press.view.ref, target.ref) && target.ref.container === 'equipment')
           this.scene.events.emit('ui:message', t('msg.equip_wrong'));
@@ -351,6 +362,49 @@ export class InventoryUI {
           scale,
         ).setDepth(DEPTH.slots),
       );
+    }
+    // Aljava (por baixo do equipamento): a munição em uso; tocar passa à seguinte.
+    const ammo = simulation.combat.activeAmmo();
+    const ammoDef = ammo ? content.items[ammo.item] : undefined;
+    if (ammo && ammoDef) {
+      const ax = gx + bag.w - size;
+      const ay = gy + TITLE_H + EQUIP_SHOWN * (size + SLOT_GAP);
+      add(
+        new Button(
+          scene,
+          ax + size / 2,
+          ay + size / 2,
+          '',
+          { width: size, height: size, style: 'secondary' },
+          () => {
+            this.scene.time.delayedCall(0, () => {
+              simulation.combat.cycleAmmo();
+              if (this.isOpen) this.buildPanel();
+            });
+          },
+        ),
+      ).setDepth(DEPTH.slots);
+      add(
+        scene.add
+          .image(ax + size / 2, ay + size / 2 - 2, ammoDef.icon)
+          .setScale(scale)
+          .setDepth(DEPTH.slots + 1),
+      );
+      add(
+        new Label(
+          scene,
+          ax + size - 1,
+          ay + size - 1,
+          String(Math.min(ammo.qty, BALANCE.quiverDisplayMax)),
+          {
+            size: 7,
+            bold: true,
+            color: 'cream',
+            stroke: true,
+          },
+          [1, 1],
+        ),
+      ).setDepth(DEPTH.slots + 1);
     }
     const other = this.other;
     if (chest && other) {

@@ -47,6 +47,7 @@ export const GUEST_COMMANDS = {
   building: ['place', 'undo', 'demolish'],
   fishing: ['cancel'],
   tutorial: ['dismiss'],
+  combat: ['selectAmmo', 'cycleAmmo'],
   sim: ['travel', 'enterZone'],
 } as const;
 export type CommandSystem = keyof typeof GUEST_COMMANDS;
