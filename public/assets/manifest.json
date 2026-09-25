@@ -1546,6 +1546,61 @@
         "letter": "S"
       },
       "file": "sprites/icons/survivor_backpack.png"
+    },
+    "icon_coin": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "gold",
+        "border": "ink",
+        "letter": "M"
+      },
+      "file": "sprites/icons/coin.png"
+    },
+    "icon_health_potion": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "red",
+        "border": "ink",
+        "letter": "P"
+      },
+      "file": "sprites/icons/health_potion.png"
+    },
+    "icon_big_health_potion": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "red",
+        "border": "ink",
+        "letter": "P"
+      },
+      "file": "sprites/icons/big_health_potion.png"
+    },
+    "icon_energy_drink": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "lime",
+        "border": "ink",
+        "letter": "E"
+      },
+      "file": "sprites/icons/energy_drink.png"
+    },
+    "market_stall": {
+      "type": "image",
+      "file": "sprites/market_stall.png",
+      "placeholder": {
+        "width": 32,
+        "height": 30,
+        "color": "red",
+        "border": "bark",
+        "letter": "L"
+      }
     }
   }
 }

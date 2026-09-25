@@ -110,6 +110,8 @@ export interface ItemDef {
   teaches?: string;
   /** Slots extra (mochilas). */
   slots?: number;
+  /** Nível mínimo do jogador para equipar (armas, roupa, mochilas). */
+  level?: number;
   /** Sementes: o que dá ao plantar num canteiro (§11 Fase 9). */
   plant?: PlantDef;
   /** Serve para regar os canteiros (água; devolve `returns`). */
@@ -369,9 +371,10 @@ const ITEM_KEYS = new Set([
   'ammoOf',
   'ammoDamage',
   'breakPct',
+  'level',
 ]);
 const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
-const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach'] as const;
+const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach', 'level'] as const;
 
 /**
  * Valida `items.json`.
@@ -570,7 +573,7 @@ export type StationDefs = Readonly<Record<string, StationDef>>;
 /** Estação especial: craft instantâneo no próprio inventário. */
 export const HANDS = 'hands';
 
-export type RecipeCategory = 'tools' | 'materials' | 'weapons' | 'armor' | 'food' | 'trade';
+export type RecipeCategory = 'tools' | 'materials' | 'weapons' | 'armor' | 'food' | 'trade' | 'buy' | 'sell';
 export const RECIPE_CATEGORIES: readonly RecipeCategory[] = [
   'tools',
   'materials',
@@ -578,7 +581,14 @@ export const RECIPE_CATEGORIES: readonly RecipeCategory[] = [
   'armor',
   'food',
   'trade',
+  'buy',
+  'sell',
 ];
+
+/** Trocas instantâneas (comerciante e loja): sem fila nem tempo. */
+export function isTradeCategory(category: RecipeCategory): boolean {
+  return category === 'trade' || category === 'buy' || category === 'sell';
+}
 
 export interface Recipe {
   id: string;
@@ -672,7 +682,9 @@ export function parseRecipes(
     const timeOk =
       typeof timeSec === 'number' &&
       Number.isInteger(timeSec) &&
-      (station === HANDS || raw.category === 'trade' ? timeSec === 0 : timeSec > 0 && timeSec <= 60);
+      (station === HANDS || ['trade', 'buy', 'sell'].includes(String(raw.category))
+        ? timeSec === 0
+        : timeSec > 0 && timeSec <= 60);
     if (!timeOk) problems.push(`${where}: timeSec tem de ser 0 nas mãos e nas trocas, e 1–60 nas estações`);
     const inputs: { item: string; qty: number }[] = [];
     if (!Array.isArray(raw.inputs) || raw.inputs.length === 0) {

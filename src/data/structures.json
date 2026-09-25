@@ -260,5 +260,23 @@
       ["moto_wheel", 2]
     ],
     "category": "other"
+  },
+  "market_stall": {
+    "sprite": "market_stall",
+    "layer": "top",
+    "size": [2, 1],
+    "station": "market_stall",
+    "footprint": {
+      "width": 22,
+      "height": 6
+    },
+    "needsFoundation": true,
+    "cost": [
+      ["wood_plank", 6],
+      ["cloth", 4],
+      ["nails", 4]
+    ],
+    "unlockLevel": 3,
+    "category": "crafting"
   }
 }

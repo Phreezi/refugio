@@ -42,5 +42,14 @@
     },
     "queue": 1,
     "trade": true
+  },
+  "market_stall": {
+    "sprite": "market_stall",
+    "footprint": {
+      "width": 22,
+      "height": 6
+    },
+    "queue": 1,
+    "trade": true
   }
 }

@@ -1,6 +1,13 @@
 import { talentOf } from '../data/talents';
 import { BALANCE } from '../data/balance';
-import { HANDS, type ItemDefs, type Recipe, type Recipes, type StationDefs } from '../data/types';
+import {
+  HANDS,
+  type ItemDefs,
+  type Recipe,
+  type Recipes,
+  type StationDefs,
+  isTradeCategory,
+} from '../data/types';
 import {
   advanceStation,
   cancelJob,
@@ -72,7 +79,7 @@ export class Crafting {
       result = craftInstant(containers, recipe, items);
       if (result === 'ok')
         this.bus.emit('craft:finished', { stationKey: HANDS, item: recipe.output, recipe: recipe.id });
-    } else if (recipe.category === 'trade') {
+    } else if (isTradeCategory(recipe.category)) {
       // Troca com o comerciante: instantânea, mas só junto dele.
       if (!key || stationType(key) !== recipe.station) return 'missing';
       result = craftInstant(containers, recipe, items);
