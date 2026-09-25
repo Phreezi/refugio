@@ -110,6 +110,20 @@ export interface ItemDef {
   stopsBleeding?: boolean;
   /** Arma à distância (Fase 10): gasta 1 de `ammo` por tiro; mira sozinha ao inimigo mais perto. */
   ranged?: RangedDef;
+  /** Armas: perícia que treinam (omisso: `archery` à distância, `blunt` corpo a corpo). */
+  skill?: WeaponSkill;
+  /** Munição que, se falhar o alvo, fica no chão e se apanha ao passar por cima (flechas…). */
+  recoverable?: boolean;
+}
+
+/** Perícias de combate: cada uma sobe com o uso e faz falhar menos (CLAUDE.md §7.8). */
+export const WEAPON_SKILLS = ['fists', 'blunt', 'blade', 'archery', 'firearms'] as const;
+export type WeaponSkill = (typeof WEAPON_SKILLS)[number];
+
+/** Perícia de uma arma (`undefined` = punhos). */
+export function skillOf(def: ItemDef | undefined): WeaponSkill {
+  if (def?.damage === undefined) return 'fists';
+  return def.skill ?? (def.ranged ? 'archery' : 'blunt');
 }
 
 export interface RangedDef {
@@ -313,6 +327,8 @@ const ITEM_KEYS = new Set([
   'waters',
   'stopsBleeding',
   'ranged',
+  'skill',
+  'recoverable',
 ]);
 const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
 const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach'] as const;
@@ -422,6 +438,15 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
         def.ranged = { ammo: r.ammo, range: r.range, speed: r.speed };
       else problems.push(`"${id}": ranged tem de ser { ammo (item), range ≤ 320, speed ≤ 800 }`);
       if (raw.damage === undefined) problems.push(`"${id}": uma arma à distância precisa de damage`);
+    }
+    if (raw.skill !== undefined) {
+      const skill = WEAPON_SKILLS.find((k) => k === raw.skill && k !== 'fists');
+      if (skill && raw.damage !== undefined) def.skill = skill;
+      else problems.push(`"${id}": skill tem de ser blunt, blade, archery ou firearms (e só em armas)`);
+    }
+    if (raw.recoverable !== undefined) {
+      if (raw.recoverable === true && def.type === 'ammo') def.recoverable = true;
+      else problems.push(`"${id}": recoverable tem de ser true (e só em munições)`);
     }
     if (raw.stopsBleeding !== undefined) {
       if (raw.stopsBleeding === true && def.type === 'consumable') def.stopsBleeding = true;

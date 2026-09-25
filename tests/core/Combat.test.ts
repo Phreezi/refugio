@@ -42,6 +42,7 @@ function setup(zone: ZoneMap, player = { x: 240, y: 240 }) {
   bus.on('enemy:killed', ({ enemy }) => events.push(`killed:${enemy}`));
   bus.on('player:died', ({ zoneId, bag }) => events.push(`died:${zoneId}:${String(bag)}`));
   bus.on('zone:change', ({ to }) => events.push(`zone:${to}`));
+  bus.on('skill:levelUp', ({ skill, level }) => events.push(`skill:${skill}:${String(level)}`));
   const sim = new Simulation(
     state,
     bus,
@@ -211,6 +212,7 @@ describe('Combate', () => {
       depleted: {},
       bags: [{ x: 1, y: 1, items: [['wood', 1]], expiresAt: Date.now() - 1, death: true }],
       loot: {},
+      ground: [],
     };
     const zone = map([]);
     sim.setZone({
@@ -356,6 +358,7 @@ describe('Armas à distância (Fase 10)', () => {
   it('a besta mira sozinha no inimigo mais perto, gasta um virote e o virote acerta', () => {
     const { state, sim, events, run } = setup(map([{ id: 'walker', x: 330, y: 240 }]));
     const player = state.data.player;
+    sim.combat.roll = () => 0.99; // acerta sempre
     player.equipment[0] = ['crossbow', 1, 240];
     player.inventory[0] = ['bolt', 2];
     const walker = sim.combat.list[0];
@@ -397,6 +400,74 @@ describe('Armas à distância (Fase 10)', () => {
     run(0.3);
     expect(sim.combat.shots).toHaveLength(0);
     expect(walker.hp).toBe(40);
+  });
+});
+
+describe('Arco, mira presa, flechas no chão e perícias', () => {
+  it('com a ação premida a mira fica presa no mesmo inimigo; ao largar vai ao mais perto', () => {
+    const { state, sim } = setup(
+      map([
+        { id: 'walker', x: 300, y: 240 },
+        { id: 'walker', x: 320, y: 240 },
+      ]),
+    );
+    sim.combat.roll = () => 0.99;
+    const player = state.data.player;
+    player.equipment[0] = ['short_bow', 1, 100];
+    player.inventory[0] = ['arrow', 20];
+    const [a, b] = sim.combat.list;
+    if (!a || !b) throw new Error('faltam arrastados');
+    a.x = 300;
+    b.x = 320;
+    a.y = b.y = 240;
+    expect(sim.combat.shoot(true)).toBe('shot');
+    expect(sim.combat.aimTarget()?.uid).toBe(a.uid);
+    // O outro fica mais perto, mas a mira continua presa enquanto a ação está premida.
+    a.x = 330;
+    b.x = 290;
+    expect(sim.combat.shoot(true)).toBe('shot');
+    expect(sim.combat.aimTarget()?.uid).toBe(a.uid);
+    sim.setActionHeld(false);
+    expect(sim.combat.aimTarget()?.uid).toBe(b.uid);
+  });
+
+  it('uma flecha que falha fica no chão e apanha-se ao passar por cima', () => {
+    const { state, sim, run } = setup(map([{ id: 'walker', x: 300, y: 240 }]));
+    sim.combat.roll = () => 0; // falha sempre
+    const player = state.data.player;
+    player.equipment[0] = ['short_bow', 1, 100];
+    player.inventory[0] = ['arrow', 3];
+    const walker = sim.combat.list[0];
+    if (!walker) throw new Error('sem arrastado');
+    walker.state = 'idle';
+    walker.timer = 10000;
+    expect(sim.combat.shoot()).toBe('shot');
+    run(1);
+    expect(walker.hp).toBe(40);
+    const ground = state.data.zones[ZONE]?.ground ?? [];
+    expect(ground).toHaveLength(1);
+    expect(ground[0]?.[2]).toBe('arrow');
+    expect(countItem([player.inventory], 'arrow')).toBe(2);
+    const [gx, gy] = ground[0] ?? [0, 0];
+    player.x = gx;
+    player.y = gy;
+    run(0.1);
+    expect(countItem([player.inventory], 'arrow')).toBe(3);
+    expect(state.data.zones[ZONE]?.ground).toEqual([]);
+  });
+
+  it('cada golpe treina a perícia da arma; a subir de nível falha-se menos', () => {
+    const { state, sim, events } = setup(map([{ id: 'walker', x: 112, y: 240 }]));
+    sim.combat.roll = () => 0.99;
+    const player = state.data.player;
+    player.equipment[0] = ['machete', 1, 180];
+    const walker = sim.combat.list[0];
+    if (!walker) throw new Error('sem arrastado');
+    walker.hp = 10000;
+    for (let i = 0; i < 15; i++) sim.combat.attack(walker.uid);
+    expect(player.skills.blade).toBe(15);
+    expect(events).toContain('skill:blade:2');
+    expect(player.skills.fists).toBeUndefined();
   });
 });
 

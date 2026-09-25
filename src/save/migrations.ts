@@ -97,6 +97,16 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     const player = s.player as Record<string, unknown>;
     return { ...s, player: { ...player, look: 'boy' } };
   },
+  // v14 → v15: perícias de combate (começam do zero) e itens soltos no chão das zonas.
+  14: (s) => {
+    const player = s.player as Record<string, unknown>;
+    const zones = (s.zones ?? {}) as Record<string, Record<string, unknown>>;
+    return {
+      ...s,
+      player: { ...player, skills: {} },
+      zones: Object.fromEntries(Object.entries(zones).map(([id, zone]) => [id, { ...zone, ground: [] }])),
+    };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

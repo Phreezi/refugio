@@ -152,7 +152,7 @@ describe('save: migrações', () => {
     const text = `{"version":4,"timestamp":9,"checksum":"${checksum(`4|9|${stateJson}`)}","state":${stateJson}}`;
     const { state } = parseSave(text);
     expect(state.player.equipment).toEqual([null, null, null, null, null, null]);
-    expect(state.zones).toEqual({ zone_base: { depleted: { '7': 90 }, bags: [], loot: {} } });
+    expect(state.zones).toEqual({ zone_base: { depleted: { '7': 90 }, bags: [], loot: {}, ground: [] } });
   });
 
   it('v5 → v6 (Fase 7): contentores com loot por zona', () => {
@@ -160,7 +160,9 @@ describe('save: migrações', () => {
     v5.zones = { zone_pine_forest: { depleted: {}, bags: [] } };
     const stateJson = JSON.stringify(v5);
     const text = `{"version":5,"timestamp":3,"checksum":"${checksum(`5|3|${stateJson}`)}","state":${stateJson}}`;
-    expect(parseSave(text).state.zones).toEqual({ zone_pine_forest: { depleted: {}, bags: [], loot: {} } });
+    expect(parseSave(text).state.zones).toEqual({
+      zone_pine_forest: { depleted: {}, bags: [], loot: {}, ground: [] },
+    });
   });
 
   it('v6 → v7 (Fase 8): nível e XP (quem já jogava começa no nível 3), receitas aprendidas', () => {
@@ -251,6 +253,27 @@ describe('save: migrações', () => {
     expect(parseSave(text).state.player.look).toBe('boy');
     const bad = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
     bad.player.look = 'dragon';
+    expect(() => validateState(bad)).toThrow();
+  });
+
+  it('v14 → v15: perícias a zero e chão vazio nas zonas; validam-se', () => {
+    const v14 = structuredClone(STATE) as unknown as {
+      player: Record<string, unknown>;
+      zones: Record<string, unknown>;
+    };
+    delete v14.player.skills;
+    v14.zones = { zone_lake: { depleted: {}, bags: [], loot: {} } };
+    const stateJson = JSON.stringify(v14);
+    const text = `{"version":14,"timestamp":7,"checksum":"${checksum(`14|7|${stateJson}`)}","state":${stateJson}}`;
+    const { state } = parseSave(text);
+    expect(state.player.skills).toEqual({});
+    expect(state.zones.zone_lake?.ground).toEqual([]);
+    const ok = structuredClone(STATE);
+    ok.player.skills = { archery: 12 };
+    ok.zones.zone_lake = { depleted: {}, bags: [], loot: {}, ground: [[10, 20, 'arrow', 3]] };
+    expect(() => validateState(ok)).not.toThrow();
+    const bad = structuredClone(ok) as unknown as { player: { skills: Record<string, number> } };
+    bad.player.skills.magic = 3;
     expect(() => validateState(bad)).toThrow();
   });
 

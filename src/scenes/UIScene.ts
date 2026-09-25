@@ -6,6 +6,7 @@ import { BASE_ZONE_ID, gameState, type PlayerState } from '../core/GameState';
 import { hoursToTicks } from '../core/Homestead';
 import { simulation } from '../core/Simulation';
 import { BALANCE } from '../data/balance';
+import { missPct } from '../systems/combat/skills';
 import { getView, setupFixedCamera } from '../display/view';
 import { pinchStep, stepWorldZoom } from '../display/worldZoom';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
@@ -456,6 +457,16 @@ export class UIScene extends Phaser.Scene {
       }),
       eventBus.on('player:bleeding', () => {
         this.showNotice(t('msg.bleeding'));
+      }),
+      eventBus.on('skill:levelUp', ({ skill, level }) => {
+        const ranged = skill === 'archery' || skill === 'firearms';
+        this.showNotice(
+          t('skill.level_up', {
+            skill: tKey(`skill.${skill}`),
+            level,
+            miss: Math.round(missPct(level, ranged, BALANCE)),
+          }),
+        );
       }),
       eventBus.on('horde:started', ({ size }) => {
         this.showNotice(t('horde.started', { n: size }));

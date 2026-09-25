@@ -365,7 +365,7 @@ Os botões que abrem painéis (Mochila, Fabricar, Construir, "II") fecham-nos se
 ### 7.3 Inventário
 
 - Grelha de slots. Base 20; mochila pequena +10; mochila grande +20.
-- Stacks: recursos 50, consumíveis 10, munições 100, ferramentas/armas 1.
+- Stacks: recursos 50, consumíveis 10, munições 100 (flechas e seixos 50), ferramentas/armas 1.
 - Slots de equipamento: arma, cabeça, corpo, pernas, pés, mochila.
 - Baús na base: 24 slots cada, sem limite de baús (limitado por recursos).
 - Ações: mover, dividir stack, largar, usar, "guardar tudo semelhante" no baú e **ordenar** (mochila e baú: junta os itens iguais em stacks cheios e agrupa por categoria — ferramentas, armas, armadura, mochilas, consumíveis, recursos, chaves) (qualidade de vida).
@@ -416,6 +416,9 @@ Os nós de recurso reaparecem (ver zonas).
 - Golpe: dano, número a subir, empurrão e 0,3 s de atordoamento — exceto durante o aviso de ataque (o ataque do inimigo já está comprometido). Mantendo a ação premida repete ao ritmo da arma.
 - Ao levar dano: 0,6 s de invulnerabilidade (o boneco pisca), um pequeno empurrão e as bordas do ecrã ficam vermelhas por um instante (sem abanar a câmara).
 - **Distância** (Fase 10): armas com `ranged: { ammo, range, speed }` (besta, pistola). Com a ação, se houver um inimigo a menos de `range` px, a mira vai sozinha ao mais perto (a seta de alvo mostra-o), gasta 1 de munição (`type: "ammo"`) e dispara um projétil que voa a `speed` px/s; pára na primeira parede/obstáculo ou no primeiro inimigo em que toca. Sem inimigos ao alcance, a ação faz o resto (recolher, abrir…); sem munição, avisa. Os projéteis não se gravam.
+- **Mira presa**: com a ação premida, os tiros seguem o mesmo inimigo (enquanto estiver vivo e ao alcance); ao largar, o próximo tiro vai ao mais perto. Armas à distância leves no início: **fisga** (seixos; 1 pedra → 6), **arco curto** (flechas; 1 madeira → 5, 50 por slot), **arco de caça** (bancada, nível 7); depois a besta e a pistola.
+- **Perícias** (`player.skills`, `systems/combat/skills.ts`): punhos, impacto, lâminas, pontaria, armas de fogo (`skill` em `items.json`; omisso: pontaria à distância, impacto corpo a corpo). Cada golpe ou tiro dá 1 de experiência (curva `skillCurve`, até `skillMaxLevel`) e sorteia se falha: `missPctMelee`/`missPctRanged` − `missPctPerLevel` por nível, nunca abaixo de `missPctMin`. Um golpe falhado mostra "Falhou"; um tiro falhado sai desviado (`missSpreadDeg`).
+- **Munição recuperável** (`recoverable`: flechas, virotes, seixos): o tiro que não acerta em ninguém fica no chão onde parou (`zones.<zona>.ground = [[x, y, item, qtd]]`, até `groundItemsMax`) e apanha-se ao passar por cima (`groundPickupPx`).
 - Inimigos **telegrafam** ataques (0,4 s de aviso com piscar) — dá para recuar.
 - **Sangrar** (Fase 10): alguns inimigos (`bleedPct` em `enemies.json`: corredor, lobo, brutamontes) podem pôr o jogador a sangrar — perde 1 de vida a cada `bleedEverySec` durante `bleedSec` (nunca instantâneo); itens com `stopsBleeding` (ligadura, kit médico) estancam. Morrer também. Save: `player.bleed` (ticks).
 - Furtividade simples: andar devagar (segurar Shift/Ctrl / joystick parcial) reduz raio de deteção para metade (`sneakDetectMultiplier`).
@@ -1104,4 +1107,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Save v14: `player.look` (`boy`/`girl`); a aparência escolhe-se no menu inicial (vale para o jogo que começar ou continuar, e para a personagem levada ao co-op) | Pedido do jogador ("personagem menina"). Mesmo layout de spritesheet; no co-op o anfitrião manda a sua aparência no `frame` e o outro boneco só leva o tom azulado se as aparências forem iguais |
 | 2026-09-25 | Erros durante o jogo não o congelam: o passo do Phaser e os handlers do EventBus são protegidos e o erro aparece num aviso em DOM (`src/ui/runtimeErrors.ts`) | O jogo congelou num iPhone ao lutar com um lobo (não se reproduz no Chromium); assim o jogo continua e o jogador pode enviar uma captura com o erro |
 | 2026-09-25 | Separadores do fabrico medidos no browser (`measureTextWidth`) e noutra linha se não couberem; dica do tutorial por baixo das barras em ecrãs estreitos | Ao alto, no iPhone, o separador "Comida" ficava cortado e a dica tapava as barras |
+| 2026-09-25 | Save v15: `player.skills` e `zones.<zona>.ground`; arco, fisga, mira presa, perícias com falhanços, flechas recuperáveis | Pedido do jogador: arco cedo com madeira, várias armas à distância mais fracas, mira presa ao carregar, falhar menos com a prática, flechas falhadas no chão |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

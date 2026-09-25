@@ -18,6 +18,12 @@ export interface GameEvents {
   'enemy:killed': { uid: number; enemy: string; x: number; y: number };
   /** Um inchado foi derrotado e vai rebentar (aviso). */
   'enemy:dying': { uid: number };
+  /** Um golpe ou tiro falhou (perícia baixa, §7.8): "Falhou" por cima do alvo. */
+  'enemy:missed': { x: number; y: number };
+  /** Uma perícia de combate subiu de nível. */
+  'skill:levelUp': { skill: string; level: number };
+  /** Os itens soltos no chão da zona mudaram (flechas caídas ou apanhadas). */
+  'ground:changed': { zoneId: string };
   'enemy:exploded': { x: number; y: number; radius: number };
   /** Um gritador gritou (os inimigos à volta ficam alertados). */
   'enemy:scream': { uid: number; x: number; y: number; radius: number };

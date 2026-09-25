@@ -1,10 +1,11 @@
 import type { GameStateData } from '../core/GameState';
 import { MIGRATIONS, migrate, type Migration } from './migrations';
+import { WEAPON_SKILLS } from '../data/types';
 
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -138,6 +139,12 @@ export function validateState(input: unknown): GameStateData {
     if (!stat(player.xp)) problems.push('player.xp inválido');
     if (!stat(player.bleed)) problems.push('player.bleed inválido');
     if (player.look !== 'boy' && player.look !== 'girl') problems.push('player.look inválido');
+    const skills = player.skills;
+    if (
+      !isObject(skills) ||
+      !Object.entries(skills).every(([k, xp]) => (WEAPON_SKILLS as readonly string[]).includes(k) && stat(xp))
+    )
+      problems.push('player.skills inválido');
   }
   if (!isObject(world)) problems.push('falta world');
   else {
@@ -177,6 +184,18 @@ export function validateState(input: unknown): GameStateData {
         Object.values(z.depleted).every(stat) &&
         Array.isArray(z.bags) &&
         z.bags.every(validBag) &&
+        Array.isArray(z.ground) &&
+        z.ground.every(
+          (g) =>
+            Array.isArray(g) &&
+            g.length === 4 &&
+            finite(g[0]) &&
+            finite(g[1]) &&
+            typeof g[2] === 'string' &&
+            g[2] !== '' &&
+            stat(g[3]) &&
+            g[3] > 0,
+        ) &&
         isObject(z.loot) &&
         Object.values(z.loot).every(
           (entry) => Array.isArray(entry) && entry.length === 2 && stat(entry[0]) && validContainer(entry[1]),

@@ -2310,6 +2310,93 @@ const PHASE10E_ICONS: Sprite[] = [
   },
 ];
 
+/** Armas à distância leves (fisga, arcos) e munição recuperável. */
+const RANGED_ICONS: Sprite[] = [
+  {
+    file: 'slingshot',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      // Cabo e forquilha em Y.
+      img.fill(7, 8, 2, 6, c('wood'));
+      img.fill(7, 8, 1, 6, c('wood_light'));
+      for (let i = 0; i < 5; i++) {
+        img.set(6 - i, 7 - i, c('wood'));
+        img.set(9 + i, 7 - i, c('bark'));
+      }
+      // Elástico com a bolsa.
+      for (let x = 3; x <= 12; x++) img.set(x, 3, c('red'));
+      img.fill(7, 3, 2, 2, c('bark_dark'));
+    },
+  },
+  {
+    file: 'pebble',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (const [x, y] of [
+        [5, 6],
+        [10, 8],
+        [6, 11],
+      ] as const) {
+        img.ellipse(x, y, 2.2, 1.8, c('stone'));
+        img.set(x - 1, y - 1, c('stone_light'));
+        img.set(x + 1, y + 1, c('stone_dark'));
+      }
+    },
+  },
+  {
+    file: 'short_bow',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      // Arco curvo (madeira) e corda reta.
+      for (let y = 2; y <= 13; y++) {
+        const x = 4 + Math.round(4 * Math.sin(((y - 2) / 11) * Math.PI));
+        img.set(x, y, c('wood'));
+        img.set(x - 1, y, c('bark'));
+      }
+      for (let y = 2; y <= 13; y++) img.set(4, y, c('wheat'));
+      img.fill(7, 7, 2, 2, c('bark_dark'));
+    },
+  },
+  {
+    file: 'hunting_bow',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let y = 1; y <= 14; y++) {
+        const x = 3 + Math.round(6 * Math.sin(((y - 1) / 13) * Math.PI));
+        img.set(x, y, c('bark'));
+        img.set(x + 1, y, c('bark_dark'));
+      }
+      for (let y = 1; y <= 14; y++) img.set(3, y, c('wheat'));
+      // Punho de couro.
+      img.fill(9, 6, 2, 4, c('bark_dark'));
+      img.set(9, 6, c('orange'));
+    },
+  },
+  {
+    file: 'arrow',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let i = 0; i < 10; i++) img.set(3 + i, 12 - i, c('wood_light'));
+      // Ponta de pedra e penas.
+      img.fill(12, 2, 2, 2, c('stone'));
+      img.set(13, 2, c('stone_light'));
+      img.set(2, 12, c('cream'));
+      img.set(3, 13, c('cream'));
+      img.set(2, 13, c('red'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -2337,6 +2424,7 @@ for (const [dir, list] of [
   [iconDir, PHASE10C_ICONS],
   [iconDir, PHASE10D_ICONS],
   [iconDir, PHASE10E_ICONS],
+  [iconDir, RANGED_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -2347,7 +2435,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length + PHASE10E.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length + PHASE10D_ICONS.length + PHASE10E_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length + PHASE10E.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length + PHASE10D_ICONS.length + PHASE10E_ICONS.length + RANGED_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

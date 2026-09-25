@@ -6,6 +6,9 @@ import { gameState } from '../core/GameState';
 import { getView } from '../display/view';
 import { coop } from '../net/coop';
 import { getLanguage, LANGUAGES, setLanguage, t, type MessageKey } from '../i18n';
+import { BALANCE } from '../data/balance';
+import { WEAPON_SKILLS } from '../data/types';
+import { missPct, skillLevel } from '../systems/combat/skills';
 import { Button } from './Button';
 import { preferences, setPreference } from './preferences';
 import { sfx } from '../audio/sfx';
@@ -100,7 +103,14 @@ export class PauseUI {
   private build(): void {
     this.clear();
     const { width, height } = getView();
-    const lines = this.view === 'main' ? 5 : this.view === 'stats' ? 8 : this.view === 'coop' ? 5 : 7;
+    const lines =
+      this.view === 'main'
+        ? 5
+        : this.view === 'stats'
+          ? 8 + this.skillRows().length
+          : this.view === 'coop'
+            ? 5
+            : 7;
     const h = Math.min(height - 8, 34 + lines * ROW + 10);
     const x = Math.round((width - W) / 2);
     const y = Math.max(4, Math.round((height - h) / 2));
@@ -325,6 +335,20 @@ export class PauseUI {
     });
   }
 
+  /** Perícias de combate já usadas: nível e % de falhar (§7.8). */
+  private skillRows(): [MessageKey, string][] {
+    if (!gameState.hasGame) return [];
+    const skills = gameState.data.player.skills;
+    return WEAPON_SKILLS.filter((skill) => (skills[skill] ?? 0) > 0).map((skill) => {
+      const level = skillLevel(skills[skill] ?? 0, BALANCE);
+      const ranged = skill === 'archery' || skill === 'firearms';
+      return [
+        `skill.${skill}`,
+        t('pause.skill_value', { level, miss: Math.round(missPct(level, ranged, BALANCE)) }),
+      ];
+    });
+  }
+
   private buildStats(x: number, top: number): void {
     if (!gameState.hasGame) return;
     const { stats, player } = gameState.data;
@@ -337,6 +361,7 @@ export class PauseUI {
       ['stats.crafted', String(stats.crafted)],
       ['stats.gathered', String(stats.gathered)],
       ['stats.looted', String(stats.looted)],
+      ...this.skillRows(),
     ];
     rows.forEach(([key, value], i) => {
       const y = top + i * ROW;

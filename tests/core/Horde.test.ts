@@ -180,8 +180,10 @@ describe('Hordas', () => {
     const { state, sim, events, skipToHorde, run } = setup();
     skipToHorde();
     for (const enemy of [...sim.combat.list]) enemy.hp = 1;
-    // Mata-os um a um (como se o jogador lhes batesse).
-    for (const enemy of [...sim.combat.list]) sim.combat.attack(enemy.uid);
+    // Mata-os um a um (como se o jogador lhes batesse; um golpe pode falhar).
+    for (const enemy of [...sim.combat.list]) {
+      for (let i = 0; i < 50 && enemy.hp > 0; i++) sim.combat.attack(enemy.uid);
+    }
     run(3); // os inchados (se houver) rebentam
     expect(sim.combat.hordeLeft).toBe(0);
     expect(events).toContain('won');
