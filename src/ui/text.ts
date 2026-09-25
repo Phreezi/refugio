@@ -141,6 +141,11 @@ export class Label {
     return this;
   }
 
+  /** Move o texto (dx, dy) px, mantendo o alinhamento. */
+  translate(dx: number, dy: number): this {
+    return this.setPosition(this.anchor.x + dx, this.anchor.y + dy);
+  }
+
   setVisible(visible: boolean): this {
     this.text.setVisible(visible);
     return this;

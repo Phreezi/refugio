@@ -23,6 +23,7 @@ import { FishingUI } from '../ui/FishingUI';
 import { LevelUpUI } from '../ui/LevelUpUI';
 import { PauseUI } from '../ui/PauseUI';
 import { DialogUI, goalText } from '../ui/DialogUI';
+import { MapUI } from '../ui/MapUI';
 import { SkillsUI, skillEffectText } from '../ui/SkillsUI';
 import { preferences, setPreference } from '../ui/preferences';
 import { autosave } from '../save';
@@ -33,7 +34,7 @@ import { uiState } from '../ui/uiState';
 import { xpToNext } from '../systems/progression/progression';
 import { countItem } from '../systems/inventory/inventory';
 import { missingInputs } from '../systems/crafting/crafting';
-import { SceneKey } from './keys';
+import { SceneKey, ZONE_CROSSED_EVENT } from './keys';
 
 /** Raio do joystick virtual e do manípulo, em píxeis de jogo. */
 const JOYSTICK_RADIUS = 24;
@@ -124,6 +125,7 @@ export class UIScene extends Phaser.Scene {
   /** Missão em curso (§7.18): título e o que falta, por baixo das barras. */
   private questLabel: Label | null = null;
   private dialog: DialogUI | null = null;
+  private worldMap: MapUI | null = null;
   private seedHintShown = false;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
   private hordeLabel: Label | null = null;
@@ -253,12 +255,13 @@ export class UIScene extends Phaser.Scene {
     };
     this.skills = new SkillsUI(this);
     this.dialog = new DialogUI(this);
+    this.worldMap = new MapUI(this);
     this.pause.onSkills = () => {
       this.skills?.open();
     };
     this.build.onToggle = (open) => {
       for (const obj of this.actionButton) obj.setVisible(!open);
-      this.buildButton?.setVisible(!open);
+      this.buildButton?.setVisible(!open && this.build?.available === true);
       // No modo construção, o Auto não fica por cima dos botões Colocar/Sair.
       this.autoButton?.setVisible(!open);
     };
@@ -279,6 +282,13 @@ export class UIScene extends Phaser.Scene {
       this.scene.restart({});
     };
     this.events.on('ui:language-changed', onLanguage);
+    // Mundo contínuo: passou a andar para outra zona (o HUD continua, só muda o que depende dela).
+    const onZoneCrossed = (zoneId: string): void => {
+      if (this.build?.isOpen) this.build.close();
+      this.buildButton?.setVisible(this.build?.available === true && !buildMode.active);
+      this.showNotice(tKey(content.zones[zoneId]?.name ?? zoneId));
+    };
+    this.events.on(ZONE_CROSSED_EVENT, onZoneCrossed);
 
     // Mudou a resolução ou o zoom: refazer o HUD com a vista nova.
     const onResize = (): void => {
@@ -288,12 +298,15 @@ export class UIScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       offEvents();
       this.events.off('ui:language-changed', onLanguage);
+      this.events.off(ZONE_CROSSED_EVENT, onZoneCrossed);
       this.pause?.destroy();
       this.pause = null;
       this.skills?.destroy();
       this.skills = null;
       this.dialog?.destroy();
       this.dialog = null;
+      this.worldMap?.destroy();
+      this.worldMap = null;
       this.questLabel = null;
       this.sprintButton = null;
       this.sprintVisible = true;
@@ -780,6 +793,17 @@ export class UIScene extends Phaser.Scene {
         this.pause?.toggle();
       },
     ).setDepth(86); // por cima do menu de pausa: carregar outra vez fecha-o
+    // Mapa (M), à esquerda da pausa: no telemóvel é a forma de saber onde se está.
+    new Button(
+      this,
+      width - HUD_MARGIN - 12 - 28 - 12 - 4 - 18,
+      HUD_MARGIN + 20,
+      t('hud.map'),
+      { width: 36, height: 12, fontSize: 8, style: 'secondary' },
+      () => {
+        this.toggleMap();
+      },
+    ).setDepth(70);
   }
 
   private updateCoopLabel(): void {
@@ -825,8 +849,9 @@ export class UIScene extends Phaser.Scene {
         this.toggleCrafting();
       },
     ).setDepth(70);
-    // Construir (só na base): por cima do Fabricar.
-    if (this.build?.available) {
+    // Construir (só na base): por cima do Fabricar. Existe sempre (o mundo contínuo muda de
+    // zona sem refazer o HUD); só se vê na base.
+    if (this.build) {
       // Um pouco mais largo se o texto não couber (a letra só encolhe em píxeis inteiros).
       const buildWidth = Math.max(bagWidth, Math.ceil(measureTextWidth(t('build.button'), 8)) + 6);
       this.buildButton = new Button(
@@ -839,7 +864,7 @@ export class UIScene extends Phaser.Scene {
           this.toggleBuild();
         },
       ).setDepth(70);
-      this.buildButton.setVisible(!buildMode.active);
+      this.buildButton.setVisible(!buildMode.active && this.build.available);
     }
     const bagX = Math.min(width - bagWidth / 2 - 4, hotbar.x + hotbar.w + 6 + bagWidth / 2);
     new Button(
@@ -962,6 +987,10 @@ export class UIScene extends Phaser.Scene {
     keyboard.on('keydown-ENTER', (event: KeyboardEvent) => {
       if (!event.repeat) this.runNoticeAction();
     });
+    // M: mapa do mundo (onde estou?).
+    keyboard.on('keydown-M', () => {
+      this.toggleMap();
+    });
     keyboard.on('keydown-K', () => {
       if (this.pause?.isOpen) return;
       if (!this.skills?.isOpen) this.closePanels();
@@ -978,6 +1007,7 @@ export class UIScene extends Phaser.Scene {
       // Esc fecha o que estiver aberto; sem nada aberto, abre (ou fecha) o menu de pausa.
       if (this.pause?.isOpen) this.pause.close();
       else if (this.skills?.isOpen) this.skills.close();
+      else if (this.worldMap?.isOpen) this.worldMap.close();
       else if (this.dialog?.isOpen) this.dialog.close();
       else if (this.inventory?.isOpen) this.inventory.close();
       else if (this.crafting?.isOpen) this.crafting.close();
@@ -1024,6 +1054,13 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** Fecha a mochila, o fabrico e a construção (antes de abrir as perícias). */
+  /** Mapa do mundo: fecha os outros painéis (não abre por cima da pausa nem de uma conversa). */
+  private toggleMap(): void {
+    if (this.pause?.isOpen || this.dialog?.isOpen || this.skills?.isOpen) return;
+    if (!this.worldMap?.isOpen) this.closePanels();
+    this.worldMap?.toggle();
+  }
+
   private closePanels(): void {
     if (this.inventory?.isOpen) this.inventory.close();
     if (this.crafting?.isOpen) this.crafting.close();
@@ -1138,7 +1175,7 @@ export class UIScene extends Phaser.Scene {
         const now = distance();
         const step = pinchStep(pinchDistance, now);
         if (step !== 0) {
-          stepWorldZoom(step, getView().zoom, getView().height > getView().width);
+          stepWorldZoom(step, getView().zoom);
           pinchDistance = now;
         }
         return;

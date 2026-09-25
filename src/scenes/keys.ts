@@ -9,3 +9,6 @@ export const SceneKey = {
 } as const;
 
 export type SceneKey = (typeof SceneKey)[keyof typeof SceneKey];
+
+/** Evento (na UIScene) de quando o jogador passou a andar para outra zona do mundo contínuo. */
+export const ZONE_CROSSED_EVENT = 'zone-crossed';
