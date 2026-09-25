@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createNewGameState } from '../../src/core/GameState';
 import { migrate } from '../../src/save/migrations';
-import { checksum, parseSave, SAVE_VERSION, SaveError, serializeSave } from '../../src/save/schema';
+import {
+  checksum,
+  parseSave,
+  SAVE_VERSION,
+  SaveError,
+  serializeSave,
+  validateState,
+} from '../../src/save/schema';
 
 const STATE = createNewGameState({ x: 392, y: 392 });
 
@@ -234,6 +241,17 @@ describe('save: migrações', () => {
     const stateJson = JSON.stringify(v12);
     const text = `{"version":12,"timestamp":6,"checksum":"${checksum(`12|6|${stateJson}`)}","state":${stateJson}}`;
     expect(parseSave(text).state.tutorial).toEqual({ done: [], off: true });
+  });
+
+  it('v13 → v14 (Fase 12): quem já jogava é o rapaz; o aspeto valida-se', () => {
+    const v13 = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    delete v13.player.look;
+    const stateJson = JSON.stringify(v13);
+    const text = `{"version":13,"timestamp":6,"checksum":"${checksum(`13|6|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.player.look).toBe('boy');
+    const bad = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    bad.player.look = 'dragon';
+    expect(() => validateState(bad)).toThrow();
   });
 
   it('valida a horta', () => {

@@ -45,6 +45,27 @@ interface Look {
   W: string; // mochila (sombra)
 }
 
+/** A menina: cabelo ruivo comprido, camisola rosa, calças de ganga. */
+const PLAYER_GIRL: Look = {
+  o: 'ink',
+  h: 'orange',
+  l: 'amber',
+  d: 'blood',
+  s: 'peach',
+  k: 'wood_light',
+  b: 'rose',
+  B: 'plum',
+  c: 'peach',
+  t: 'bark',
+  g: 'gold',
+  p: 'water',
+  P: 'deep_water',
+  f: 'bark_dark',
+  w: 'wood',
+  T: 'wood_light',
+  W: 'bark',
+};
+
 const PLAYER: Look = {
   o: 'ink',
   h: 'bark',
@@ -107,6 +128,58 @@ const HEAD: Record<'down' | 'up' | 'side', string[]> = {
     '...ohhhkssssso..',
     '...ohhksssssko..',
     '....okkkkkko....',
+  ],
+};
+
+/** Cabelo comprido (a menina): pinta-se por cima da cabeça e dos ombros, a partir da cabeça. */
+const LONG_HAIR: Record<'down' | 'up' | 'side', string[]> = {
+  down: [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '..od........do..',
+    '..od........do..',
+    '..oh........ho..',
+    '..oh........ho..',
+    '..ohh......hho..',
+    '..ohh......hho..',
+    '...oh......ho...',
+    '...oo......oo...',
+  ],
+  up: [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '..ohhhhhhhhhho..',
+    '..ohhhlhhhhhho..',
+    '..ohhlhhhhhhho..',
+    '..ohhhhhhhhhho..',
+    '...oddddddddo...',
+    '....oooooooo....',
+  ],
+  side: [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '..od............',
+    '..od............',
+    '..oh............',
+    '..ohh...........',
+    '..ohhh..........',
+    '..ohho..........',
+    '..ohho..........',
+    '...oo...........',
   ],
 };
 
@@ -229,7 +302,7 @@ const WALK_LIFTS: readonly (readonly [number, number])[] = [
 ];
 
 /** Um frame da personagem. */
-function frame(view: View, column: number, look: Look): Bitmap {
+function frame(view: View, column: number, look: Look, longHair: boolean): Bitmap {
   const img = new Bitmap(W, H);
   const walk = [1, 2, 3, 4].indexOf(column);
   const attack = [5, 6].indexOf(column);
@@ -269,6 +342,8 @@ function frame(view: View, column: number, look: Look): Bitmap {
   if (side) paintGrid(body, PACK_SIDE, 0, torsoY, look);
   paintGrid(body, side ? TORSO.side : view === 'up' ? TORSO.up : TORSO.down, 0, torsoY, look);
   paintGrid(body, side ? HEAD.side : view === 'up' ? HEAD.up : HEAD.down, 0, headY, look);
+  if (longHair)
+    paintGrid(body, side ? LONG_HAIR.side : view === 'up' ? LONG_HAIR.up : LONG_HAIR.down, 0, headY, look);
   if (side && attack < 0) {
     const swing = walk === 0 ? 1 : walk === 2 ? -1 : 0;
     sideArm(body, 6 + swing, torsoY + 1, look);
@@ -302,16 +377,17 @@ function mirror(src: Bitmap): Bitmap {
   return out;
 }
 
-function sheet(look: Look): Bitmap {
+function sheet(look: Look, longHair = false): Bitmap {
   const out = new Bitmap(W * COLUMNS, H * ROWS.length);
   ROWS.forEach((view, row) => {
-    for (let column = 0; column < COLUMNS; column++) out.blit(frame(view, column, look), column * W, row * H);
+    for (let column = 0; column < COLUMNS; column++)
+      out.blit(frame(view, column, look, longHair), column * W, row * H);
   });
   return out;
 }
 
 // Validação das grelhas: todas com 16 colunas (um erro aqui estraga a personagem inteira).
-for (const [name, rows] of Object.entries({ ...HEAD, ...TORSO })) {
+for (const [name, rows] of Object.entries({ ...HEAD, ...TORSO, ...LONG_HAIR })) {
   rows.forEach((row, i) => {
     if (row.length !== W)
       throw new Error(`Grelha ${name}, linha ${String(i)}: ${String(row.length)} colunas`);
@@ -320,17 +396,26 @@ for (const [name, rows] of Object.entries({ ...HEAD, ...TORSO })) {
 
 const dir = new URL('public/assets/sprites/', ROOT);
 mkdirSync(dir, { recursive: true });
-const player = sheet(PLAYER);
-writeFileSync(new URL('player.png', dir), player.toPng());
-console.log('sprites/player.png (10×4 frames de 16×32)');
+const sheets: [string, Bitmap][] = [
+  ['player', sheet(PLAYER)],
+  ['player_girl', sheet(PLAYER_GIRL, true)],
+];
+for (const [name, img] of sheets) {
+  writeFileSync(new URL(`${name}.png`, dir), img.toPng());
+  console.log(`sprites/${name}.png (10×4 frames de 16×32)`);
+}
 
 const previewIndex = process.argv.indexOf('--preview');
 const previewPath = previewIndex >= 0 ? process.argv[previewIndex + 1] : undefined;
 if (previewPath) {
   const SCALE = 6;
-  const out = new Bitmap(player.width * SCALE, player.height * SCALE);
+  const first = sheets[0]?.[1];
+  if (!first) throw new Error('sem personagens');
+  const out = new Bitmap(first.width * SCALE, first.height * SCALE * sheets.length);
   out.fill(0, 0, out.width, out.height, c('grass'));
-  out.blit(player, 0, 0, SCALE);
+  sheets.forEach(([, img], i) => {
+    out.blit(img, 0, i * first.height * SCALE, SCALE);
+  });
   writeFileSync(previewPath, out.toPng());
   console.log(`pré-visualização: ${previewPath}`);
 }

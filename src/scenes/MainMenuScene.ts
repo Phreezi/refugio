@@ -5,7 +5,7 @@ import { FIXED_STEP_MS } from '../config';
 import { eventBus } from '../core/EventBus';
 import { advanceRespawns, offlineTicks } from '../core/offline';
 import { simulation } from '../core/Simulation';
-import { BASE_ZONE_ID, gameState } from '../core/GameState';
+import { BASE_ZONE_ID, gameState, type CharacterLook } from '../core/GameState';
 import { BALANCE } from '../data/balance';
 import { getView, setupFixedCamera } from '../display/view';
 import { t, type MessageKey } from '../i18n';
@@ -29,6 +29,7 @@ export interface MainMenuData {
 
 const MAIN_BUTTON = { width: 136, height: 22 } as const;
 const SMALL_BUTTON = { width: 64, height: 14, fontSize: 8, style: 'secondary' } as const;
+const LOOK_BUTTON_WIDTH = 108;
 /** Tempo para confirmar uma ação destrutiva (segundo toque no mesmo botão). */
 const CONFIRM_MS = 3000;
 
@@ -42,6 +43,8 @@ export class MainMenuScene extends Phaser.Scene {
   private primaryAction: (() => void) | null = null;
   /** Hordas ligadas (§7.13): vem do save e aplica-se ao continuar ou ao começar um jogo novo. */
   private hordes = false;
+  /** Aparência escolhida (aplica-se ao jogo que começar). */
+  private look: CharacterLook = 'boy';
 
   constructor() {
     super(SceneKey.MainMenu);
@@ -132,6 +135,7 @@ export class MainMenuScene extends Phaser.Scene {
     const spacing = 26;
     const save = result.save;
     this.hordes = save?.state.settings.hordes ?? false;
+    this.look = save?.state.player.look ?? 'boy';
 
     if (save) {
       const time = clockAt(save.state.world.tick, BALANCE.dayLengthSec, BALANCE.dayStartHour);
@@ -167,6 +171,20 @@ export class MainMenuScene extends Phaser.Scene {
       () => {
         this.hordes = !this.hordes;
         hordeButton.setText(t(this.hordes ? 'horde.menu_on' : 'horde.menu_off'));
+      },
+    );
+
+    // Aparência da personagem: no canto oposto ao co-op (cabe sempre).
+    const lookLabel = (): string => t('look.button', { look: t(`look.${this.look}`) });
+    const lookButton = new Button(
+      this,
+      4 + LOOK_BUTTON_WIDTH / 2,
+      4 + SMALL_BUTTON.height / 2,
+      lookLabel(),
+      { ...SMALL_BUTTON, width: LOOK_BUTTON_WIDTH },
+      () => {
+        this.look = this.look === 'boy' ? 'girl' : 'boy';
+        lookButton.setText(lookLabel());
       },
     );
 
@@ -245,6 +263,14 @@ export class MainMenuScene extends Phaser.Scene {
     });
   }
 
+  /** Grava a aparência escolhida na personagem do jogo. */
+  private applyLook(): void {
+    const player = gameState.data.player;
+    if (player.look === this.look) return;
+    player.look = this.look;
+    gameState.markDirty();
+  }
+
   /** Grava a escolha das hordas no jogo; ao ligá-las, a primeira vem daqui a uns dias. */
   private applyHordes(): void {
     const data = gameState.data;
@@ -263,6 +289,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.busy = true;
     const state = gameState.load(save.state);
     this.applyHordes();
+    this.applyLook();
     // Tempo em que o jogo esteve fechado: crafts e reaparecimento de recursos avançam (§7.6).
     const ticks = offlineTicks(save.timestamp, Date.now(), BALANCE.offlineCapHours, FIXED_STEP_MS);
     if (ticks > 0) {
@@ -279,6 +306,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.busy = true;
     const state = gameState.newGame(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     this.applyHordes();
+    this.applyLook();
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
     void autosave.flush(); // o jogo novo substitui já o antigo
     this.scene.start(SceneKey.Zone, { zoneId: BASE_ZONE_ID } satisfies ZoneSceneData);
@@ -300,7 +328,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.busy = true;
     this.setStatus('coop.joining');
     // A personagem do save deste jogador vai para o mundo do amigo (e volta com o que ganhar).
-    coop.join(code, save?.state ?? null).then(
+    coop.join(code, save?.state ?? null, this.look).then(
       (state) => {
         gameState.load(state, true);
         simulation.reset();

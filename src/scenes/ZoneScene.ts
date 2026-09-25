@@ -9,7 +9,7 @@ import { uiState } from '../ui/uiState';
 import { preferences } from '../ui/preferences';
 import { CHARACTER_COLUMNS, CHARACTER_ROWS, characterFrame } from '../assets/characterSheet';
 import { zoneMapKey } from '../config';
-import { BASE_ZONE_ID, gameState } from '../core/GameState';
+import { BASE_ZONE_ID, CHARACTER_LOOKS, gameState, type CharacterLook } from '../core/GameState';
 import { simulation } from '../core/Simulation';
 import { getView } from '../display/view';
 import { onWorldZoomChange, stepWorldZoom, worldZoomFor } from '../display/worldZoom';
@@ -32,7 +32,8 @@ import { SceneKey } from './keys';
 import type { MainMenuData } from './MainMenuScene';
 import type { WorldMapData } from './WorldMapScene';
 
-const PLAYER_TEXTURE = 'player';
+/** Spritesheet de cada aparência (mesmo layout). */
+const PLAYER_TEXTURES: Record<CharacterLook, string> = { boy: 'player', girl: 'player_girl' };
 /** Eventos do mundo que, no co-op, também vêm do convidado (o anfitrião vê-os se estiver lá). */
 const SHARED_VIEW_EVENTS: ReadonlySet<keyof GameEvents> = new Set<keyof GameEvents>([
   'resource:hit',
@@ -104,8 +105,10 @@ interface EnemyView {
   bar: Phaser.GameObjects.Rectangle;
 }
 
-const walkAnimationKey = (facing: Facing): string => `${PLAYER_TEXTURE}_walk_${facing}`;
-const sneakAnimationKey = (facing: Facing): string => `${PLAYER_TEXTURE}_sneak_${facing}`;
+const walkAnimationKey = (look: CharacterLook, facing: Facing): string =>
+  `${PLAYER_TEXTURES[look]}_walk_${facing}`;
+const sneakAnimationKey = (look: CharacterLook, facing: Facing): string =>
+  `${PLAYER_TEXTURES[look]}_sneak_${facing}`;
 const SNEAK_FRAME_RATE = 4;
 
 type MoveKeys = Record<'up' | 'down' | 'left' | 'right' | 'action' | 'sneak', Phaser.Input.Keyboard.Key[]>;
@@ -188,10 +191,10 @@ export class ZoneScene extends Phaser.Scene {
     }
 
     this.createPlayerAnimations();
-    const { x, y, facing } = gameState.data.player;
+    const { x, y, facing, look } = gameState.data.player;
     // Origem nos pés (meio da base do sprite): é o ponto usado no Y-sort e nas colisões.
     this.player = this.add
-      .sprite(x, y, PLAYER_TEXTURE, characterFrame(facing, CHARACTER_COLUMNS.idle))
+      .sprite(x, y, PLAYER_TEXTURES[look], characterFrame(facing, CHARACTER_COLUMNS.idle))
       .setOrigin(0.5, 1)
       .setDepth(y);
 
@@ -925,20 +928,28 @@ export class ZoneScene extends Phaser.Scene {
 
   /** As animações são globais (do jogo), por isso só se criam na primeira vez. */
   private createPlayerAnimations(): void {
-    const define = (key: string, columns: readonly number[], facing: Facing, frameRate: number): void => {
+    const define = (
+      look: CharacterLook,
+      key: string,
+      columns: readonly number[],
+      facing: Facing,
+      frameRate: number,
+    ): void => {
       if (this.anims.exists(key)) return;
       this.anims.create({
         key,
-        frames: this.anims.generateFrameNumbers(PLAYER_TEXTURE, {
+        frames: this.anims.generateFrameNumbers(PLAYER_TEXTURES[look], {
           frames: columns.map((column) => characterFrame(facing, column)),
         }),
         frameRate,
         repeat: -1,
       });
     };
-    for (const facing of CHARACTER_ROWS) {
-      define(walkAnimationKey(facing), CHARACTER_COLUMNS.walk, facing, WALK_FRAME_RATE);
-      define(sneakAnimationKey(facing), CHARACTER_COLUMNS.sneakWalk, facing, SNEAK_FRAME_RATE);
+    for (const look of CHARACTER_LOOKS) {
+      for (const facing of CHARACTER_ROWS) {
+        define(look, walkAnimationKey(look, facing), CHARACTER_COLUMNS.walk, facing, WALK_FRAME_RATE);
+        define(look, sneakAnimationKey(look, facing), CHARACTER_COLUMNS.sneakWalk, facing, SNEAK_FRAME_RATE);
+      }
     }
   }
 
@@ -1042,10 +1053,14 @@ export class ZoneScene extends Phaser.Scene {
       return;
     }
     this.other ??= this.add
-      .sprite(view.x, view.y, PLAYER_TEXTURE, characterFrame(view.facing, CHARACTER_COLUMNS.idle))
-      .setOrigin(0.5, 1)
-      .setTint(OTHER_TINT);
+      .sprite(view.x, view.y, PLAYER_TEXTURES[view.look], characterFrame(view.facing, CHARACTER_COLUMNS.idle))
+      .setOrigin(0.5, 1);
     const other = this.other;
+    const texture = PLAYER_TEXTURES[view.look];
+    if (other.texture.key !== texture) other.stop().setTexture(texture);
+    // Com a mesma aparência, um tom azulado distingue o outro jogador.
+    if (view.look === gameState.data.player.look) other.setTint(OTHER_TINT);
+    else other.clearTint();
     const now = performance.now();
     const a = coop.alpha(now, view.at, coop.otherInterval);
     const x = this.toScreenGrid(view.px + (view.x - view.px) * a);
@@ -1057,7 +1072,10 @@ export class ZoneScene extends Phaser.Scene {
       other.stop();
       other.setFrame(characterFrame(view.facing, sinceAttack < ATTACK_MS / 2 ? raised : extended));
     } else if (view.moved) {
-      other.play(view.sneak ? sneakAnimationKey(view.facing) : walkAnimationKey(view.facing), true);
+      other.play(
+        view.sneak ? sneakAnimationKey(view.look, view.facing) : walkAnimationKey(view.look, view.facing),
+        true,
+      );
     } else {
       other.stop();
       other.setFrame(
@@ -1078,6 +1096,9 @@ export class ZoneScene extends Phaser.Scene {
     const x = this.toScreenGrid(previous.x + (state.x - previous.x) * alpha);
     const y = this.toScreenGrid(previous.y + (state.y - previous.y) * alpha);
     player.setPosition(x, y).setDepth(y);
+    // A aparência pode mudar no menu de pausa.
+    const texture = PLAYER_TEXTURES[state.look];
+    if (player.texture.key !== texture) player.stop().setTexture(texture);
 
     if (this.time.now < this.attackUntil) {
       // Golpe: frame "levantado" e depois "estendido".
@@ -1087,7 +1108,10 @@ export class ZoneScene extends Phaser.Scene {
       player.setFrame(characterFrame(state.facing, column));
     } else if (simulation.playerMoved) {
       const sneak = simulation.playerSneaking;
-      player.play(sneak ? sneakAnimationKey(state.facing) : walkAnimationKey(state.facing), true);
+      player.play(
+        sneak ? sneakAnimationKey(state.look, state.facing) : walkAnimationKey(state.look, state.facing),
+        true,
+      );
     } else {
       player.stop();
       const idle = simulation.playerSneaking ? CHARACTER_COLUMNS.sneakIdle : CHARACTER_COLUMNS.idle;

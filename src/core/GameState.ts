@@ -30,7 +30,12 @@ export interface PlayerState {
   xp: number;
   /** A sangrar: ticks que faltam (0 = não). Uma ligadura estanca. */
   bleed: number;
+  /** Aspeto da personagem (escolhido ao começar; muda-se nas definições). */
+  look: CharacterLook;
 }
+
+export type CharacterLook = 'boy' | 'girl';
+export const CHARACTER_LOOKS: readonly CharacterLook[] = ['boy', 'girl'];
 
 export interface WorldState {
   /** Ticks de lógica decorridos desde o início do jogo (1 tick = FIXED_STEP_MS). */
@@ -136,6 +141,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       level: 1,
       xp: 0,
       bleed: 0,
+      look: 'boy',
     },
     world: { tick: 0, rng: seed >>> 0 },
     base: {
