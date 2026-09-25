@@ -144,7 +144,8 @@ export class Progression {
 
   /** Soma XP; ao subir de nível avisa com o que ficou desbloqueado. */
   gain(amount: number): void {
-    if (!this.state.hasGame || amount <= 0) return;
+    // Co-op (convidado): a XP conta-se no anfitrião (e chega com o estado dele).
+    if (!this.state.hasGame || amount <= 0 || this.state.borrowed) return;
     const player = this.state.data.player;
     const reached = addXp(player, amount, BALANCE.xpCurve, BALANCE.maxLevel);
     this.state.markDirty();
@@ -160,6 +161,7 @@ export class Progression {
     const recipe = this.content().recipes.find((r) => r.id === recipeId);
     if (!recipe) return 'unknown';
     if (this.isRecipeUnlocked(recipe)) return 'known';
+    if (this.state.borrowed) return 'learned'; // co-op (convidado): o anfitrião é que regista
     this.state.data.unlocks.recipes.push(recipeId);
     this.state.markDirty();
     this.bus.emit('recipe:learned', { recipe: recipeId });

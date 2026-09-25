@@ -20,7 +20,6 @@ import type { ZoneContext } from './Interaction';
 import type { PlayerActions } from './PlayerActions';
 import type { Building } from './Building';
 import { isNight } from './DayNight';
-import { partnerUp, type Partner } from './Partner';
 import { nextRandom, randomInt } from './Rng';
 
 /** Projétil em voo (seta, bala). Não se grava. */
@@ -40,6 +39,27 @@ export interface Projectile {
   /** Distância que ainda pode voar. */
   left: number;
   damage: number;
+  /** Quem disparou (co-op: os drops e os eventos vão para esse jogador). */
+  owner: Combat;
+}
+
+/**
+ * Inimigos e projéteis de uma zona. No co-op, quando os dois jogadores estão na mesma zona, o
+ * do convidado aponta para o do anfitrião (os mesmos inimigos para os dois).
+ */
+interface EnemyPool {
+  enemies: Enemy[];
+  projectiles: Projectile[];
+  nextUid: number;
+  nextShot: number;
+  /** Próximo tick em que cada armadilha pode voltar a ferir (não se grava). */
+  trapReady: Map<number, number>;
+  /** Quem derrotou um inimigo que ainda vai rebentar (inchado): recebe os drops. */
+  killers: WeakMap<Enemy, Combat>;
+}
+
+function createPool(nextUid = 1, nextShot = 1): EnemyPool {
+  return { enemies: [], projectiles: [], nextUid, nextShot, trapReady: new Map(), killers: new WeakMap() };
 }
 
 /** Altura dos tiros acima dos pés (px). */
@@ -66,17 +86,20 @@ export class Combat {
   private readonly actions: PlayerActions;
   private readonly content: () => CombatContent;
   private zone: ZoneContext | null = null;
-  private enemies: Enemy[] = [];
-  private nextUid = 1;
+  private pool = createPool();
+  /** Co-op: o combate do anfitrião cujos inimigos se partilham (mesma zona), ou null. */
+  private linkedTo: Combat | null = null;
+  /** Co-op: os outros jogadores na mesma zona (os inimigos atacam quem estiver mais perto). */
+  private others: Combat[] = [];
   private invulnerableUntil = 0;
   /** Peças da base: as hordas partem-nas e as armadilhas ferem os inimigos. */
   building: Building | null = null;
-  /** O boneco do convidado (co-op), ou null. Os inimigos atacam quem estiver mais perto. */
-  partner: Partner | null = null;
-  /** Próximo tick em que cada armadilha pode voltar a ferir (não se grava). */
-  private trapReady = new Map<number, number>();
-  private projectiles: Projectile[] = [];
-  private nextShot = 1;
+  /** Multiplicador de vida e dano dos inimigos que nascem (co-op: `coopEnemyMultiplier`). */
+  difficulty = 1;
+  /** O jogador anda agachado (atualizado a cada tick; os inimigos veem-no de mais perto). */
+  sneaking = false;
+  /** Co-op: o jogador está no mapa-mundo ou em pausa (os inimigos ignoram-no). */
+  away = false;
   /** Hora real (ms): as mochilas no chão duram horas reais (§7.12). Substituível nos testes. */
   now: () => number = () => Date.now();
 
@@ -92,13 +115,72 @@ export class Combat {
     this.content = content;
   }
 
+  private get enemies(): Enemy[] {
+    return this.pool.enemies;
+  }
+
+  private set enemies(list: Enemy[]) {
+    this.pool.enemies = list;
+  }
+
+  private get projectiles(): Projectile[] {
+    return this.pool.projectiles;
+  }
+
+  private set projectiles(list: Projectile[]) {
+    this.pool.projectiles = list;
+  }
+
+  /** Co-op: passa a partilhar os inimigos da zona de `primary` (os dois na mesma zona). */
+  link(primary: Combat): void {
+    if (this.linkedTo === primary) return;
+    this.unlink();
+    this.linkedTo = primary;
+    this.pool = primary.pool;
+    this.zone = primary.zone;
+    this.invulnerableUntil = 0;
+    primary.others.push(this);
+  }
+
+  /** Co-op: deixa de partilhar (fica com uma cópia dos inimigos que estavam na zona). */
+  unlink(): void {
+    const primary = this.linkedTo;
+    if (!primary) return;
+    primary.others = primary.others.filter((other) => other !== this);
+    const shared = this.pool;
+    this.pool = createPool(shared.nextUid, shared.nextShot);
+    this.pool.enemies = [...shared.enemies];
+    this.linkedTo = null;
+  }
+
+  /**
+   * Co-op: multiplicador de vida e dano dos inimigos; os que já estão na zona ajustam-se logo
+   * (mantendo a fração de vida que tinham).
+   */
+  setDifficulty(multiplier: number): void {
+    this.difficulty = multiplier;
+    for (const enemy of this.enemies) {
+      if (enemy.power === multiplier) continue;
+      const ratio = multiplier / enemy.power;
+      enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * ratio));
+      enemy.hp = Math.max(1, Math.round(enemy.hp * ratio));
+      enemy.power = multiplier;
+    }
+  }
+
+  /** Pode ser alvo dos inimigos da zona `zoneId` (vivo, lá, e não no mapa-mundo)? */
+  private targetable(zoneId: string): boolean {
+    const player = this.state.data.player;
+    return !this.away && player.hp > 0 && player.zoneId === zoneId;
+  }
+
   /** Entra numa zona: os inimigos nascem nos pontos do mapa; mochilas expiradas desaparecem. */
   setZone(zone: ZoneContext | null): void {
+    this.unlink();
+    for (const other of [...this.others]) other.unlink();
     this.zone = zone;
-    this.enemies = [];
+    this.pool = createPool(this.pool.nextUid, this.pool.nextShot);
     this.invulnerableUntil = 0;
-    this.trapReady.clear();
-    this.projectiles = [];
     if (!zone) return;
     const bags = zoneState(this.state.data, zone.zoneId).bags;
     const now = this.now();
@@ -127,7 +209,7 @@ export class Combat {
             x: Math.round(spawn.x + (nextRandom(rng) - 0.5) * 24),
             y: Math.round(spawn.y + (nextRandom(rng) - 0.5) * 24),
           };
-          this.enemies.push(createEnemy(this.nextUid++, member.enemy, def, at));
+          this.enemies.push(createEnemy(this.pool.nextUid++, member.enemy, def, at, this.difficulty));
         }
       }
     }
@@ -155,7 +237,7 @@ export class Combat {
           x: Math.round(point.x + (nextRandom(rng) - 0.5) * 32),
           y: Math.round(point.y + (nextRandom(rng) - 0.5) * 32),
         };
-        const enemy = createEnemy(this.nextUid++, member.enemy, def, at);
+        const enemy = createEnemy(this.pool.nextUid++, member.enemy, def, at, this.difficulty);
         enemy.horde = true;
         enemy.state = 'chase';
         this.enemies.push(enemy);
@@ -217,7 +299,7 @@ export class Combat {
     player.facing =
       Math.abs(dir.x) > Math.abs(dir.y) ? (dir.x > 0 ? 'right' : 'left') : dir.y > 0 ? 'down' : 'up';
     this.projectiles.push({
-      id: this.nextShot++,
+      id: this.pool.nextShot++,
       ammo: ranged.ammo,
       x: from.x,
       y: from.y,
@@ -228,6 +310,7 @@ export class Combat {
       step: ranged.speed / TICKS_PER_SECOND,
       left: ranged.range,
       damage: weapon.damage,
+      owner: this,
     });
     this.state.markDirty();
     this.bus.emit('player:action', { kind: 'attack' });
@@ -240,8 +323,8 @@ export class Combat {
     if (this.projectiles.length === 0) return;
     const world = this.zone?.collision;
     const { enemies } = this.content();
-    const player = this.state.data.player;
     this.projectiles = this.projectiles.filter((shot) => {
+      const owner = shot.owner;
       shot.px = shot.x;
       shot.py = shot.y;
       let travelled = 0;
@@ -263,12 +346,17 @@ export class Combat {
           const died = hitEnemy(
             hit,
             shot.damage,
-            player,
+            owner.state.data.player,
             BALANCE.enemyKnockbackPx / 2,
             secondsToTicks(BALANCE.enemyHitStunSec),
           );
-          this.bus.emit('enemy:hit', { uid: hit.uid, damage: shot.damage, x: hit.x, y: hit.y - BODY_HEIGHT });
-          if (died && def) this.defeated(hit, def);
+          owner.bus.emit('enemy:hit', {
+            uid: hit.uid,
+            damage: shot.damage,
+            x: hit.x,
+            y: hit.y - BODY_HEIGHT,
+          });
+          if (died && def) this.defeated(hit, def, owner);
           return false;
         }
       }
@@ -319,10 +407,13 @@ export class Combat {
   /** Um tick: a IA de cada inimigo; os ataques que acertam tiram vida ao jogador. */
   tick(sneaking: boolean): void {
     const zone = this.zone;
+    this.sneaking = sneaking;
     this.flyProjectiles();
     if (!zone || this.enemies.length === 0) return;
     const { enemies } = this.content();
     const player = this.state.data.player;
+    // Co-op: cada inimigo vai atrás do jogador (desta zona) que estiver mais perto.
+    const players = [this, ...this.others].filter((c) => c.targetable(zone.zoneId));
     const ctx = {
       player,
       sneaking,
@@ -334,7 +425,6 @@ export class Combat {
       stuckTicks: secondsToTicks(BALANCE.hordeStuckSec),
       obstacle: (enemy: Enemy) => this.obstacle(enemy),
     };
-    const partner = partnerUp(this.partner) ? this.partner : null;
     for (const enemy of [...this.enemies]) {
       const def = enemies[enemy.id];
       if (!def) continue;
@@ -343,24 +433,33 @@ export class Combat {
         if (enemy.dying === 0) this.explode(enemy);
         continue;
       }
-      // Co-op: cada inimigo vai atrás de quem estiver mais perto (o jogador ou o parceiro).
-      const target =
-        partner &&
-        Math.hypot(partner.x - enemy.x, partner.y - enemy.y) <
-          Math.hypot(player.x - enemy.x, player.y - enemy.y)
-          ? partner
-          : null;
-      const result = stepEnemy(enemy, def, target ? { ...ctx, player: target, sneaking: target.sneak } : ctx);
-      if (result === 'attack' && target) this.damagePartner(def.damage);
-      else if (result === 'attack') this.damagePlayer(def.damage, enemy, def.bleedPct ?? 0);
+      const target = this.nearestPlayer(players, enemy);
+      const result = stepEnemy(
+        enemy,
+        def,
+        target === this ? ctx : { ...ctx, player: target.state.data.player, sneaking: target.sneaking },
+      );
+      const damage = Math.round(def.damage * enemy.power);
+      if (result === 'attack') target.damagePlayer(damage, enemy, def.bleedPct ?? 0);
       else if (result === 'scream' && def.scream) this.scream(enemy, def.scream);
       else if (result === 'siege' && enemy.siege !== null) {
-        const amount = Math.round((def.damage * BALANCE.hordeStructureDamagePct) / 100);
+        const amount = Math.round((damage * BALANCE.hordeStructureDamagePct) / 100);
         this.building?.damageStructure(enemy.siege, amount);
         enemy.siege = null;
       }
     }
     this.springTraps();
+  }
+
+  /** O jogador (co-op: de entre os que estão na zona) mais perto do inimigo. */
+  private nearestPlayer(players: readonly Combat[], enemy: Enemy): Combat {
+    const dist = (c: Combat): number => {
+      const p = c.state.data.player;
+      return Math.hypot(p.x - enemy.x, p.y - enemy.y);
+    };
+    return (
+      players.reduce<Combat | null>((best, c) => (best && dist(best) <= dist(c) ? best : c), null) ?? this
+    );
   }
 
   /** O gritador grita: os inimigos à volta vêm à procura do jogador durante `alertSec`. */
@@ -406,9 +505,10 @@ export class Combat {
     if (!building || this.enemies.length === 0) return;
     const tick = this.state.data.world.tick;
     const { enemies } = this.content();
+    const trapReady = this.pool.trapReady;
     for (const [uid, id, tx, ty] of building.structures()) {
       const trap = building.def(id)?.trap;
-      if (!trap || tick < (this.trapReady.get(uid) ?? 0)) continue;
+      if (!trap || tick < (trapReady.get(uid) ?? 0)) continue;
       const size = building.tileSize;
       const area = { x: tx * size, y: ty * size, w: size, h: size };
       const inside = this.enemies.filter(
@@ -420,7 +520,7 @@ export class Combat {
           e.y <= area.y + area.h + 2,
       );
       if (inside.length === 0) continue;
-      this.trapReady.set(uid, tick + secondsToTicks(trap.everySec));
+      trapReady.set(uid, tick + secondsToTicks(trap.everySec));
       for (const enemy of inside) {
         const def = enemies[enemy.id];
         if (!def) continue;
@@ -464,63 +564,29 @@ export class Combat {
     return true;
   }
 
-  /**
-   * Golpe do parceiro (co-op) no inimigo `uid`, com o dano da arma dele (sem desgaste: a arma é
-   * do save do convidado). @returns true se acertou.
-   */
-  attackAs(uid: number, from: { x: number; y: number }, damage: number): boolean {
-    const enemy = this.get(uid);
-    const def = enemy ? this.content().enemies[enemy.id] : undefined;
-    if (!enemy || !def || enemy.dying > 0) return false;
-    const died = hitEnemy(
-      enemy,
-      damage,
-      from,
-      BALANCE.enemyKnockbackPx,
-      secondsToTicks(BALANCE.enemyHitStunSec),
-    );
-    this.bus.emit('enemy:hit', { uid, damage, x: enemy.x, y: enemy.y - BODY_HEIGHT });
-    this.state.markDirty();
-    if (died) this.defeated(enemy, def);
-    return true;
-  }
-
-  /** Dano ao parceiro (sem armadura). A 0 fica caído e volta pouco depois ao pé do anfitrião. */
-  damagePartner(amount: number): void {
-    const partner = this.partner;
-    const tick = this.state.data.world.tick;
-    if (!partnerUp(partner) || amount <= 0 || tick < partner.invulnerableUntil) return;
-    partner.hp = Math.max(0, partner.hp - amount);
-    partner.invulnerableUntil = tick + secondsToTicks(BALANCE.playerInvulnSec);
-    this.bus.emit('partner:damaged', { amount, x: partner.x, y: partner.y });
-    if (partner.hp === 0) {
-      partner.downUntil = tick + secondsToTicks(BALANCE.partnerDownSec);
-      this.bus.emit('partner:down', {});
-    }
-  }
-
   /** Vida a 0: morre (ou, o inchado, incha e rebenta ao fim do aviso — dá tempo de fugir). */
-  private defeated(enemy: Enemy, def: EnemyDef): void {
+  private defeated(enemy: Enemy, def: EnemyDef, by: Combat = this): void {
     if (def.explode) {
       enemy.dying = secondsToTicks(def.explode.delaySec);
       enemy.stun = 0;
-      this.bus.emit('enemy:dying', { uid: enemy.uid });
-    } else this.kill(enemy);
+      this.pool.killers.set(enemy, by);
+      by.bus.emit('enemy:dying', { uid: enemy.uid });
+    } else this.kill(enemy, by);
   }
 
   /** O inchado rebenta: dano em área (com armadura) e depois conta como derrotado. */
   private explode(enemy: Enemy): void {
     const blast = this.content().enemies[enemy.id]?.explode;
-    if (blast) {
-      const player = this.state.data.player;
+    const zoneId = this.zone?.zoneId;
+    if (blast && zoneId) {
       this.bus.emit('enemy:exploded', { x: enemy.x, y: enemy.y, radius: blast.radius });
-      if (Math.hypot(player.x - enemy.x, player.y - enemy.y) <= blast.radius)
-        this.damagePlayer(blast.damage, enemy);
-      const partner = this.partner;
-      if (partnerUp(partner) && Math.hypot(partner.x - enemy.x, partner.y - enemy.y) <= blast.radius)
-        this.damagePartner(blast.damage);
+      for (const target of [this, ...this.others]) {
+        const p = target.state.data.player;
+        if (target.targetable(zoneId) && Math.hypot(p.x - enemy.x, p.y - enemy.y) <= blast.radius)
+          target.damagePlayer(Math.round(blast.damage * enemy.power), enemy);
+      }
     }
-    this.kill(enemy);
+    this.kill(enemy, this.pool.killers.get(enemy) ?? this);
   }
 
   /**
@@ -609,31 +675,33 @@ export class Combat {
     return empty;
   }
 
-  private kill(enemy: Enemy): void {
+  /** Tira o inimigo e dá os drops a quem o derrotou (`by`; co-op: pode ser o outro jogador). */
+  private kill(enemy: Enemy, by: Combat = this): void {
     const zone = this.zone;
     const def = this.content().enemies[enemy.id];
     this.enemies = this.enemies.filter((e) => e !== enemy);
-    this.bus.emit('enemy:killed', { uid: enemy.uid, enemy: enemy.id, x: enemy.x, y: enemy.y });
+    by.bus.emit('enemy:killed', { uid: enemy.uid, enemy: enemy.id, x: enemy.x, y: enemy.y });
     if (!def || !zone) return;
     if (def.boss) {
       const days = zone.respawnDays ?? 1;
       this.state.data.bosses[zone.zoneId] =
         this.state.data.world.tick + secondsToTicks(days * BALANCE.dayLengthSec);
-      this.bus.emit('boss:defeated', { enemy: enemy.id });
+      by.bus.emit('boss:defeated', { enemy: enemy.id });
     }
-    const containers = this.actions.pickupContainers();
+    const containers = by.actions.pickupContainers();
     const leftovers = createContainer(0);
     for (const drop of rollEnemyDrops(def, this.state.data.world)) {
       const left = addItem(containers, drop.item, drop.qty, this.content().items);
       if (drop.qty - left > 0)
-        this.bus.emit('item:gained', { item: drop.item, qty: drop.qty - left, x: enemy.x, y: enemy.y });
+        by.bus.emit('item:gained', { item: drop.item, qty: drop.qty - left, x: enemy.x, y: enemy.y });
       if (left > 0) leftovers.push([drop.item, left]);
     }
     // O que não coube fica numa mochila no chão, no sítio do inimigo.
     if (leftovers.length > 0) {
-      this.dropBag(zone.zoneId, enemy.x, enemy.y, leftovers, false);
-      this.bus.emit('action:blocked', { reason: 'inventory_full' });
+      by.dropBag(zone.zoneId, enemy.x, enemy.y, leftovers, false);
+      by.bus.emit('action:blocked', { reason: 'inventory_full' });
     }
-    this.bus.emit('inventory:changed', {});
+    by.state.markDirty();
+    by.bus.emit('inventory:changed', {});
   }
 }

@@ -53,11 +53,13 @@ export class PauseUI {
     this.view = view;
     uiState.paused = true;
     uiState.modalOpen = true;
+    coop.setAway(true); // co-op: o tempo não pára, mas os inimigos ignoram quem está em pausa
     this.build();
   }
 
   close(): void {
     this.clear();
+    if (this.view !== null) coop.setAway(false);
     this.view = null;
     uiState.paused = false;
     uiState.modalOpen = false;

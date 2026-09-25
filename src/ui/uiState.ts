@@ -13,4 +13,6 @@ export const uiState = {
   paused: false,
   /** Reabrir o menu de pausa nesta vista quando o HUD se refizer (mudou a língua/tamanho). */
   reopenPause: null as 'main' | 'settings' | 'stats' | null,
+  /** Co-op ligado: o tempo não pára (pausa, mapa-mundo) e a velocidade fica em x1. */
+  coop: false,
 };

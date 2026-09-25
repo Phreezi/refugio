@@ -83,11 +83,6 @@ export interface GameEvents {
   /** Troca feita com o comerciante (não dá XP). */
   traded: { item: string };
   /** Co-op: o parceiro levou dano, caiu ou voltou. */
-  'partner:damaged': { amount: number; x: number; y: number };
-  'partner:down': Record<string, never>;
-  'partner:revived': Record<string, never>;
-  /** Co-op: o parceiro fez uma ação (para a animação). */
-  'partner:action': { kind: 'gather' | 'attack' | 'swing' };
   /** Co-op: ligou-se/desligou-se alguém (o HUD atualiza o estado). */
   'coop:changed': Record<string, never>;
   /** Hordas (§7.13). */
@@ -113,6 +108,15 @@ export interface GameEvents {
 /** Emissor de eventos tipado e sem dependências do Phaser (testável com Vitest). */
 export class EventBus<Events extends object> {
   private readonly handlers = new Map<keyof Events, Set<Handler<never>>>();
+  private readonly anyHandlers = new Set<(event: keyof Events, payload: unknown) => void>();
+
+  /** Subscreve todos os eventos (co-op: reenviar ao outro jogador). Devolve o cancelamento. */
+  onAny(handler: (event: keyof Events, payload: unknown) => void): () => void {
+    this.anyHandlers.add(handler);
+    return () => {
+      this.anyHandlers.delete(handler);
+    };
+  }
 
   /** Subscreve um evento. Devolve a função que cancela a subscrição. */
   on<K extends keyof Events>(event: K, handler: Handler<Events[K]>): () => void {
@@ -144,6 +148,7 @@ export class EventBus<Events extends object> {
   }
 
   emit<K extends keyof Events>(event: K, payload: Events[K]): void {
+    for (const handler of [...this.anyHandlers]) handler(event, payload);
     const set = this.handlers.get(event);
     if (!set) return;
     // Cópia: um handler pode subscrever/cancelar durante a emissão sem afetar esta volta.

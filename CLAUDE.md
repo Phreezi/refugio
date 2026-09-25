@@ -134,7 +134,7 @@ refugio/
 │   │   ├── characterSheet.ts # layout das spritesheets de personagem + desenho do placeholder
 │   │   └── placeholders.ts   # texturas placeholder geradas por código
 │   ├── display/              # escala inteira + vista (view.ts) + zoom do jogador (worldZoom.ts)
-│   ├── world/                # mapas: tileset.ts, zoneMap.ts (validação Tiled, puro), content.ts
+│   ├── world/                # mapas: tileset.ts, zoneMap.ts (validação Tiled, puro), content.ts, zoneContext.ts
 │   ├── debug/                # overlay F3 (DOM)
 │   ├── scenes/
 │   │   ├── keys.ts           # chaves das cenas
@@ -178,7 +178,7 @@ refugio/
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
 │   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, BuildUI (+ buildMode), FishingUI, LevelUpUI, gameSpeed, uiState, fileTransfer, fatalError
 │   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
-│   ├── net/                  # co-op (Fase 15): protocol.ts (código e mensagens, puro), coop.ts (PeerJS)
+│   ├── net/                  # co-op (Fase 15): protocol.ts (código, mensagens, comandos; puro), coop.ts (PeerJS, sessões, sincronização)
 │   ├── save/
 │   │   ├── index.ts          # instâncias (saves, autosave) + gravar ao esconder a página
 │   │   ├── Autosave.ts       # quando gravar (15 s, eventos, flush/flushSync)
@@ -922,19 +922,20 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** jogar com um amigo pela internet, no mundo de um dos dois.
 
-Versão leve (pedido do jogador: "o mais leve e fácil"): o convidado é um **ajudante** no mundo do anfitrião.
+Os dois jogadores são **completos e autónomos**, como sozinhos: cada um com a sua personagem (mochila, hotbar, equipamento, vida/fome/sede, nível, receitas), fabrico, construção e viagens próprias — podem estar em zonas diferentes. O **mundo é o do anfitrião** e é partilhado: baús, peças construídas, estações, recursos apanhados, contentores, mochilas no chão, hordas e o relógio.
 
-- [x] **Código de sessão**: "Convidar amigo" no menu de pausa mostra um código de **5 caracteres** (alfabeto sem `0/O`, `1/I/L`: 31 símbolos, ~28 milhões de códigos). O código é o id do anfitrião no servidor de sinalização do PeerJS (`refugio-coop-<código>`), que **recusa ids em uso**: nunca há duas sessões ativas com o mesmo código (se calhar um ocupado, tenta-se outro). O amigo carrega em "Entrar com código" no menu inicial.
-- [x] **Ligação**: WebRTC (DataChannel) com o **PeerJS** (MIT, ~100 KB); a sinalização usa o servidor gratuito do PeerJS (sem alojamento nosso). `?peer=host:porta` na URL usa outro servidor (testes locais com o pacote `peer`).
-- [x] **Anfitrião autoritativo**: a `Simulation` corre no anfitrião. O convidado anda no ecrã dele e manda a posição (15×/s) e a ação; o anfitrião manda 10×/s o boneco dele, a vida do convidado e os inimigos (interpolados), o estado inteiro a cada 2 s e ao mudar de zona, e reenvia os eventos que se veem (golpes, recursos, loot…) (`src/net/`).
-- [x] **Parceiro** (`core/Partner.ts`, só em memória no anfitrião): os inimigos atacam o jogador mais perto; bate (com a arma que trouxe equipada no save dele) e recolhe — o que apanha vai para a **mochila partilhada** do anfitrião. Sem fome/sede; caído, volta ao pé do anfitrião ao fim de `partnerDownSec` (5 s) com a vida cheia.
-- [x] O convidado vê o mundo do anfitrião (`GameState` "emprestado", que **nunca se grava**); a mochila, o fabrico e a construção são do anfitrião (aviso). Muda de zona com o anfitrião; as peças construídas atualizam-se refazendo a cena.
-- [x] Fim: o anfitrião "Terminar co-op" ou sair; o convidado volta ao menu ("A ligação terminou"), com o save dele intacto.
+- [x] **Código de sessão**: "Convidar amigo" no menu de pausa mostra um código de **5 caracteres** (alfabeto sem `0/O`, `1/I/L`: 31 símbolos, ~28 milhões de códigos). O código é o id do anfitrião no servidor de sinalização do PeerJS (`refugio-coop-<código>`), que **recusa ids em uso**: nunca há duas sessões ativas com o mesmo código. O amigo carrega em "Entrar com código" no menu inicial.
+- [x] **Ligação**: WebRTC (DataChannel) com o **PeerJS** (MIT); a sinalização usa o servidor gratuito do PeerJS. `?peer=host:porta` na URL usa outro servidor (testes locais com o pacote `peer`).
+- [x] **Personagem do convidado**: vem do save dele (ou uma nova, se não tiver) e volta para lá — a cada 10 s, ao sair e ao fechar a página grava-se no save **dele** (mantendo a posição que tinha no mundo dele). O que tirar dos baús do anfitrião leva para casa.
+- [x] **Anfitrião autoritativo** (`src/net/`): o anfitrião corre uma **segunda `Simulation`** para o convidado, sobre o mesmo mundo (o `GameState` do convidado aponta para os mesmos objetos do mundo, com `player`/`unlocks`/`stats`/`tutorial` próprios e um `EventBus` próprio, `guestBus`). Corre dentro do tick do principal (o relógio, as estações e a horda avançam uma vez). **Na mesma zona**, as duas simulações partilham a zona (inimigos, peças, colisões: `Simulation.attach`/`syncLinks`, `Combat.link`, `Building.link`) e os inimigos atacam o jogador mais perto; **noutra zona**, o convidado tem a sua (com os seus inimigos).
+- [x] **Ecrã do convidado**: anda localmente (manda a posição 15×/s); os painéis (mochila, fabrico, construção, viagens, pesca, tutorial) fazem logo a ação no ecrã dele e mandam-na ao anfitrião como comando (lista fechada em `GUEST_COMMANDS`). O anfitrião manda 10×/s um `frame` (vida/fome/sede, inimigos, o anfitrião se estiver na mesma zona, pesca) e o mundo inteiro (`snap`) quando muda (≤ 4×/s; de 3 em 3 s sem mudanças). O `snap` só se aplica quando o anfitrião já fez todos os comandos enviados (`ack`), e a posição só muda quando o anfitrião o muda de sítio (`warp`: ao entrar, ao morrer). A XP, os níveis e as estatísticas calculam-se só no anfitrião.
+- [x] **Morte do convidado**: como sozinho — a mochila fica no chão (no mundo do anfitrião) e ele reaparece na base.
+- [x] **Dificuldade**: em co-op, os inimigos têm **1,5× vida e dano** (`coopEnemyMultiplier`; os que já estão na zona ajustam-se ao entrar o convidado).
+- [x] O tempo não pára em co-op: a pausa e o mapa-mundo deixam o jogador "ausente" (os inimigos ignoram-no) e a velocidade fica em x1.
 - [ ] Redes difíceis: o PeerJS usa STUN público; sem TURN, algumas redes (4G com CGNAT, empresas) podem não ligar.
-- [ ] Personagem própria do convidado (inventário, nível) — fica para depois, se fizer falta.
 - [ ] Verificar se Android (Fase 13) e YouTube Playables (Fase 14) permitem multijogador.
 
-**Aceitação:** dois jogadores em redes diferentes entram com o código, recolhem e combatem juntos durante 30 min; nunca há duas sessões ativas com o mesmo código. *(Testado localmente com dois browsers e o servidor `peer`; falta testar entre redes diferentes.)*
+**Aceitação:** dois jogadores em redes diferentes entram com o código, recolhem, constroem e combatem juntos durante 30 min sem dessincronizar; nunca há duas sessões ativas com o mesmo código. *(Testado localmente com dois browsers e o servidor `peer`: baú partilhado, personagem gravada no save do convidado, zonas diferentes, inimigos partilhados na mesma zona, morte; falta testar entre redes diferentes.)*
 
 ---
 
@@ -1072,5 +1073,9 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-24 | Save v13: `tutorial`; saves antigos ficam com as dicas desligadas | Quem já jogava não precisa do tutorial; jogos novos veem-no |
 | 2026-09-24 | Levar dano não abana o ecrã: moldura vermelha nas 4 bordas que se apaga em 0,45 s; a explosão do inchado abana só um pouco | Pedido do jogador: o abanão incomodava |
 | 2026-09-25 | Co-op leve: o convidado é um ajudante no mundo do anfitrião (sem personagem própria nem save) | Pedido do jogador ("o mais leve e fácil"): a lógica já corre só no anfitrião; o convidado só envia posição e ação. Mochila partilhada, sem fome/sede para o convidado |
+| 2026-09-25 | Co-op com dois jogadores completos (substitui o "ajudante"): personagem própria do convidado, gravada no save dele; baús e resto do mundo partilhados; zonas independentes | Pedido do jogador: "exatamente como em single player, os 2 jogadores são autónomos e têm tudo disponível, com a diferença de poderem partilhar baús" |
+| 2026-09-25 | No anfitrião, uma segunda `Simulation` para o convidado, sobre os mesmos objetos do mundo; ligada à principal na mesma zona | Reaproveita toda a lógica de um jogador (fabrico, construção, combate, progressão) sem a duplicar; sem mudar o formato do save |
+| 2026-09-25 | Convidado com previsão: as ações dos painéis fazem-se logo no ecrã dele e são repetidas no anfitrião (comandos numerados; o estado só se aplica depois de o anfitrião os fazer todos) | Painéis sem atraso de rede e sem estado a "saltar para trás" |
+| 2026-09-25 | Inimigos 1,5× mais fortes (vida e dano) em co-op | Pedido do jogador |
 | 2026-09-25 | Dependência nova: **PeerJS** (MIT) + servidor de sinalização gratuito do PeerJS | Sem servidor próprio a alojar; o servidor recusa ids repetidos, o que garante códigos únicos entre as sessões ativas. Contrapartida: depende de um serviço de terceiros (pode trocar-se por um próprio com `?peer=`) |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

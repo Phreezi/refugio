@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { PALETTE, paletteNumber, type PaletteColor } from '../assets/palette';
 import { PLAYER_FOOTPRINT } from '../config';
-import { eventBus } from '../core/EventBus';
+import { eventBus, type GameEvents } from '../core/EventBus';
 import { itemName, t, tKey } from '../i18n';
 import { Label } from '../ui/text';
 import { gameSpeed } from '../ui/gameSpeed';
@@ -17,10 +17,10 @@ import { installShortcutGuard } from '../input/browserShortcuts';
 import { keyboardDirection } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
 import { autosave } from '../save';
-import { coop } from '../net/coop';
+import { buildZoneContext } from '../world/zoneContext';
+import { coop, guestBus } from '../net/coop';
 import { CROP_SPROUT_SPRITE, cropSprite, structureSprite, type StructureDef } from '../data/types';
 import { structureArea, structureFeet, type StructureRecord } from '../systems/building/building';
-import { CollisionWorld } from '../systems/movement/CollisionWorld';
 import { buildMode, buildTargetTile } from '../ui/buildMode';
 import type { Facing } from '../systems/movement/movement';
 import { content } from '../world/content';
@@ -33,6 +33,22 @@ import type { MainMenuData } from './MainMenuScene';
 import type { WorldMapData } from './WorldMapScene';
 
 const PLAYER_TEXTURE = 'player';
+/** Eventos do mundo que, no co-op, também vêm do convidado (o anfitrião vê-os se estiver lá). */
+const SHARED_VIEW_EVENTS: ReadonlySet<keyof GameEvents> = new Set<keyof GameEvents>([
+  'resource:hit',
+  'resource:respawned',
+  'structure:placed',
+  'structure:removed',
+  'structure:changed',
+  'structure:damaged',
+  'structure:destroyed',
+  'enemy:hit',
+  'enemy:killed',
+  'enemy:exploded',
+  'enemy:scream',
+  'bag:changed',
+  'inventory:changed',
+]);
 /** Tinta do boneco do outro jogador (co-op), para se distinguirem. */
 const OTHER_TINT = 0x9fc6ff;
 /** Seta por cima do alvo da ação contextual (textura gerada por código). */
@@ -129,6 +145,8 @@ export class ZoneScene extends Phaser.Scene {
   private attackUntil = 0;
   /** Último "+N item" mostrado (para empilhar os que chegam juntos). */
   private lastGain: { x: number; y: number; at: number; row: number } | null = null;
+  /** Co-op (convidado): as peças desenhadas (para saber se o mundo recebido as mudou). */
+  private structuresKey = '';
 
   constructor() {
     super(SceneKey.Zone);
@@ -192,25 +210,7 @@ export class ZoneScene extends Phaser.Scene {
     const offShortcuts = installShortcutGuard();
 
     this.keys = this.createMoveKeys();
-    simulation.setZone({
-      zoneId: this.zoneId,
-      map: zone,
-      collision: CollisionWorld.fromZone(
-        zone,
-        content.resources,
-        content.props,
-        content.stations,
-        content.lootTables,
-      ),
-      items: content.items,
-      resources: content.resources,
-      props: content.props,
-      stations: content.stations,
-      structures: content.structures,
-      lootTables: content.lootTables,
-      nightEnemyMultiplier: content.zones[this.zoneId]?.nightEnemyMultiplier ?? 1,
-      respawnDays: content.zones[this.zoneId]?.respawnDays ?? 1,
-    });
+    simulation.setZone(buildZoneContext(this.zoneId));
     simulation.setRespawnPoint(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     simulation.reset();
     this.setupCoop();
@@ -220,6 +220,7 @@ export class ZoneScene extends Phaser.Scene {
     this.structureSprites = new Map();
     this.cropSprites = new Map();
     for (const record of simulation.building.structures()) this.addStructureSprite(record);
+    this.structuresKey = JSON.stringify(gameState.data.base.structures);
     this.marker = this.add.image(0, 0, this.markerTexture()).setOrigin(0.5, 1).setVisible(false);
     this.ghost = this.add.image(0, 0, '__DEFAULT').setOrigin(0.5, 1).setAlpha(0.75).setVisible(false);
     this.ghostArea = this.add.rectangle(0, 0, 16, 16, GHOST_OK, 0.3).setOrigin(0).setVisible(false);
@@ -257,7 +258,7 @@ export class ZoneScene extends Phaser.Scene {
       this.demolishTinted = null;
       buildMode.active = false;
       moveInput.reset();
-      coop.onWorldChanged = null;
+      coop.onSnapshot = null;
       coop.onLost = null;
       this.player = null;
       this.other = null;
@@ -269,7 +270,7 @@ export class ZoneScene extends Phaser.Scene {
     moveInput.keyboard = this.readKeyboard();
     moveInput.keyboardSneak = this.keys?.sneak.some((key) => key.isDown) ?? false;
     // Com a mochila/baú aberto (ou a sair da zona) o jogador fica parado.
-    const blocked = uiState.modalOpen || this.leaving || coop.guestDown;
+    const blocked = uiState.modalOpen || this.leaving;
     simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction, moveInput.sneak);
     // No modo construção, Espaço/clique colocam peças (UIScene) em vez da ação contextual.
     const actionKey = !buildMode.active && (this.keys?.action.some((key) => key.isDown) ?? false);
@@ -279,7 +280,8 @@ export class ZoneScene extends Phaser.Scene {
     // Velocidade do jogo (x1/x2/x3): mais tempo de jogo por frame (no máx. 5 ticks por frame).
     const speed = gameSpeed();
     // Menu de pausa aberto: o tempo de jogo pára (o ecrã continua a ser desenhado).
-    if (!uiState.paused) simulation.update(this.game.loop.rawDelta * speed);
+    // Em co-op o tempo nunca pára (o outro jogador continua a jogar).
+    if (!uiState.paused || uiState.coop) simulation.update(this.game.loop.rawDelta * speed);
     if (this.player) this.player.anims.timeScale = speed;
     coop.update(performance.now());
     this.renderPlayer();
@@ -463,11 +465,27 @@ export class ZoneScene extends Phaser.Scene {
 
   /** Reações visuais aos eventos da lógica: golpes, recursos apanhados, itens ganhos. */
   private listenForFeedback(): () => void {
+    // Co-op (anfitrião): o que o convidado faz no mundo (golpes, recursos, peças) também se vê
+    // aqui, se ele estiver nesta zona.
+    const on = <K extends keyof GameEvents>(
+      event: K,
+      handler: (payload: GameEvents[K]) => void,
+    ): (() => void) => {
+      const off = eventBus.on(event, handler);
+      if (!SHARED_VIEW_EVENTS.has(event)) return off;
+      const offGuest = guestBus.on(event, (payload) => {
+        if (coop.isHost && coop.guestHere(this.zoneId)) handler(payload);
+      });
+      return () => {
+        off();
+        offGuest();
+      };
+    };
     const offs = [
-      eventBus.on('player:action', ({ kind }) => {
+      on('player:action', ({ kind }) => {
         if (kind !== 'open') this.attackUntil = this.time.now + ATTACK_MS;
       }),
-      eventBus.on('resource:hit', ({ objectId, hp }) => {
+      on('resource:hit', ({ objectId, hp }) => {
         const sprite = this.resourceSprites.get(objectId);
         if (!sprite) return;
         if (hp <= 0) {
@@ -482,29 +500,29 @@ export class ZoneScene extends Phaser.Scene {
           this.time.delayedCall(40 * i, () => sprite.setX(x + dx));
         });
       }),
-      eventBus.on('resource:respawned', ({ objectId }) => {
+      on('resource:respawned', ({ objectId }) => {
         const sprite = this.resourceSprites.get(objectId);
         if (!sprite) return;
         sprite.setVisible(true).setAlpha(0);
         this.tweens.add({ targets: sprite, alpha: 1, duration: 600 });
       }),
-      eventBus.on('structure:placed', ({ uid }) => {
+      on('structure:placed', ({ uid }) => {
         const record = simulation.building.get(uid);
         if (record) this.addStructureSprite(record);
       }),
-      eventBus.on('structure:removed', ({ uid }) => {
+      on('structure:removed', ({ uid }) => {
         this.structureSprites.get(uid)?.destroy();
         this.structureSprites.delete(uid);
         this.cropSprites.get(uid)?.destroy();
         this.cropSprites.delete(uid);
       }),
-      eventBus.on('structure:changed', ({ uid }) => {
+      on('structure:changed', ({ uid }) => {
         const record = simulation.building.get(uid);
         const def = record ? content.structures[record[1]] : undefined;
         if (record && def) this.structureSprites.get(uid)?.setTexture(this.structureTexture(record, def));
         this.applyDamageTint(uid);
       }),
-      eventBus.on('structure:damaged', ({ uid, amount, x, y }) => {
+      on('structure:damaged', ({ uid, amount, x, y }) => {
         const record = simulation.building.get(uid);
         const def = record ? content.structures[record[1]] : undefined;
         // As armadilhas gastam-se sem números (seria ruído); as paredes mostram o dano.
@@ -515,7 +533,7 @@ export class ZoneScene extends Phaser.Scene {
           [1, -1, 0].forEach((dx, i) => this.time.delayedCall(40 * i, () => sprite.setX(sx + dx)));
         }
       }),
-      eventBus.on('structure:destroyed', ({ x, y }) => {
+      on('structure:destroyed', ({ x, y }) => {
         // Pó a saltar do sítio da peça.
         for (let i = 0; i < 8; i++) {
           const angle = (i / 8) * Math.PI * 2;
@@ -534,14 +552,14 @@ export class ZoneScene extends Phaser.Scene {
           });
         }
       }),
-      eventBus.on('enemy:hit', ({ uid, damage, x, y }) => {
+      on('enemy:hit', ({ uid, damage, x, y }) => {
         if (preferences().damageNumbers)
           this.floatText(`-${String(damage)}`, Math.round(x), Math.round(y) - 2, 'gold');
         const sprite = this.enemyViews.get(uid)?.sprite;
         sprite?.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
         this.time.delayedCall(80, () => sprite?.clearTint());
       }),
-      eventBus.on('enemy:killed', ({ uid }) => {
+      on('enemy:killed', ({ uid }) => {
         const view = this.enemyViews.get(uid);
         this.enemyViews.delete(uid);
         if (!view) return;
@@ -556,7 +574,7 @@ export class ZoneScene extends Phaser.Scene {
           },
         });
       }),
-      eventBus.on('enemy:exploded', ({ x, y, radius }) => {
+      on('enemy:exploded', ({ x, y, radius }) => {
         const blast = this.add
           .circle(Math.round(x), Math.round(y) - 6, radius, paletteNumber('orange'), 0.55)
           .setDepth(LAYER_DEPTH.decor_high + 1);
@@ -570,7 +588,7 @@ export class ZoneScene extends Phaser.Scene {
         });
         this.cameras.main.shake(120, 0.002); // a explosão abana só um pouco
       }),
-      eventBus.on('enemy:scream', ({ x, y, radius }) => {
+      on('enemy:scream', ({ x, y, radius }) => {
         // Grito: um anel que cresce até ao raio do alerta.
         const ring = this.add
           .circle(Math.round(x), Math.round(y) - 16, 4)
@@ -586,19 +604,19 @@ export class ZoneScene extends Phaser.Scene {
           },
         });
       }),
-      eventBus.on('player:damaged', ({ amount, x, y }) => {
+      on('player:damaged', ({ amount, x, y }) => {
         if (preferences().damageNumbers)
           this.floatText(`-${String(amount)}`, Math.round(x), Math.round(y) - 34, 'red');
         this.hurtUntil = this.time.now + 150;
         // Sem abanar o ecrã: o HUD mostra as bordas avermelhadas (pedido do jogador).
       }),
-      eventBus.on('inventory:changed', () => {
+      on('inventory:changed', () => {
         this.renderContainers();
       }),
-      eventBus.on('bag:changed', ({ zoneId }) => {
+      on('bag:changed', ({ zoneId }) => {
         if (zoneId === this.zoneId) this.renderBags();
       }),
-      eventBus.on('zone:change', ({ from, to, exit }) => {
+      on('zone:change', ({ from, to, exit }) => {
         if (to === null) {
           // Saída para o mapa-mundo: o jogador fica na saída até escolher para onde vai.
           this.leave(() => {
@@ -612,7 +630,7 @@ export class ZoneScene extends Phaser.Scene {
           this.scene.restart({ zoneId: to } satisfies ZoneSceneData);
         });
       }),
-      eventBus.on('player:died', () => {
+      on('player:died', () => {
         // O jogador já está na base (GameState): se morreu noutra zona, muda de cena.
         if (this.zoneId !== BASE_ZONE_ID) {
           this.leave(() => {
@@ -620,7 +638,7 @@ export class ZoneScene extends Phaser.Scene {
           });
         }
       }),
-      eventBus.on('item:gained', ({ item, qty, x, y }) => {
+      on('item:gained', ({ item, qty, x, y }) => {
         // Vários ganhos no mesmo sítio e no mesmo instante (fruto + sementes) ficam empilhados.
         const now = this.time.now;
         const last = this.lastGain;
@@ -704,7 +722,7 @@ export class ZoneScene extends Phaser.Scene {
       } else if (view.sprite.tintMode === Phaser.TintModes.FILL && enemy.stun === 0) {
         view.sprite.clearTint();
       }
-      const hurt = enemy.hp < def.hp;
+      const hurt = enemy.hp < enemy.maxHp;
       const top = y - view.sprite.height - 4;
       view.barBack
         .setPosition(x - ENEMY_BAR / 2 - 1, top)
@@ -712,7 +730,7 @@ export class ZoneScene extends Phaser.Scene {
         .setVisible(hurt);
       view.bar
         .setPosition(x - ENEMY_BAR / 2, top + 1)
-        .setSize(Math.max(1, Math.round((ENEMY_BAR * enemy.hp) / def.hp)), 2)
+        .setSize(Math.max(1, Math.round((ENEMY_BAR * enemy.hp) / enemy.maxHp)), 2)
         .setDepth(y)
         .setVisible(hurt);
     }
@@ -732,7 +750,7 @@ export class ZoneScene extends Phaser.Scene {
       if (now < this.hurtUntil) this.player.setTint(0xb33a3a).setTintMode(Phaser.TintModes.FILL);
       else this.player.clearTint();
       const blink = simulation.combat.playerInvulnerable && Math.floor(now / 80) % 2 === 0;
-      this.player.setAlpha(blink || coop.guestDown ? 0.4 : 1);
+      this.player.setAlpha(blink ? 0.4 : 1);
     }
   }
 
@@ -970,20 +988,54 @@ export class ZoneScene extends Phaser.Scene {
    * quando o anfitrião muda de zona ou de peças, e volta ao menu se a ligação cair.
    */
   private setupCoop(): void {
-    if (coop.isHost) coop.hostZoneEntered();
+    coop.setAway(false);
     if (!coop.isGuest) return;
-    coop.onWorldChanged = (zoneId) => {
-      if (!this.leaving) this.scene.restart({ zoneId } satisfies ZoneSceneData);
+    coop.onSnapshot = () => {
+      if (this.leaving) return;
+      const zoneId = gameState.data.player.zoneId;
+      // O anfitrião mudou-o de zona (morreu e voltou à base): muda de cena.
+      if (zoneId !== this.zoneId) {
+        this.leave(() => {
+          this.scene.restart({ zoneId } satisfies ZoneSceneData);
+        });
+        return;
+      }
+      this.resyncWorld();
     };
     coop.onLost = () => {
       gameState.clear();
+      this.scene.stop(SceneKey.UI);
       this.scene.start(SceneKey.MainMenu, { message: 'coop.lost' } satisfies MainMenuData);
     };
   }
 
-  /** O outro jogador do co-op: posição interpolada, andar, golpe; meio transparente se caiu. */
+  /**
+   * Co-op (convidado): chegou o mundo do anfitrião. Refaz as peças (se mudaram), os recursos
+   * apanhados, os contentores vazios e as mochilas no chão.
+   */
+  private resyncWorld(): void {
+    const structures = JSON.stringify(gameState.data.base.structures);
+    if (structures !== this.structuresKey) {
+      this.structuresKey = structures;
+      simulation.building.resync();
+      for (const sprite of this.structureSprites.values()) sprite.destroy();
+      for (const sprite of this.cropSprites.values()) sprite.destroy();
+      this.structureSprites.clear();
+      this.cropSprites.clear();
+      for (const record of simulation.building.structures()) this.addStructureSprite(record);
+    }
+    for (const [objectId, sprite] of this.resourceSprites) {
+      const depleted = simulation.interaction.isDepleted(objectId);
+      if (sprite.visible === depleted) sprite.setVisible(!depleted).setAlpha(1);
+    }
+    simulation.interaction.refreshCollisions();
+    this.renderContainers();
+    this.renderBags();
+  }
+
+  /** O outro jogador do co-op (se estiver nesta zona): posição interpolada, andar, golpe. */
   private renderOther(): void {
-    const view = coop.otherAvatar();
+    const view = coop.otherAvatar(this.zoneId);
     if (!view) {
       this.other?.setVisible(false);
       return;
@@ -997,17 +1049,13 @@ export class ZoneScene extends Phaser.Scene {
     const a = coop.alpha(now, view.at, coop.otherInterval);
     const x = this.toScreenGrid(view.px + (view.x - view.px) * a);
     const y = this.toScreenGrid(view.py + (view.y - view.py) * a);
-    other
-      .setVisible(true)
-      .setPosition(x, y)
-      .setDepth(y)
-      .setAlpha(view.down ? 0.4 : 1);
+    other.setVisible(true).setPosition(x, y).setDepth(y);
     const sinceAttack = now - coop.otherAttackAt;
     if (sinceAttack < ATTACK_MS) {
       const [raised, extended] = CHARACTER_COLUMNS.attack;
       other.stop();
       other.setFrame(characterFrame(view.facing, sinceAttack < ATTACK_MS / 2 ? raised : extended));
-    } else if (view.moved && !view.down) {
+    } else if (view.moved) {
       other.play(view.sneak ? sneakAnimationKey(view.facing) : walkAnimationKey(view.facing), true);
     } else {
       other.stop();

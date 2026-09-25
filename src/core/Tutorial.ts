@@ -57,7 +57,7 @@ export class Tutorial {
   }
 
   private complete(step: TutorialStep): void {
-    if (!this.state.hasGame) return;
+    if (!this.state.hasGame || this.state.borrowed) return;
     const done = this.state.data.tutorial.done;
     if (done.includes(step)) return;
     done.push(step);
