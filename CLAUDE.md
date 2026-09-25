@@ -276,6 +276,7 @@ npm run map:t3     # gera maps/industrial.json, hospital.json (idem)
 npm run map:bunker # gera maps/bunker_1..4.json (idem)
 npm run map:t4     # gera maps/military.json, city.json (idem)
 npm run map:events # gera maps/plane_crash.json, train.json, camp.json (idem)
+npm run map:routes # gera maps/route_1..10.json (Caminhos do mundo contínuo; idem)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -530,8 +531,16 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - Cada zona tem **nível de perigo** T1–T4 (cor verde, amarelo, laranja, vermelho).
 - Zonas com `requiresItem` (ex.: bunker → chave) só se visitam levando o item (não se gasta); o painel diz o que falta e mostra a pista (`hint`).
 - **Masmorras** (`dungeon: { id, floor }` em `zones.json`, Fase 10): só o piso 1 aparece no mapa-mundo; os outros são `hidden` e ligam-se por escadas (saídas `exit:<zona do piso>` sobre os tiles `stairs_up`/`stairs_down`). O piso mais fundo já alcançado é o **checkpoint** (save `dungeons[id]`): viajar para a masmorra leva lá, ao início do piso. Zonas com `darkness` são sempre escuras.
-- **Teletransporte (Etapa E, parte 1)**: cada zona normal (não masmorras nem eventos) tem um **poste** (`prop:waystone`, `action: "teleport"`) perto da entrada. A ação ativa-o (save v21 `waystones`, aviso) e abre o mapa-mundo em modo teletransporte (`WorldMapData.teleport`): destinos = postes ativados + a base, **sem custo**; chega-se ao lado do poste (`teleportArrivalPx`). Na base constrói-se o **poste de teletransporte** (`waystone_post`, nível 5, `teleport: true`). Co-op: `sim.teleport` é um comando do convidado. *(Mais tarde: ligações diretas entre zonas vizinhas e, por fim, mundo contínuo.)*
+- **Teletransporte (Etapa E, parte 1)**: cada zona normal (não masmorras nem eventos) tem um **poste** (`prop:waystone`, `action: "teleport"`) perto da entrada. A ação ativa-o (save v21 `waystones`, aviso) e abre o mapa-mundo em modo teletransporte (`WorldMapData.teleport`): destinos = postes ativados + a base, **sem custo**; chega-se ao lado do poste (`teleportArrivalPx`). Na base constrói-se o **poste de teletransporte** (`waystone_post`, nível 5, `teleport: true`). Co-op: `sim.teleport` é um comando do convidado.
 - Chefes (`boss: true` em `enemies.json`): barra de vida no topo do HUD; derrotados, só voltam ao fim de `respawnDays` da zona (save `bosses[zona]`).
+
+### 8.1.1 Mundo contínuo (Etapa E, estilo Pokémon)
+
+- As zonas com `world: [x, y]` (zones.json, tiles do canto superior esquerdo) são **blocos de um só mapa**, que se tocam pelas bordas (`src/world/worldLayout.ts`, puro). Onde as duas bordas estão abertas passa-se a andar de uma zona para a outra, **sem ecrã de viagem nem fade**: fora do mapa, a colisão é a do tile da zona vizinha (`CollisionWorld.outside`); ao sair do mapa, `Simulation.checkEdges` emite `zone:cross` com o ponto já nas coordenadas da vizinha e a cena recomeça lá (`crossTo`; no co-op é um comando do convidado). As saídas `exit` numa abertura destas deixam de abrir o mapa-mundo (`travelExits`); as outras continuam.
+- **Carregamento parcial**: só se desenham (chão, obstáculos, recursos, e na base as peças construídas) as zonas a `NEIGHBOR_MARGIN_TILES` (40) da atual; a lógica (inimigos, recolha…) é só a da zona onde se está. Os limites da câmara são a união das zonas desenhadas.
+- **Desenho do mundo**: a Casa a sudoeste; a leste dela sobe para norte uma estrada de **Caminhos** (`zone_route_1…10`, 20 tiles de largura, `hidden` no mapa-mundo, `npm run map:routes`), e cada zona encosta-se a leste do seu Caminho, **por ordem de dificuldade**: Pinhal, Quinta, Lago, Estrada, Aldeia, Floresta Profunda, Industrial, Hospital, Base Militar, Cidade. Cada Caminho tem barreiras de lado a lado com uma só passagem, alternada à esquerda e à direita (obriga a andar em ziguezague), inimigos do nível da zona ao lado, relva alta, árvores e pedras.
+- **Dificuldade por ordem**: cada Caminho pede o nível da zona ao lado (`unlockLevel`); sem ele, a borda trava ("precisas de nível N para passar"). Zonas com `requiresItem` também travam na borda.
+- As masmorras e as zonas-evento ficam fora do mundo contínuo (mapa-mundo e postes). O `validate-data` confirma que os blocos não se sobrepõem e que cada abertura de um Caminho dá para chão livre.
 
 ### 8.2 Lista de zonas
 
@@ -1162,4 +1171,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Fonte Jersey 10 (pixel arredondada, ~1,5× maior); botões encolhem a letra se o texto não couber; "Entrar com código" na coluna dos botões | Pedido do jogador: a Tiny5 lia-se mal e o botão do canto tapava a lista de jogos |
 | 2026-09-25 | Com um campo de texto focado, a vista não se refaz (o teclado do telemóvel encolhe a janela); o menu só se refaz ao fechar a janela | No telemóvel não se conseguia escrever o nome nem o código: o teclado reiniciava o menu ("pisca e não faz nada") |
 | 2026-09-25 | Save v21: moedas como contador (`player.coins`; as dos slots e baús migram); frigorífico + take-away com entrega à porta; comida com efeitos temporários (`player.buffs`); postes de teletransporte (`waystones`) | Pedidos do jogador; Etapa E começa pelos teletransportes (o mundo contínuo fica para depois) |
+| 2026-09-25 | Mundo contínuo à Pokémon: zonas como blocos com coordenadas no mundo, ligadas por Caminhos com obstáculos; passa-se a andar pelas bordas (sem fade) e só se desenham as zonas perto | Pedido do jogador: "o mapa tornar-se contínuo… load parcial… caminhos específicos… dificuldade por ordem". Os mapas e o save não mudam: a zona continua a ser a unidade da lógica e do save; recomeçar a cena na vizinha (com a mesma vista) evita reescrever o jogo todo |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

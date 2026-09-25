@@ -11,6 +11,7 @@ import type {
   ZoneDefs,
 } from '../data/types';
 import type { ZoneMap } from './zoneMap';
+import { buildWorldLayout, type WorldLayout } from './worldLayout';
 
 /**
  * Conteúdo já validado no arranque (PreloadScene), partilhado pelas cenas.
@@ -28,6 +29,7 @@ class Content {
   private zoneDefs: ZoneDefs | null = null;
   private lootDefs: LootTables | null = null;
   private readonly zoneMaps = new Map<string, ZoneMap>();
+  private layout: WorldLayout | null = null;
 
   setItems(defs: ItemDefs): void {
     this.itemDefs = defs;
@@ -115,6 +117,13 @@ class Content {
 
   setZoneMap(zoneId: string, map: ZoneMap): void {
     this.zoneMaps.set(zoneId, map);
+    this.layout = null;
+  }
+
+  /** Mundo contínuo: as zonas com `world` (feito na primeira vez, com os mapas carregados). */
+  get world(): WorldLayout {
+    this.layout ??= buildWorldLayout(this.zones, (zoneId) => this.zoneMap(zoneId));
+    return this.layout;
   }
 
   zoneMap(zoneId: string): ZoneMap {

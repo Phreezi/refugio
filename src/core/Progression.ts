@@ -78,7 +78,12 @@ export class Progression {
   }
 
   isZoneUnlocked(zoneId: string): boolean {
-    return (this.content().zones[zoneId]?.unlockLevel ?? 1) <= this.level;
+    return this.zoneLevel(zoneId) <= this.level;
+  }
+
+  /** Nível pedido para entrar na zona. */
+  zoneLevel(zoneId: string): number {
+    return this.content().zones[zoneId]?.unlockLevel ?? 1;
   }
 
   /** A zona existe agora? (as zonas-evento só durante o evento, §8.3) */

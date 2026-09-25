@@ -30,6 +30,25 @@ import { buildZoneContext } from '../world/zoneContext';
  * Corre a lógica do jogo em passo fixo. As cenas de jogo (Base, Zona) chamam
  * `update(delta)` uma vez por frame; os sistemas correm dentro de `tick()`.
  */
+/**
+ * Saídas que abrem o mapa-mundo (ou levam a outra zona): as que estão numa abertura para uma
+ * zona vizinha do mundo contínuo não contam — por ali passa-se a andar (Etapa E).
+ */
+function travelExits(zone: ZoneContext): ZoneMap['exits'] {
+  if (!zone.neighborAt) return zone.map.exits;
+  const { width, height, tileSize } = zone.map;
+  return zone.map.exits.filter((exit) => {
+    const tx = Math.floor(exit.x / tileSize);
+    const ty = Math.floor(exit.y / tileSize);
+    const outward: [number, number][] = [];
+    if (tx === 0) outward.push([-1, ty]);
+    if (ty === 0) outward.push([tx, -1]);
+    if (tx === width - 1) outward.push([width, ty]);
+    if (ty === height - 1) outward.push([tx, height]);
+    return !outward.some(([ox, oy]) => !zone.collision.isSolidTile(ox, oy));
+  });
+}
+
 /** Prop dos postes de teletransporte nos mapas (`prop:waystone`). */
 export const WAYSTONE_PROP = 'waystone';
 
@@ -68,6 +87,8 @@ export class Simulation {
   private intent: Vec2 = ZERO;
   private sneaking = false;
   private previous: Vec2 = ZERO;
+  /** Mundo contínuo: não repetir o aviso "precisas de nível" a cada tick na borda. */
+  private edgeWarnTick = 0;
   private moved = false;
   private zone: ZoneContext | null = null;
   /**
@@ -174,7 +195,7 @@ export class Simulation {
     this.linked = false;
     this.zone = zone;
     this.world = zone?.collision ?? null;
-    this.exits = zone?.map.exits ?? [];
+    this.exits = zone ? travelExits(zone) : [];
     this.leavingTo = null;
     this.fishing.cancel();
     this.building.setZone(zone);
@@ -233,7 +254,7 @@ export class Simulation {
     this.linked = true;
     this.zone = zone;
     this.world = zone.collision;
-    this.exits = zone.map.exits;
+    this.exits = travelExits(zone);
     this.leavingTo = null;
     this.fishing.cancel();
     this.combat.link(primary.combat);
@@ -532,12 +553,56 @@ export class Simulation {
   /** Pisar uma saída leva a outra zona (uma vez; a cena trata da transição). */
   private checkExits(): void {
     if (this.leavingTo !== null || !this.moved) return;
+    if (this.checkEdges()) return;
     const player = this.state.data.player;
     const exit = this.exits.find((e) => Math.hypot(e.x - player.x, e.y - player.y) <= BALANCE.exitReachPx);
     if (!exit) return;
     // Sem destino, a saída abre o mapa-mundo (a cena decide para onde se vai).
     this.leavingTo = exit.to ?? 'world';
     this.bus.emit('zone:change', { from: player.zoneId, to: exit.to, exit: { x: exit.x, y: exit.y } });
+  }
+
+  /**
+   * Mundo contínuo (Etapa E): passou a borda do mapa para uma zona vizinha? Muda-se para lá sem
+   * ecrã de viagem (a cena troca a zona); se o nível (ou o item pedido) não chegar, volta atrás.
+   * @returns true se o jogador saiu do mapa (mudou de zona ou foi travado).
+   */
+  private checkEdges(): boolean {
+    const zone = this.zone;
+    const player = this.state.data.player;
+    if (!zone?.neighborAt) return false;
+    const { width, height, tileSize } = zone.map;
+    if (player.x >= 0 && player.y >= 0 && player.x < width * tileSize && player.y < height * tileSize)
+      return false;
+    const next = zone.neighborAt(player.x, player.y);
+    const level = next ? this.progression.zoneLevel(next.zoneId) : 1;
+    const missing = next ? this.progression.missingItem(next.zoneId) : null;
+    if (!next || !this.progression.isZoneUnlocked(next.zoneId) || missing) {
+      player.x = this.previous.x;
+      player.y = this.previous.y;
+      const tick = this.state.data.world.tick;
+      if (next && tick >= this.edgeWarnTick) {
+        this.edgeWarnTick = tick + secondsToTicks(BALANCE.noAmmoWarnSec);
+        if (missing) this.bus.emit('action:blocked', { reason: 'needs_item', item: missing });
+        else this.bus.emit('action:blocked', { reason: 'zone_level', level });
+      }
+      return true;
+    }
+    this.leavingTo = next.zoneId;
+    this.bus.emit('zone:cross', { from: zone.zoneId, to: next.zoneId, x: next.x, y: next.y });
+    return true;
+  }
+
+  /**
+   * Mundo contínuo: entra na zona vizinha exatamente no ponto (x, y) dela (continua a andar sem
+   * saltos). A cena chama isto ao receber `zone:cross` (no co-op, é um comando do convidado).
+   */
+  crossTo(to: string, _map: ZoneMap, x: number, y: number): void {
+    const player = this.state.data.player;
+    player.zoneId = to;
+    player.x = x;
+    player.y = y;
+    this.state.markDirty();
   }
 
   private runAction(tick: number): void {

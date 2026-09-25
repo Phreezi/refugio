@@ -504,5 +504,16 @@
   "map.teleport_off": "No active post in this zone",
   "map.teleport_go": "Go",
   "map.teleport_hint": "Pick an active post (home is always available).",
-  "fridge.ordered": "Ordered: {item} (delivered to your door)"
+  "fridge.ordered": "Ordered: {item} (delivered to your door)",
+  "zone.route_1": "Route 1",
+  "zone.route_2": "Route 2",
+  "zone.route_3": "Route 3",
+  "zone.route_4": "Route 4",
+  "zone.route_5": "Route 5",
+  "zone.route_6": "Route 6",
+  "zone.route_7": "Route 7",
+  "zone.route_8": "Route 8",
+  "zone.route_9": "Route 9",
+  "zone.route_10": "Route 10",
+  "msg.zone_level": "It gets dangerous ahead: you need level {level} to pass."
 }

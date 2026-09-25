@@ -1301,6 +1301,11 @@ export interface ZoneDef {
   danger: number;
   /** Posição no mapa-mundo (0–100 em cada eixo; a base fica ao centro). */
   worldMapPos: { x: number; y: number };
+  /**
+   * Mundo contínuo (Etapa E): canto superior esquerdo do mapa no mundo, em tiles. As zonas com
+   * `world` encaixam-se pelas bordas (ver world/worldLayout.ts); sem ele, só por viagem.
+   */
+  world?: { x: number; y: number };
   /** Custo de viajar até lá (fome e sede). */
   travelCost: { hunger: number; thirst: number };
   /** Dias de jogo até os contentores voltarem a ter loot. */
@@ -1366,6 +1371,7 @@ export function parseZones(input: unknown): ZoneDefs {
           'hidden',
           'darkness',
           'event',
+          'world',
         ].includes(key)
       )
         problems.push(`"${id}": campo desconhecido "${key}"`);
@@ -1415,6 +1421,11 @@ export function parseZones(input: unknown): ZoneDefs {
       problems.push(`"${id}": nightEnemyMultiplier tem de ser > 0`);
     if (raw.hidden !== undefined && typeof raw.hidden !== 'boolean')
       problems.push(`"${id}": hidden tem de ser true/false`);
+    if (raw.world !== undefined) {
+      const [wx, wy] = Array.isArray(raw.world) ? (raw.world as unknown[]) : [];
+      if (Number.isInteger(wx) && Number.isInteger(wy)) def.world = { x: wx as number, y: wy as number };
+      else problems.push(`"${id}": world tem de ser [x, y] em tiles (inteiros)`);
+    }
     if (raw.requiresItem !== undefined) {
       if (typeof raw.requiresItem === 'string' && raw.requiresItem !== '')
         def.requiresItem = raw.requiresItem;

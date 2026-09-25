@@ -343,6 +343,8 @@ class Coop {
     const map = content.zoneMap(zoneId);
     if (method === 'teleport') {
       sim.teleport(zoneId, map);
+    } else if (method === 'crossTo') {
+      sim.crossTo(zoneId, map, Number(args[1]) || 0, Number(args[2]) || 0);
     } else if (method === 'travel') {
       const cost = (args[1] ?? {}) as { hunger?: unknown; thirst?: unknown };
       const hunger = Number(cost.hunger) || 0;
@@ -538,8 +540,7 @@ class Coop {
 
   private sendCommand(sys: CommandSystem, method: string, args: unknown[]): void {
     // As viagens levam o mapa da zona: vai só o id (o anfitrião tem os mesmos mapas).
-    const sent =
-      sys === 'sim' ? (method === 'travel' ? [args[0], args[2], args[3]] : [args[0], args[2]]) : args;
+    const sent = sys === 'sim' ? [args[0], ...args.slice(2)] : args;
     this.seq += 1;
     this.send({ t: 'cmd', seq: this.seq, sys, m: method, args: sent });
   }

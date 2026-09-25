@@ -26,7 +26,8 @@ import {
   type ResourceDefs,
 } from '../src/data/types.ts';
 import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../src/world/tileset.ts';
-import { ZoneMapError, parseZoneMap } from '../src/world/zoneMap.ts';
+import { ZoneMapError, parseZoneMap, type ZoneMap } from '../src/world/zoneMap.ts';
+import { buildWorldLayout } from '../src/world/worldLayout.ts';
 import { parseTalents } from '../src/systems/progression/talents.ts';
 
 const ROOT = new URL('../', import.meta.url);
@@ -344,13 +345,14 @@ function checkMaps(): string[] {
   const groups = loadEnemyGroups();
   if (Array.isArray(groups)) return ['enemies.json/enemyGroups.json inválidos (ver acima)'];
   const problems: string[] = [];
-  for (const file of Object.values(zones).map((z) => z.map)) {
+  const parsed = new Map<string, ZoneMap>();
+  for (const [zoneId, file] of Object.entries(zones).map(([id, z]) => [id, z.map] as const)) {
     if (!existsExactCase(file, 'public/assets/')) {
       problems.push(`${file} não existe em public/assets/`);
       continue;
     }
     try {
-      parseZoneMap(
+      const map = parseZoneMap(
         readJson(`public/assets/${file}`),
         {
           tileSize: TILE_SIZE,
@@ -365,9 +367,49 @@ function checkMaps(): string[] {
         },
         file,
       );
+      parsed.set(zoneId, map);
     } catch (error) {
       if (error instanceof ZoneMapError) problems.push(...error.problems.map((p) => `${file}: ${p}`));
       else problems.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (problems.length === 0) problems.push(...checkWorld(zones, parsed));
+  return problems;
+}
+
+/**
+ * Mundo contínuo (Etapa E): os blocos não se sobrepõem, e cada abertura na borda de um Caminho
+ * dá para um tile livre de outra zona (senão era um beco sem saída).
+ */
+function checkWorld(zones: ZoneDefs, maps: ReadonlyMap<string, ZoneMap>): string[] {
+  const layout = buildWorldLayout(zones, (zoneId) => {
+    const map = maps.get(zoneId);
+    if (!map) throw new Error(`sem mapa: ${zoneId}`);
+    return map;
+  });
+  const problems = layout.overlaps();
+  for (const rect of layout.all()) {
+    if (!rect.zoneId.startsWith('zone_route_')) continue;
+    const map = maps.get(rect.zoneId);
+    if (!map) continue;
+    const { width: w, height: h } = map;
+    for (let ty = 0; ty < h; ty++) {
+      for (let tx = 0; tx < w; tx++) {
+        if (map.solid[ty * w + tx] || (tx > 0 && ty > 0 && tx < w - 1 && ty < h - 1)) continue;
+        const outside: [number, number][] = [];
+        if (tx === 0) outside.push([-1, ty]);
+        if (tx === w - 1) outside.push([w, ty]);
+        if (ty === 0) outside.push([tx, -1]);
+        if (ty === h - 1) outside.push([tx, h]);
+        for (const [ox, oy] of outside) {
+          const hit = layout.resolve(rect.zoneId, ox, oy);
+          const other = hit ? maps.get(hit.zone.zoneId) : undefined;
+          if (!hit || !other || other.solid[hit.ty * other.width + hit.tx])
+            problems.push(
+              `${rect.zoneId}: a abertura (${String(tx)}, ${String(ty)}) não dá para lado nenhum`,
+            );
+        }
+      }
     }
   }
   return problems;

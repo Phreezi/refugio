@@ -17,6 +17,7 @@ import { CollisionWorld } from '../../src/systems/movement/CollisionWorld';
 import { arrivalPoint, canTravel } from '../../src/systems/travel/travel';
 import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../../src/world/tileset';
 import { parseZoneMap, type ZoneMap } from '../../src/world/zoneMap';
+import { buildWorldLayout, worldLinks } from '../../src/world/worldLayout';
 import { loadContent } from '../helpers/content';
 
 const content = loadContent();
@@ -201,10 +202,85 @@ describe('Mapa-mundo e viagens', () => {
   });
 });
 
+describe('Mundo contínuo (Etapa E)', () => {
+  const worldMaps = new Map(
+    Object.entries(zones)
+      .filter(([, zone]) => zone.world)
+      .map(([id]) => [id, realMap(id)] as const),
+  );
+  const layout = buildWorldLayout(zones, (id) => {
+    const map = worldMaps.get(id);
+    if (!map) throw new Error(id);
+    return map;
+  });
+  const enterWorld = (sim: Simulation, zoneId: string): void => {
+    const map = worldMaps.get(zoneId);
+    if (!map) throw new Error(zoneId);
+    const links = worldLinks(layout, zoneId, 16, (id) => worldMaps.get(id) ?? map);
+    const collision = CollisionWorld.fromZone(
+      map,
+      content.resources,
+      content.props,
+      content.stations,
+      content.lootTables,
+    );
+    if (links) collision.outside = links.outside;
+    sim.setZone({
+      zoneId,
+      map,
+      collision,
+      ...content,
+      ...(links ? { neighborAt: links.neighborAt } : {}),
+    });
+    sim.reset();
+  };
+
+  it('os blocos não se sobrepõem e a dificuldade sobe para norte', () => {
+    expect(layout.overlaps()).toEqual([]);
+    const routes = layout
+      .all()
+      .filter((r) => r.zoneId.startsWith('zone_route_'))
+      .sort((a, b) => b.y - a.y);
+    const levels = routes.map((r) => zones[r.zoneId]?.unlockLevel ?? 1);
+    expect(levels).toEqual([...levels].sort((a, b) => a - b));
+    expect(routes).toHaveLength(10);
+  });
+
+  it('da base para o Caminho 1 a andar (sem mapa-mundo) e o nível trava o Caminho 2', () => {
+    const { state, sim, bus } = setup();
+    const crossed: string[] = [];
+    const blocked: string[] = [];
+    bus.on('zone:cross', ({ to, x, y }) => {
+      crossed.push(to);
+      sim.crossTo(to, realMap(to), x, y);
+      enterWorld(sim, to);
+    });
+    bus.on('zone:change', ({ to }) => crossed.push(`mapa:${String(to)}`));
+    bus.on('action:blocked', ({ reason }) => blocked.push(reason));
+    enterWorld(sim, BASE_ZONE_ID);
+    // Ao lado da abertura a leste da base (linha 27), a andar para leste.
+    Object.assign(state.data.player, { x: 44 * 16, y: 27 * 16 + 8 });
+    sim.setMoveIntent({ x: 1, y: 0 });
+    for (let i = 0; i < 40; i++) sim.update(FIXED_STEP_MS);
+    expect(crossed[0]).toBe('zone_route_1');
+    expect(state.data.player.zoneId).toBe('zone_route_1');
+    // No Caminho 1, junto à passagem para norte: nível 1 não passa (o Caminho 2 pede nível 2).
+    Object.assign(state.data.player, { x: 9 * 16 + 8, y: 20 });
+    sim.setMoveIntent({ x: 0, y: -1 });
+    for (let i = 0; i < 20; i++) sim.update(FIXED_STEP_MS);
+    expect(state.data.player.zoneId).toBe('zone_route_1');
+    expect(blocked).toContain('zone_level');
+    state.data.player.level = 2;
+    for (let i = 0; i < 20; i++) sim.update(FIXED_STEP_MS);
+    expect(state.data.player.zoneId).toBe('zone_route_2');
+    expect(crossed).not.toContain('mapa:null');
+  });
+});
+
 describe('Teletransporte (Etapa E)', () => {
   it('todas as zonas normais têm um poste perto da entrada, fora das colisões', () => {
     for (const [zoneId, zone] of Object.entries(zones)) {
-      if (zoneId === BASE_ZONE_ID || zone.dungeon || zone.event) continue;
+      if (zoneId === BASE_ZONE_ID || zone.dungeon || zone.event || zone.hidden) continue;
       const map = realMap(zoneId);
       const post = map.props.find((p) => p.id === 'waystone');
       expect(post, zoneId).toBeDefined();
