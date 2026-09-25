@@ -7,7 +7,8 @@ import { getView } from '../display/view';
 import { coop } from '../net/coop';
 import { getLanguage, LANGUAGES, setLanguage, t, type MessageKey } from '../i18n';
 import { Button } from './Button';
-import { preferences, setPreference, UI_SIZES } from './preferences';
+import { preferences, setPreference, UI_SIZES, VOLUME_STEPS } from './preferences';
+import { sfx } from '../audio/sfx';
 import { Label } from './text';
 import { uiState } from './uiState';
 
@@ -99,7 +100,7 @@ export class PauseUI {
   private build(): void {
     this.clear();
     const { width, height } = getView();
-    const lines = this.view === 'main' ? 5 : this.view === 'stats' ? 8 : this.view === 'coop' ? 5 : 7;
+    const lines = this.view === 'main' ? 5 : this.view === 'stats' ? 8 : this.view === 'coop' ? 5 : 8;
     const h = Math.min(height - 8, 34 + lines * ROW + 10);
     const x = Math.round((width - W) / 2);
     const y = Math.max(4, Math.round((height - h) / 2));
@@ -202,6 +203,11 @@ export class PauseUI {
       // O HUD e a cena de jogo refazem-se com os textos novos.
       uiState.reopenPause = 'settings';
       this.scene.events.emit('ui:language-changed');
+    });
+    this.setting(x, next(), t('pause.volume'), `${String(Math.round(prefs.volume * 100))}%`, () => {
+      const i = VOLUME_STEPS.findIndex((v) => v >= prefs.volume - 0.01);
+      setPreference('volume', VOLUME_STEPS[(i + 1) % VOLUME_STEPS.length] ?? 0.6);
+      sfx.play('pickup'); // ouve-se logo o volume novo
     });
     this.setting(x, next(), t('pause.ui_size'), t(`pause.size.${prefs.uiSize}`), () => {
       const i = UI_SIZES.indexOf(prefs.uiSize);

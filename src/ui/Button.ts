@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { paletteNumber, type PaletteColor } from '../assets/palette';
 import { Label } from './text';
+import { sfx } from '../audio/sfx';
 
 export type ButtonStyle = 'primary' | 'secondary' | 'danger';
 
@@ -88,7 +89,10 @@ export class Button {
         pressed = true;
       })
       .on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => {
-        if (pressed) onClick();
+        if (pressed) {
+          sfx.play('click');
+          onClick();
+        }
         pressed = false;
       });
   }

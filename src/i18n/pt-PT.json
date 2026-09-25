@@ -322,5 +322,6 @@
   "coop.join_failed": "Não foi possível entrar. Tenta outra vez.",
   "coop.lost": "A ligação ao jogo do amigo terminou.",
   "coop.partner_joined": "O parceiro entrou no jogo!",
-  "coop.partner_left": "O parceiro saiu."
+  "coop.partner_left": "O parceiro saiu.",
+  "pause.volume": "Volume"
 }

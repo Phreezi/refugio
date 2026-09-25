@@ -20,4 +20,11 @@ describe('Preferências (Fase 11)', () => {
       DEFAULT_PREFERENCES,
     );
   });
+
+  it('volume entre 0 e 1 (Fase 12)', () => {
+    expect(parsePreferences(JSON.stringify({ volume: 0.25 })).volume).toBe(0.25);
+    expect(parsePreferences(JSON.stringify({ volume: 0 })).volume).toBe(0);
+    expect(parsePreferences(JSON.stringify({ volume: 3 })).volume).toBe(DEFAULT_PREFERENCES.volume);
+    expect(parsePreferences(JSON.stringify({ volume: 'alto' })).volume).toBe(DEFAULT_PREFERENCES.volume);
+  });
 });
