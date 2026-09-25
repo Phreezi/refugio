@@ -10,6 +10,7 @@ import { footprintRect, type Rect } from '../systems/movement/geometry';
 import type { ResourcePlacement, ZoneMap } from '../world/zoneMap';
 import { secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
+import type { Facing } from '../systems/movement/movement';
 import { zoneState, type GameState } from './GameState';
 import { structureChestId, structureStationKey, type Building } from './Building';
 import type { Combat } from './Combat';
@@ -326,7 +327,33 @@ export class Interaction {
     }
   }
 
-  private gather(placement: ResourcePlacement): void {
+  /**
+   * Ação do parceiro (co-op): bate no inimigo em frente dele ou recolhe o recurso em frente
+   * (os drops vão para a mochila partilhada do anfitrião). Não abre contentores nem portas.
+   * @returns o que fez, ou null se não havia nada em frente.
+   */
+  partnerAct(
+    partner: { x: number; y: number; facing: Facing },
+    weapon: { damage: number; reach: number },
+    footprint: { width: number; height: number },
+  ): 'attack' | 'gather' | null {
+    if (!this.zone) return null;
+    const from = { x: partner.x, y: partner.y - footprint.height / 2 };
+    const enemy = pickTarget(from, partner.facing, this.enemyTargets(), weapon.reach);
+    if (enemy?.data.type === 'enemy') {
+      this.combat.attackAs(enemy.data.uid, partner, weapon.damage);
+      this.bus.emit('partner:action', { kind: 'attack' });
+      return 'attack';
+    }
+    const resources = this.targets().filter((t) => t.data.type === 'resource');
+    const target = pickTarget(from, partner.facing, resources, BALANCE.actionReachPx);
+    if (target?.data.type !== 'resource') return null;
+    this.gather(target.data.placement, true);
+    this.bus.emit('partner:action', { kind: 'gather' });
+    return 'gather';
+  }
+
+  private gather(placement: ResourcePlacement, byPartner = false): void {
     const zone = this.zone;
     const def = zone?.resources[placement.id];
     if (!zone || !def) return;
@@ -347,7 +374,7 @@ export class Interaction {
       return;
     }
 
-    this.bus.emit('player:action', { kind: 'gather' });
+    if (!byPartner) this.bus.emit('player:action', { kind: 'gather' });
     if (tool) {
       const toolItem = tool.container[tool.index]?.[0];
       if (wearTool(tool) && toolItem) this.bus.emit('item:broken', { item: toolItem });

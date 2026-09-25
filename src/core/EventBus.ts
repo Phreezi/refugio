@@ -82,6 +82,14 @@ export interface GameEvents {
   'boss:defeated': { enemy: string };
   /** Troca feita com o comerciante (não dá XP). */
   traded: { item: string };
+  /** Co-op: o parceiro levou dano, caiu ou voltou. */
+  'partner:damaged': { amount: number; x: number; y: number };
+  'partner:down': Record<string, never>;
+  'partner:revived': Record<string, never>;
+  /** Co-op: o parceiro fez uma ação (para a animação). */
+  'partner:action': { kind: 'gather' | 'attack' | 'swing' };
+  /** Co-op: ligou-se/desligou-se alguém (o HUD atualiza o estado). */
+  'coop:changed': Record<string, never>;
   /** Hordas (§7.13). */
   'horde:started': { size: number };
   'horde:ended': { won: boolean };

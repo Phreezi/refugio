@@ -9,6 +9,8 @@ import { BASE_ZONE_ID, gameState } from '../core/GameState';
 import { BALANCE } from '../data/balance';
 import { getView, setupFixedCamera } from '../display/view';
 import { t, type MessageKey } from '../i18n';
+import { coop } from '../net/coop';
+import { normalizeCode } from '../net/protocol';
 import { autosave, saves } from '../save';
 import type { LoadedSave, LoadResult } from '../save/SaveManager';
 import { SaveError } from '../save/schema';
@@ -168,6 +170,18 @@ export class MainMenuScene extends Phaser.Scene {
       },
     );
 
+    // Co-op (Fase 15): entrar no jogo de um amigo com o código dele. No canto (cabe sempre).
+    new Button(
+      this,
+      width - 4 - SMALL_BUTTON.width / 2 - 8,
+      4 + SMALL_BUTTON.height / 2,
+      t('coop.join'),
+      { ...SMALL_BUTTON, width: SMALL_BUTTON.width + 16 },
+      () => {
+        this.joinCoop(save);
+      },
+    );
+
     // Gestão do save: linha de botões pequenos.
     const rowY = height - 50;
     const actions: [MessageKey, (x: number) => void][] = [];
@@ -268,6 +282,39 @@ export class MainMenuScene extends Phaser.Scene {
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
     void autosave.flush(); // o jogo novo substitui já o antigo
     this.scene.start(SceneKey.Zone, { zoneId: BASE_ZONE_ID } satisfies ZoneSceneData);
+  }
+
+  /**
+   * Entra no jogo de um amigo: pede o código, liga-se e joga no mundo dele (que não se grava
+   * aqui). Da nossa gravação só vem a arma equipada (o dano do nosso boneco).
+   */
+  private joinCoop(save: LoadedSave | null): void {
+    if (this.busy) return;
+    const input = window.prompt(t('coop.enter_code'));
+    if (input === null) return;
+    const code = normalizeCode(input);
+    if (!code) {
+      this.setStatus('coop.bad_code');
+      return;
+    }
+    this.busy = true;
+    this.setStatus('coop.joining');
+    const weapon = save?.state.player.equipment[0]?.[0] ?? null;
+    coop.join(code, weapon).then(
+      (state) => {
+        gameState.load(state, true);
+        simulation.remoteAction = () => {
+          coop.sendAct();
+        };
+        this.scene.start(SceneKey.Zone, { zoneId: state.player.zoneId } satisfies ZoneSceneData);
+      },
+      (error: unknown) => {
+        console.warn('[coop] não foi possível entrar:', error);
+        this.busy = false;
+        const reason = error instanceof Error ? error.message : '';
+        this.setStatus(reason === 'not_found' ? 'coop.not_found' : 'coop.join_failed');
+      },
+    );
   }
 
   private async importSave(): Promise<void> {

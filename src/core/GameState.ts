@@ -191,6 +191,11 @@ export function chestContents(data: GameStateData, chestId: string): Container {
 export class GameState {
   private current: GameStateData | null = null;
   private changed = false;
+  /**
+   * Mundo emprestado (co-op, Fase 15): o convidado mostra o mundo do anfitrião, que nunca se
+   * grava no save dele (o autosave vê sempre "sem alterações").
+   */
+  borrowed = false;
 
   get hasGame(): boolean {
     return this.current !== null;
@@ -205,26 +210,29 @@ export class GameState {
   }
 
   newGame(spawn: { x: number; y: number }, seed?: number): GameStateData {
+    this.borrowed = false;
     this.current = createNewGameState(spawn, seed);
     this.changed = true;
     return this.current;
   }
 
   /** Continua um jogo gravado (já validado e migrado pelo SaveManager). */
-  load(data: GameStateData): GameStateData {
+  load(data: GameStateData, borrowed = false): GameStateData {
     this.current = data;
     this.changed = false;
+    this.borrowed = borrowed;
     return this.current;
   }
 
   clear(): void {
     this.current = null;
     this.changed = false;
+    this.borrowed = false;
   }
 
   /** Há alterações por gravar? (CLAUDE.md §10.2: o autosave só grava se houver). */
   get dirty(): boolean {
-    return this.changed;
+    return this.changed && !this.borrowed;
   }
 
   markDirty(): void {

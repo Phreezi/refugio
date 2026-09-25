@@ -15,6 +15,7 @@ import { Homestead } from './Homestead';
 import { Horde, type HordeContent } from './Horde';
 import { Stats } from './Stats';
 import { Tutorial } from './Tutorial';
+import { createPartner, type Partner } from './Partner';
 import { Progression, type ProgressionContent } from './Progression';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
@@ -34,6 +35,7 @@ export class Simulation {
   private readonly bus: EventBus<GameEvents>;
   private readonly survival = survivalRules(BALANCE);
   private readonly actionCooldownTicks = secondsToTicks(BALANCE.actionCooldownSec);
+  private readonly items: () => ItemDefs;
   readonly actions: PlayerActions;
   readonly interaction: Interaction;
   readonly crafting: Crafting;
@@ -57,6 +59,13 @@ export class Simulation {
   private sneaking = false;
   private previous: Vec2 = ZERO;
   private moved = false;
+  /** Co-op (convidado): em vez de fazer a ação aqui, pede-a ao anfitrião. */
+  remoteAction: (() => void) | null = null;
+  /** O parceiro pediu uma ação (co-op, anfitrião); faz-se no próximo tick. */
+  private partnerActionQueued = false;
+  private partnerNextAction = 0;
+  /** Convidado: ticks locais (o relógio do mundo é o do anfitrião), para o ritmo das ações. */
+  private remoteTicks = 0;
 
   /**
    * @param items definições dos itens (lidas quando são precisas: carregam depois do arranque).
@@ -91,6 +100,7 @@ export class Simulation {
   ) {
     this.state = state;
     this.bus = bus;
+    this.items = items;
     this.actions = new PlayerActions(state, bus, items);
     this.progression = new Progression(state, bus, progression);
     this.actions.readNote = (recipe) => this.progression.learn(recipe);
@@ -194,6 +204,39 @@ export class Simulation {
     return this.sneaking;
   }
 
+  /** O boneco do convidado (co-op) no mundo deste jogo, ou null. */
+  get partner(): Partner | null {
+    return this.combat.partner;
+  }
+
+  /** Um convidado entrou (aparece ao pé do jogador) ou saiu (null). */
+  setPartner(weapon: string | null | undefined): void {
+    if (weapon === undefined) {
+      this.combat.partner = null;
+      return;
+    }
+    const { x, y } = this.state.data.player;
+    this.combat.partner = createPartner({ x, y }, BALANCE.statMax, weapon);
+  }
+
+  /** Posição que o convidado mandou (ele anda no ecrã dele; o anfitrião confia nela). */
+  movePartner(x: number, y: number, facing: Partner['facing'], moved: boolean, sneak: boolean): void {
+    const partner = this.combat.partner;
+    if (!partner || partner.downUntil > 0) return;
+    partner.px = partner.x;
+    partner.py = partner.y;
+    partner.x = x;
+    partner.y = y;
+    partner.facing = facing;
+    partner.moved = moved;
+    partner.sneak = sneak;
+  }
+
+  /** O convidado carregou na ação (faz-se no próximo tick, ao ritmo da arma dele). */
+  partnerAction(): void {
+    this.partnerActionQueued = true;
+  }
+
   /** @returns número de ticks executados. */
   update(deltaMs: number): number {
     return this.clock.advance(deltaMs, () => {
@@ -231,6 +274,12 @@ export class Simulation {
   }
 
   private tick(): void {
+    // Co-op (convidado): o mundo corre no anfitrião; aqui só se anda e se pedem ações.
+    if (this.remoteAction) {
+      this.movePlayer();
+      this.runAction(this.remoteTicks++);
+      return;
+    }
     const world = this.state.data.world;
     world.tick += 1;
     this.state.markDirty(); // o tempo de jogo avançou
@@ -238,6 +287,7 @@ export class Simulation {
     if (this.moved) this.tutorial.playerMoved();
     this.checkExits();
     this.runAction(world.tick);
+    this.tickPartner(world.tick);
     this.interaction.tick(world.tick);
     this.combat.tick(this.sneaking);
     this.horde.tick();
@@ -247,6 +297,33 @@ export class Simulation {
     this.tickBleeding(world.tick);
     if (this.state.data.player.hp <= 0) this.respawn();
     this.bus.emit('world:tick', { tick: world.tick });
+  }
+
+  /** Parceiro (co-op): faz a ação pedida e, se caiu, volta ao pé do jogador passado um pouco. */
+  private tickPartner(tick: number): void {
+    const partner = this.combat.partner;
+    if (!partner) return;
+    if (partner.downUntil > 0) {
+      this.partnerActionQueued = false;
+      if (tick < partner.downUntil) return;
+      const { x, y } = this.state.data.player;
+      Object.assign(partner, { x, y, px: x, py: y, hp: BALANCE.statMax, downUntil: 0 });
+      this.bus.emit('partner:revived', {});
+      return;
+    }
+    if (!this.partnerActionQueued || tick < this.partnerNextAction) return;
+    this.partnerActionQueued = false;
+    const def = partner.weapon ? this.items()[partner.weapon] : undefined;
+    const weapon = def?.damage
+      ? {
+          damage: def.damage,
+          reach: def.reach ?? BALANCE.weaponReachPx,
+          sec: def.attackSec ?? BALANCE.weaponAttackSec,
+        }
+      : { damage: BALANCE.fistDamage, reach: BALANCE.fistReachPx, sec: BALANCE.fistAttackSec };
+    const done = this.interaction.partnerAct(partner, weapon, PLAYER_FOOTPRINT);
+    this.partnerNextAction =
+      tick + (done === 'attack' ? secondsToTicks(weapon.sec) : this.actionCooldownTicks);
   }
 
   /** A sangrar: perde vida devagar até acabar o tempo ou usar uma ligadura (nunca instantâneo). */
@@ -271,6 +348,13 @@ export class Simulation {
   private runAction(tick: number): void {
     if (!(this.actionQueued || this.actionHeld) || tick < this.nextActionTick) return;
     this.actionQueued = false;
+    // Co-op (convidado): a ação é feita pelo anfitrião; aqui só se anima.
+    if (this.remoteAction) {
+      this.remoteAction();
+      this.bus.emit('player:action', { kind: 'swing' });
+      this.nextActionTick = tick + secondsToTicks(BALANCE.weaponAttackSec);
+      return;
+    }
     // A pescar, o botão de ação é o "puxar" do mini-jogo.
     if (this.fishing.active) {
       this.fishing.strike();
