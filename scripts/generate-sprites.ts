@@ -467,14 +467,54 @@ const SPRITES: Sprite[] = [
       img.fill(23, 2, 2, 2, c('red'));
     },
   },
+  {
+    // Banca de comércio: balcão com toldo às riscas e mercadoria em cima.
+    file: 'market_stall',
+    width: 32,
+    height: 30,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 16, 28, 14, 1.5);
+      for (const x of [3, 27]) {
+        img.fill(x, 6, 2, 22, c('bark'));
+        img.fill(x, 6, 1, 22, c('wood'));
+      }
+      // Toldo às riscas (vermelho e creme), com a aba recortada.
+      for (let x = 1; x < 31; x++) {
+        const stripe = Math.floor((x - 1) / 3) % 2 === 0 ? 'red' : 'cream';
+        img.fill(x, 1, 1, 6, c(stripe));
+        if (x % 3 !== 0) img.set(x, 7, c(stripe));
+      }
+      img.fill(1, 1, 30, 1, c('blood'));
+      img.fill(1, 6, 30, 1, c('blood'));
+      // Balcão.
+      img.fill(3, 16, 26, 11, c('wood'));
+      img.fill(3, 16, 26, 2, c('wood_light'));
+      img.fill(3, 18, 26, 1, c('bark'));
+      for (const x of [9, 16, 23]) img.fill(x, 19, 1, 8, c('bark'));
+      // Mercadoria: frascos, uma saca de moedas e flechas.
+      img.fill(6, 12, 3, 4, c('red'));
+      img.fill(7, 11, 1, 1, c('bark'));
+      img.fill(11, 12, 3, 4, c('teal'));
+      img.fill(12, 11, 1, 1, c('bark'));
+      img.ellipse(19, 14, 3, 2.5, c('wheat'));
+      img.set(19, 11, c('bark'));
+      img.set(18, 13, c('gold'));
+      img.set(20, 14, c('gold'));
+      img.fill(23, 10, 1, 6, c('wood_light'));
+      img.fill(25, 10, 1, 6, c('wood_light'));
+      img.set(23, 10, c('stone_light'));
+      img.set(25, 10, c('stone_light'));
+    },
+  },
 ];
 
 /**
- * Peças de construção (CLAUDE.md §7.7). As de cima têm 16×24: o tile (16×16) visto de cima fica
- * nas linhas 0–15 e a face da frente nas 16–23, para parecerem ter altura (vista 3/4). Sem
- * contorno exterior, para as peças encostadas formarem uma parede contínua.
+ * Peças de construção (CLAUDE.md §7.7). Paredes, portas e janelas têm 16×32: o topo (16×16, a
+ * espessura vista de cima) nas linhas 0–15 e a face da frente nas 16–31, para parecerem ter
+ * altura (vista 3/4). Sem contorno exterior, para as peças encostadas formarem uma parede
+ * contínua.
  */
-/** Paredes, portas e janelas: 16×32 — topo de 16 px (a espessura vista de cima) e face da frente de 16 px. */
 const WALL_FRONT = 16;
 const WALL_H = 32;
 
@@ -1959,6 +1999,71 @@ const PHASE10A_ICONS: Sprite[] = [
       img.ellipse(8, 11, 4, 3, c('lime'));
       img.set(6, 10, c('cream'));
       img.fill(6, 1, 4, 1, c('stone'));
+    },
+  },
+  {
+    // Moeda: disco dourado com brilho e o bordo mais escuro.
+    file: 'coin',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 8.5, 5, 5, c('orange'));
+      img.ellipse(7.6, 8, 4.2, 4.2, c('gold'));
+      img.ellipse(7.5, 8, 2.5, 2.8, c('amber'));
+      img.fill(7, 6, 1, 4, c('gold'));
+      img.set(5, 5, c('cream'));
+      img.set(6, 5, c('cream'));
+      img.set(5, 6, c('cream'));
+    },
+  },
+  {
+    // Poção de vida: frasco redondo, líquido vermelho, rolha.
+    file: 'health_potion',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(7, 2, 2, 2, c('bark'));
+      img.fill(7, 4, 2, 2, c('ice'));
+      img.ellipse(8, 10, 4.5, 4.5, c('ice'));
+      img.ellipse(8, 10.5, 3.6, 3.4, c('red'));
+      img.ellipse(8, 11.5, 3, 2.2, c('blood'));
+      img.set(6, 8, c('cream'));
+      img.set(6, 9, c('rose'));
+    },
+  },
+  {
+    // Poção grande: frasco maior e mais alto, com um laço dourado.
+    file: 'big_health_potion',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(6, 1, 4, 2, c('bark'));
+      img.fill(6, 3, 4, 2, c('ice'));
+      img.fill(5, 5, 6, 1, c('gold'));
+      img.ellipse(8, 10.5, 5.5, 5, c('ice'));
+      img.ellipse(8, 11, 4.6, 4, c('red'));
+      img.ellipse(8, 12, 3.8, 2.6, c('blood'));
+      img.set(5, 9, c('cream'));
+      img.set(5, 10, c('rose'));
+    },
+  },
+  {
+    // Bebida energética: lata verde com risca e anilha.
+    file: 'energy_drink',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(5, 3, 6, 11, c('lime'));
+      img.fill(5, 3, 6, 1, c('stone_light'));
+      img.fill(5, 13, 6, 1, c('stone'));
+      img.fill(5, 7, 6, 3, c('forest_dark'));
+      img.fill(7, 8, 2, 1, c('gold'));
+      img.fill(5, 4, 1, 9, c('leaf'));
+      img.set(8, 2, c('stone_light'));
     },
   },
   {

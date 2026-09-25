@@ -16,7 +16,8 @@
       ["scrap_metal", 3, 1, 2],
       ["empty_bottle", 2, 1, 1],
       ["canned_food", 1, 1, 1],
-      ["note_spiked_club", 1, 1, 1]
+      ["note_spiked_club", 1, 1, 1],
+      ["coin", 4, 2, 6]
     ]
   },
   "barrel": {
@@ -31,7 +32,8 @@
       ["water_dirty", 5, 1, 2],
       ["empty_bottle", 3, 1, 2],
       ["scrap_metal", 2, 1, 1],
-      ["rope", 1, 1, 1]
+      ["rope", 1, 1, 1],
+      ["coin", 3, 1, 4]
     ]
   },
   "cabinet": {
@@ -52,7 +54,8 @@
       ["cloth_hat", 1, 1, 1],
       ["empty_bottle", 2, 1, 1],
       ["note_machete", 1, 1, 1],
-      ["note_spiked_club", 1, 1, 1]
+      ["note_spiked_club", 1, 1, 1],
+      ["coin", 4, 3, 8]
     ]
   },
   "fishing_box": {
@@ -85,7 +88,8 @@
       ["rope", 3, 1, 2],
       ["canned_food", 2, 1, 1],
       ["empty_bottle", 2, 1, 1],
-      ["water_dirty", 2, 1, 1]
+      ["water_dirty", 2, 1, 1],
+      ["coin", 4, 3, 8]
     ]
   },
   "village_cabinet": {
@@ -106,7 +110,9 @@
       ["note_machete", 1, 1, 1],
       ["note_spiked_club", 1, 1, 1],
       ["cloth_shirt", 1, 1, 1],
-      ["tomato_seeds", 2, 1, 2]
+      ["tomato_seeds", 2, 1, 2],
+      ["coin", 4, 4, 10],
+      ["energy_drink", 3, 1, 1]
     ]
   },
   "seed_sack": {
@@ -141,7 +147,8 @@
       ["machete", 1, 1, 1],
       ["cloth_shirt", 1, 1, 1],
       ["tomato_seeds", 2, 2, 3],
-      ["note_machete", 1, 1, 1]
+      ["note_machete", 1, 1, 1],
+      ["coin", 6, 20, 40]
     ]
   },
   "industrial_locker": {
@@ -160,7 +167,8 @@
       ["iron_ingot", 2, 1, 2],
       ["rope", 2, 1, 2],
       ["bandage", 1, 1, 1],
-      ["bolt", 2, 3, 6]
+      ["bolt", 2, 3, 6],
+      ["coin", 4, 6, 15]
     ]
   },
   "medical_cabinet": {
@@ -178,7 +186,9 @@
       ["chemicals", 3, 1, 1],
       ["water_clean", 3, 1, 2],
       ["canned_food", 2, 1, 1],
-      ["cloth", 3, 2, 3]
+      ["cloth", 3, 2, 3],
+      ["coin", 3, 5, 12],
+      ["health_potion", 5, 1, 2]
     ]
   },
   "safe": {
@@ -210,7 +220,9 @@
       ["canned_food", 3, 1, 2],
       ["water_clean", 2, 1, 2],
       ["crossbow", 1, 1, 1],
-      ["leather_jacket", 1, 1, 1]
+      ["leather_jacket", 1, 1, 1],
+      ["coin", 5, 15, 30],
+      ["big_health_potion", 2, 1, 1]
     ]
   },
   "armory": {
@@ -230,7 +242,8 @@
       ["gunpowder", 3, 2, 4],
       ["medkit", 2, 1, 1],
       ["bolt", 3, 6, 12],
-      ["large_backpack", 1, 1, 1]
+      ["large_backpack", 1, 1, 1],
+      ["coin", 4, 15, 30]
     ]
   },
   "city_store": {
@@ -252,7 +265,9 @@
       ["cloth", 4, 2, 5],
       ["large_backpack", 1, 1, 1],
       ["tomato_seeds", 2, 1, 2],
-      ["pistol_ammo", 2, 3, 8]
+      ["pistol_ammo", 2, 3, 8],
+      ["coin", 6, 10, 25],
+      ["health_potion", 3, 1, 2]
     ]
   },
   "cargo_crate": {
@@ -272,7 +287,8 @@
       ["large_backpack", 1, 1, 1],
       ["military_helmet", 1, 1, 1],
       ["crossbow", 1, 1, 1],
-      ["gunpowder", 2, 2, 3]
+      ["gunpowder", 2, 2, 3],
+      ["coin", 5, 15, 35]
     ]
   },
   "wagon_food": {

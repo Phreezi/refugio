@@ -500,6 +500,12 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - Painel "Perícias" (`src/ui/SkillsUI.ts`): separador "Com o uso" (nível, barra e o que dá) e um por ramo, com "Aprender" e o que falta a vermelho; páginas quando não cabe tudo. O "Subiste de nível!" lembra o ponto novo. Co-op: `progression.learnTalent` é um comando do convidado.
 - Save v18: `player.talents` (`{ id: pontos }`).
 
+### 7.16 Economia (Etapa D)
+
+- **Moedas** (`coin`, item empilhável até 9999): caem dos inimigos (`drops` em `enemies.json`) e aparecem em contentores (`lootTables.json`).
+- **Banca de comércio** (`market_stall`, peça construída na base, nível 3; estação com `trade: true`): separadores **Comprar** (`category: "buy"`: flechas, munições, poções, ligaduras, sementes, materiais) e **Vender** (`"sell"`: recursos → moedas). O comerciante do acampamento também compra e vende algumas coisas. As trocas são receitas instantâneas (`isTradeCategory`).
+- **Poções**: de vida (+35), de vida grande (+80) e bebida energética (fome/sede).
+
 ---
 
 ## 8. Mapas e zonas
@@ -1136,4 +1142,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Shift corre (toque liga/desliga, segurar) a gastar muito mais fome e sede; o Ctrl agacha; o talento ativo "Correr" passou a "Fôlego" (correr gasta menos) | Pedido do jogador |
 | 2026-09-25 | Níveis até 999 com curva que abranda depois do 25; perícias até 50; 24 talentos | Pedido do jogador: um jogo que dure muito ou não tenha fim |
 | 2026-09-25 | Paredes/portas/janelas 16×32 com volume; tiles de água (com espuma na margem, desenhada em runtime), estrada, soalho, betão, muro, rochedo e terra redesenhados; veados mais lentos (50 px/s); cadáveres a cinzento; texto do que se apanha desvanece em 5 s; avisos 5 s | Pedidos do jogador |
+| 2026-09-25 | Menu inicial: botões sempre ao centro da página; a lista de jogos à direita só se couber no espaço livre, senão numa linha de 3; em ecrãs baixos (< 250 px de jogo) o título encolhe | Pedido do jogador: no browser do Tesla os botões sobrepunham-se e, em ecrã inteiro, ficavam alinhados pelo espaço vazio |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

@@ -39,6 +39,8 @@ const MAIN_BUTTON = { width: 136, height: 22 } as const;
 const SMALL_BUTTON = { width: 64, height: 14, fontSize: 8, style: 'secondary' } as const;
 /** A partir desta largura, a lista de jogos fica à direita dos botões. */
 const WIDE_MENU = 420;
+/** Abaixo desta altura, o menu aperta-se (título mais pequeno, botões mais acima). */
+const SHORT_MENU = 250;
 const SLOT_BUTTON_WIDTH = 132;
 const OVERLAY_DEPTH = 100;
 /** Tempo para confirmar uma ação destrutiva (segundo toque no mesmo botão). */
@@ -73,12 +75,14 @@ export class MainMenuScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(PALETTE.night);
 
     // Posições proporcionais à altura: a resolução do jogo depende do ecrã.
+    // Em ecrãs baixos (ex.: o browser de um carro) o título fica mais pequeno e mais acima.
+    const short = height < SHORT_MENU;
     new Label(
       this,
       cx,
-      Math.round(height * 0.2),
+      short ? 6 : Math.round(height * 0.2),
       t('game.title'),
-      { size: 32, color: 'wheat', bold: true },
+      { size: short ? 24 : 32, color: 'wheat', bold: true },
       [0.5, 0],
     );
     this.status = new Label(
@@ -145,11 +149,18 @@ export class MainMenuScene extends Phaser.Scene {
 
   private buildButtons(result: LoadResult, keepMessage: boolean, slots: (LoadResult | null)[]): void {
     const { width, height } = getView();
-    const wide = width >= WIDE_MENU;
-    // Com espaço, os botões ficam à esquerda do centro e a lista de jogos à direita.
-    const cx = wide ? Math.round(width * 0.4) : Math.round(width / 2);
-    const y = Math.round(height * 0.4);
-    const spacing = 26;
+    // Os botões principais ficam sempre ao centro da página; a lista de jogos à direita se
+    // couber no espaço livre, senão numa linha por baixo.
+    const cx = Math.round(width / 2);
+    const rightStart = cx + MAIN_BUTTON.width / 2 + 10;
+    const listSide = Math.round((rightStart + width - 4) / 2);
+    const wide =
+      width >= WIDE_MENU &&
+      listSide - SLOT_BUTTON_WIDTH / 2 >= rightStart &&
+      listSide + SLOT_BUTTON_WIDTH / 2 <= width - 4;
+    const short = height < SHORT_MENU;
+    const y = short ? 46 : Math.round(height * 0.4);
+    const spacing = short ? 24 : 26;
     const save = result.save;
     this.hordes = save?.state.settings.hordes ?? false;
 
@@ -190,28 +201,33 @@ export class MainMenuScene extends Phaser.Scene {
       },
     );
 
-    // Os meus jogos: à direita (ou por baixo, num ecrã estreito). Tocar escolhe o jogo.
-    const listX = wide ? Math.round(width * 0.78) : cx;
-    let listY = wide ? y - 14 : hordeY + 22;
-    new Label(this, listX, listY - 14, t('menu.games'), { size: 8, bold: true, color: 'wheat' }, [0.5, 0.5]);
+    // Os meus jogos: à direita (lista) ou, sem espaço, numa linha de 3 por baixo. Tocar escolhe.
+    const rowY = height - 50;
+    const inRow = !wide;
+    const rowSlotW = Math.min(SLOT_BUTTON_WIDTH, Math.floor((width - 16 - 2 * 4) / 3)) & ~1;
+    const listX = wide ? listSide : cx;
+    let listY = wide ? y - 14 : Math.max(hordeY + 30, rowY - 26);
+    new Label(this, listX, listY - 13, t('menu.games'), { size: 8, bold: true, color: 'wheat' }, [0.5, 0.5]);
     slots.forEach((slot, i) => {
       const summary = slot?.save;
-      const label = summary
-        ? t('menu.slot', {
+      const vars = summary
+        ? {
             name: summary.state.player.name,
             level: summary.state.player.level,
             day: clockAt(summary.state.world.tick, BALANCE.dayLengthSec, BALANCE.dayStartHour).day,
-          })
-        : t('menu.slot_empty');
+          }
+        : null;
+      const label = vars ? t(inRow ? 'menu.slot_short' : 'menu.slot', vars) : t('menu.slot_empty');
+      const x = inRow ? cx + (i - 1) * (rowSlotW + 4) : listX;
       new Button(
         this,
-        listX,
+        x,
         listY,
         label,
         {
-          width: SLOT_BUTTON_WIDTH,
+          width: inRow ? rowSlotW : SLOT_BUTTON_WIDTH,
           height: 18,
-          fontSize: 8,
+          fontSize: inRow ? 7 : 8,
           style: i === saves.slot ? 'primary' : 'secondary',
         },
         () => {
@@ -220,7 +236,7 @@ export class MainMenuScene extends Phaser.Scene {
           this.scene.restart({});
         },
       );
-      listY += 21;
+      if (!inRow) listY += 21;
     });
 
     // Co-op (Fase 15): entrar no jogo de um amigo com o código dele. No canto (cabe sempre).
@@ -235,14 +251,14 @@ export class MainMenuScene extends Phaser.Scene {
       },
     );
 
-    // Gestão do save: linha de botões pequenos.
-    const rowY = height - 50;
+    // Gestão do save: linha de botões pequenos (por baixo da lista, se estiver numa linha).
+    const actionsY = inRow ? Math.max(rowY, listY + 20) : rowY;
     const actions: [MessageKey, (x: number) => void][] = [];
     if (save) {
       actions.push([
         'save.export',
         (x) =>
-          new Button(this, x, rowY, t('save.export'), SMALL_BUTTON, () => {
+          new Button(this, x, actionsY, t('save.export'), SMALL_BUTTON, () => {
             downloadText(saveFileName(new Date()), save.text);
             this.setStatus('save.exported');
           }),
@@ -251,7 +267,7 @@ export class MainMenuScene extends Phaser.Scene {
     actions.push([
       'save.import',
       (x) =>
-        new Button(this, x, rowY, t('save.import'), SMALL_BUTTON, () => {
+        new Button(this, x, actionsY, t('save.import'), SMALL_BUTTON, () => {
           void this.importSave();
         }),
     ]);
@@ -259,7 +275,7 @@ export class MainMenuScene extends Phaser.Scene {
       actions.push([
         'save.delete',
         (x) => {
-          this.confirmButton(x, rowY, 'save.delete', 'save.confirm_delete', SMALL_BUTTON, () => {
+          this.confirmButton(x, actionsY, 'save.delete', 'save.confirm_delete', SMALL_BUTTON, () => {
             void this.deleteSave();
           });
         },

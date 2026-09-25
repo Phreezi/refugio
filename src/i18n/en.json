@@ -450,5 +450,16 @@
   "talent_effect.rangedDamagePct": "+{v}% ranged damage",
   "talent_effect.xpPct": "+{v}% experience",
   "item.expedition_backpack": "Expedition backpack",
-  "item.survivor_backpack": "Survivor backpack"
+  "item.survivor_backpack": "Survivor backpack",
+  "item.coin": "Coin",
+  "item.health_potion": "Health potion",
+  "item.big_health_potion": "Large health potion",
+  "item.energy_drink": "Energy drink",
+  "structure.market_stall": "Market stall",
+  "station.market_stall": "Market stall",
+  "craft.cat.buy": "Buy",
+  "craft.cat.sell": "Sell",
+  "craft.buy": "Buy",
+  "craft.sell": "Sell",
+  "menu.slot_short": "{name} · Lv {level}"
 }

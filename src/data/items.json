@@ -235,7 +235,8 @@
     "damage": 12,
     "attackSec": 0.6,
     "durability": 220,
-    "skill": "blade"
+    "skill": "blade",
+    "level": 10
   },
   "iron_pickaxe": {
     "name": "item.iron_pickaxe",
@@ -247,7 +248,8 @@
     "gatherPower": 3,
     "damage": 10,
     "attackSec": 0.7,
-    "durability": 220
+    "durability": 220,
+    "level": 10
   },
   "wooden_club": {
     "name": "item.wooden_club",
@@ -269,7 +271,8 @@
     "damage": 15,
     "durability": 140,
     "attackSec": 0.6,
-    "reach": 14
+    "reach": 14,
+    "level": 3
   },
   "machete": {
     "name": "item.machete",
@@ -281,7 +284,8 @@
     "durability": 180,
     "attackSec": 0.5,
     "reach": 16,
-    "skill": "blade"
+    "skill": "blade",
+    "level": 5
   },
   "cloth_shirt": {
     "name": "item.cloth_shirt",
@@ -309,7 +313,8 @@
     "type": "backpack",
     "stack": 1,
     "rarity": "uncommon",
-    "slots": 10
+    "slots": 10,
+    "level": 5
   },
   "note_machete": {
     "name": "item.note_machete",
@@ -416,7 +421,8 @@
     "rarity": "uncommon",
     "durability": 220,
     "armor": 20,
-    "equip": "body"
+    "equip": "body",
+    "level": 8
   },
   "leather_pants": {
     "name": "item.leather_pants",
@@ -426,7 +432,8 @@
     "rarity": "uncommon",
     "durability": 200,
     "armor": 12,
-    "equip": "legs"
+    "equip": "legs",
+    "level": 8
   },
   "crossbow": {
     "name": "item.crossbow",
@@ -441,7 +448,8 @@
       "ammo": "bolt",
       "range": 130,
       "speed": 240
-    }
+    },
+    "level": 12
   },
   "pistol": {
     "name": "item.pistol",
@@ -457,7 +465,8 @@
       "range": 160,
       "speed": 400
     },
-    "skill": "firearms"
+    "skill": "firearms",
+    "level": 20
   },
   "bolt": {
     "name": "item.bolt",
@@ -504,7 +513,8 @@
     "rarity": "rare",
     "durability": 300,
     "armor": 15,
-    "equip": "head"
+    "equip": "head",
+    "level": 18
   },
   "military_vest": {
     "name": "item.military_vest",
@@ -514,7 +524,8 @@
     "rarity": "epic",
     "durability": 320,
     "armor": 30,
-    "equip": "body"
+    "equip": "body",
+    "level": 18
   },
   "large_backpack": {
     "name": "item.large_backpack",
@@ -522,7 +533,8 @@
     "type": "backpack",
     "stack": 1,
     "rarity": "rare",
-    "slots": 20
+    "slots": 20,
+    "level": 13
   },
   "moto_engine": {
     "name": "item.moto_engine",
@@ -597,7 +609,8 @@
       "ammo": "arrow",
       "range": 135,
       "speed": 260
-    }
+    },
+    "level": 7
   },
   "arrow": {
     "name": "item.arrow",
@@ -644,7 +657,8 @@
     "type": "backpack",
     "stack": 1,
     "rarity": "epic",
-    "slots": 30
+    "slots": 30,
+    "level": 20
   },
   "expedition_backpack": {
     "name": "item.expedition_backpack",
@@ -652,7 +666,8 @@
     "type": "backpack",
     "stack": 1,
     "rarity": "epic",
-    "slots": 40
+    "slots": 40,
+    "level": 30
   },
   "survivor_backpack": {
     "name": "item.survivor_backpack",
@@ -660,6 +675,45 @@
     "type": "backpack",
     "stack": 1,
     "rarity": "epic",
-    "slots": 50
+    "slots": 50,
+    "level": 45
+  },
+  "coin": {
+    "name": "item.coin",
+    "icon": "icon_coin",
+    "type": "resource",
+    "stack": 9999,
+    "rarity": "common"
+  },
+  "health_potion": {
+    "name": "item.health_potion",
+    "icon": "icon_health_potion",
+    "type": "consumable",
+    "effects": {
+      "hp": 35
+    },
+    "stack": 10,
+    "rarity": "uncommon"
+  },
+  "big_health_potion": {
+    "name": "item.big_health_potion",
+    "icon": "icon_big_health_potion",
+    "type": "consumable",
+    "effects": {
+      "hp": 80
+    },
+    "stack": 10,
+    "rarity": "rare"
+  },
+  "energy_drink": {
+    "name": "item.energy_drink",
+    "icon": "icon_energy_drink",
+    "type": "consumable",
+    "effects": {
+      "hunger": 25,
+      "thirst": 40
+    },
+    "stack": 10,
+    "rarity": "uncommon"
   }
 }

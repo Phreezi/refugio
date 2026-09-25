@@ -6,7 +6,7 @@ import { eventBus } from '../core/EventBus';
 import { gameState, stationState } from '../core/GameState';
 import type { SlotRef } from '../core/PlayerActions';
 import type { Simulation } from '../core/Simulation';
-import { HANDS, RECIPE_CATEGORIES, type Recipe, type RecipeCategory } from '../data/types';
+import { HANDS, RECIPE_CATEGORIES, type Recipe, type RecipeCategory, isTradeCategory } from '../data/types';
 import { getView } from '../display/view';
 import { itemName, t, tKey } from '../i18n';
 import { describeItem, ownedCount } from './itemInfo';
@@ -369,9 +369,13 @@ export class CraftingUI {
           ry + 9,
           !unlocked
             ? t('craft.locked', { level: recipe.unlockLevel })
-            : recipe.category === 'trade'
-              ? t('craft.trade')
-              : t('craft.make'),
+            : recipe.category === 'buy'
+              ? t('craft.buy')
+              : recipe.category === 'sell'
+                ? t('craft.sell')
+                : isTradeCategory(recipe.category)
+                  ? t('craft.trade')
+                  : t('craft.make'),
           44,
           () => {
             const result = this.sim.crafting.craft(recipe.id, this.station);
@@ -381,7 +385,7 @@ export class CraftingUI {
             else if (result === 'queue_full') {
               const max = content.stations[recipe.station]?.queue ?? 1;
               this.message(t('craft.queue_full', { max }));
-            } else if (recipe.category === 'trade')
+            } else if (isTradeCategory(recipe.category))
               this.message(t('craft.traded', { item: itemName(recipe.output) }));
             else if (recipe.station === HANDS)
               this.message(

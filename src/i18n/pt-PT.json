@@ -450,5 +450,16 @@
   "talent_effect.rangedDamagePct": "+{v}% de dano à distância",
   "talent_effect.xpPct": "+{v}% de experiência",
   "item.expedition_backpack": "Mochila de expedição",
-  "item.survivor_backpack": "Mochila de sobrevivente"
+  "item.survivor_backpack": "Mochila de sobrevivente",
+  "item.coin": "Moeda",
+  "item.health_potion": "Poção de vida",
+  "item.big_health_potion": "Poção de vida grande",
+  "item.energy_drink": "Bebida energética",
+  "structure.market_stall": "Banca de comércio",
+  "station.market_stall": "Banca de comércio",
+  "craft.cat.buy": "Comprar",
+  "craft.cat.sell": "Vender",
+  "craft.buy": "Comprar",
+  "craft.sell": "Vender",
+  "menu.slot_short": "{name} · Nv {level}"
 }
