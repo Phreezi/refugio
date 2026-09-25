@@ -57,6 +57,14 @@ export interface GameEvents {
   'player:consumed': { item: string };
   /** Comida com efeito temporário (§7.17). */
   'buff:started': { item: string; effect: string; value: number; hours: number };
+  /** NPCs e missões (§7.18). `npc:talk` abre a conversa; `npc:talked` já contou para as missões. */
+  'npc:talk': { npc: string };
+  'npc:talked': { npc: string };
+  'quest:accepted': { quest: string };
+  'quest:done': { quest: string };
+  'quests:changed': Record<string, never>;
+  /** Usou um pergaminho de viagem: abre o teletransporte a partir de onde está. */
+  'scroll:use': Record<string, never>;
   /** Poste de teletransporte ativado pela primeira vez / usado (Etapa E). */
   'waystone:activated': { zoneId: string };
   'waystone:use': { zoneId: string };
@@ -77,6 +85,7 @@ export interface GameEvents {
       | 'no_ammo'
       | 'needs_level'
       | 'zone_level'
+      | 'post_broken'
       | 'food_only';
     tool?: string;
     /** needs_item: o item que falta; no_ammo: a munição da arma. */

@@ -81,6 +81,11 @@ export class Progression {
     return this.zoneLevel(zoneId) <= this.level;
   }
 
+  /** Perigo da zona (0 = segura … 4). */
+  zoneDanger(zoneId: string): number {
+    return this.content().zones[zoneId]?.danger ?? 0;
+  }
+
   /** Nível pedido para entrar na zona. */
   zoneLevel(zoneId: string): number {
     return this.content().zones[zoneId]?.unlockLevel ?? 1;

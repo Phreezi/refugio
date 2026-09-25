@@ -1,6 +1,7 @@
 import type { WorldObjectDef } from '../../data/types';
 import type { ZoneMap } from '../../world/zoneMap';
 import { footprintRect, overlaps, type Rect } from './geometry';
+import { NPC_FOOTPRINT } from '../quests/quests';
 
 /**
  * Geometria sólida de uma zona: tiles da camada `collision`, caixas dos recursos e tudo o que
@@ -60,6 +61,7 @@ export class CollisionWorld {
       const footprint = stations[placement.id]?.footprint;
       if (footprint) obstacles.push(footprintRect(placement, footprint));
     }
+    for (const placement of map.npcs ?? []) obstacles.push(footprintRect(placement, NPC_FOOTPRINT));
     for (const placement of map.containers) {
       const footprint = lootTables[placement.id]?.footprint;
       if (footprint) obstacles.push(footprintRect(placement, footprint));

@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import { paletteNumber, type PaletteColor } from '../assets/palette';
 import { BASE_ZONE_ID, gameState } from '../core/GameState';
-import { simulation } from '../core/Simulation';
+import { simulation, TRAVEL_SCROLL } from '../core/Simulation';
 import { getView, setupFixedCamera } from '../display/view';
 import { itemName, t, tKey } from '../i18n';
 import { autosave } from '../save';
 import { canTravel } from '../systems/travel/travel';
+import { countItem } from '../systems/inventory/inventory';
 import { Button } from '../ui/Button';
 import { Label } from '../ui/text';
 import { uiState } from '../ui/uiState';
@@ -320,24 +321,65 @@ export class WorldMapScene extends Phaser.Scene {
         [0.5, 0],
       ),
     );
-    add(
-      new Button(
-        this,
-        cx,
-        height - 12,
-        here ? t('map.back') : t('map.teleport_go'),
-        { width: 80, height: 16, fontSize: 9, style: ok ? 'primary' : 'secondary' },
+    const go = (pay: 'coins' | 'scroll'): void => {
+      if (this.busy) return;
+      if (!simulation.teleport(zoneId, content.zoneMap(zoneId), pay)) {
+        this.flash(t('map.no_coins'));
+        return;
+      }
+      this.busy = true;
+      uiState.pendingNotice = tKey(zone.name);
+      this.go(zoneId);
+    };
+    if (here || !ok) {
+      add(
+        new Button(
+          this,
+          cx,
+          height - 12,
+          here ? t('map.back') : t('map.teleport_go'),
+          { width: 80, height: 16, fontSize: 9, style: 'secondary' },
+          () => {
+            if (here) this.back();
+            else this.flash(line);
+          },
+        ),
+      );
+      return;
+    }
+    // Pagar: moedas (para casa é grátis) ou um pergaminho de viagem, se houver.
+    const price = simulation.teleportPrice(zoneId);
+    const player = gameState.data.player;
+    const scrolls = countItem([player.inventory, player.hotbar], TRAVEL_SCROLL);
+    const options: [string, () => void][] = [
+      [
+        price > 0 ? t('map.pay_coins', { n: price }) : t('map.teleport_go'),
         () => {
-          if (here) this.back();
-          else if (!ok) this.flash(line);
-          else if (!this.busy && simulation.teleport(zoneId, content.zoneMap(zoneId))) {
-            this.busy = true;
-            uiState.pendingNotice = tKey(zone.name);
-            this.go(zoneId);
-          }
+          go('coins');
         },
-      ),
-    );
+      ],
+    ];
+    if (price > 0 && scrolls > 0)
+      options.push([
+        `${t('map.pay_scroll')} (${String(scrolls)})`,
+        () => {
+          go('scroll');
+        },
+      ]);
+    const bw = 110;
+    options.forEach(([label, onClick], i) => {
+      const x = cx + Math.round((i - (options.length - 1) / 2) * (bw + 8));
+      add(
+        new Button(
+          this,
+          x,
+          height - 12,
+          label,
+          { width: bw, height: 16, fontSize: 8, style: 'primary' },
+          onClick,
+        ),
+      );
+    });
   }
 
   /** A zona do mapa-mundo onde se está (nos pisos de baixo de uma masmorra, a entrada). */

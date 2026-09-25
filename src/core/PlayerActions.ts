@@ -175,6 +175,11 @@ export class PlayerActions {
       this.changed();
       return true;
     }
+    // Pergaminho de viagem (§7.18): abre o teletransporte daqui; gasta-se só ao viajar.
+    if (slot && def?.type === 'scroll') {
+      this.bus.emit('scroll:use', {});
+      return true;
+    }
     if (!slot || def?.type !== 'consumable' || !def.effects) return false;
 
     const player = this.state.data.player;

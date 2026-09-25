@@ -62,6 +62,7 @@ export const GUEST_COMMANDS = {
   tutorial: ['dismiss'],
   combat: ['selectAmmo', 'cycleAmmo'],
   progression: ['learnTalent', 'resetTalents'],
+  quests: ['accept', 'turnIn', 'repairWaystone'],
   sim: ['travel', 'enterZone', 'teleport', 'crossTo'],
 } as const;
 export type CommandSystem = keyof typeof GUEST_COMMANDS;

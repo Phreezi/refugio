@@ -569,8 +569,10 @@ export class InventoryUI {
         );
         left += bw + 4;
       };
-      if (def.type === 'consumable' || def.type === 'note') {
+      if (def.type === 'consumable' || def.type === 'note' || def.type === 'scroll') {
         action(t(def.type === 'note' ? 'inv.read' : 'inv.use'), () => {
+          // O pergaminho abre o teletransporte (a mochila fecha-se).
+          if (def.type === 'scroll') this.close();
           this.actions.use(selected);
           this.rebuildSoon();
         });

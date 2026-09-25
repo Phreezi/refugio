@@ -6,7 +6,7 @@ import { TALENT_EFFECTS } from '../systems/progression/talents';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 21;
+export const SAVE_VERSION = 22;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -189,6 +189,15 @@ export function validateState(input: unknown): GameStateData {
       )
     )
       problems.push('player.buffs inválido');
+    const quests = player.quests;
+    if (
+      !isObject(quests) ||
+      !isObject(quests.active) ||
+      !Object.values(quests.active).every((goals) => Array.isArray(goals) && goals.every(stat)) ||
+      !Array.isArray(quests.done) ||
+      !quests.done.every((id) => typeof id === 'string')
+    )
+      problems.push('player.quests inválido');
   }
   if (!isObject(world)) problems.push('falta world');
   else {

@@ -110,6 +110,9 @@ export interface ZoneSceneData {
   seamless?: boolean;
 }
 
+/** Marcas por cima dos NPCs ("!", "?"): acima de tudo o que está no chão. */
+const NPC_MARK_DEPTH = 9000;
+
 /** Mundo contínuo (Etapa E): desenham-se as zonas a menos disto (tiles) da zona atual. */
 const NEIGHBOR_MARGIN_TILES = 40;
 
@@ -135,6 +138,7 @@ export class ZoneScene extends Phaser.Scene {
   private zoneId: string = BASE_ZONE_ID;
   private enemyViews = new Map<number, EnemyView>();
   /** Contentores com loot, pelo id do objeto (ficam escuros quando vazios). */
+  private npcMarks: { npc: string; label: Label }[] = [];
   private containerSprites = new Map<number, Phaser.GameObjects.Image>();
   private bagSprites: Phaser.GameObjects.Image[] = [];
   private groundSprites: Phaser.GameObjects.Image[] = [];
@@ -209,6 +213,23 @@ export class ZoneScene extends Phaser.Scene {
       const def = content.lootTables[p.id];
       if (def) this.containerSprites.set(p.objectId, place(p, def.sprite));
     }
+    // NPCs (§7.18), com "!" (missão nova) ou "?" (pronta a entregar) por cima.
+    this.npcMarks = [];
+    for (const p of zone.npcs ?? []) {
+      const def = content.npcs[p.id];
+      if (!def) continue;
+      place(p, def.sprite);
+      const mark = new Label(
+        this,
+        Math.round(p.x),
+        Math.round(p.y) - 34,
+        '',
+        { size: 9, color: 'gold', stroke: true },
+        [0.5, 1],
+      ).setDepth(NPC_MARK_DEPTH);
+      this.npcMarks.push({ npc: p.id, label: mark });
+    }
+    this.renderNpcMarks();
 
     this.createPlayerAnimations();
     const { x, y, facing, look } = gameState.data.player;
@@ -678,6 +699,21 @@ export class ZoneScene extends Phaser.Scene {
           this.scene.start(SceneKey.WorldMap, { from: zoneId, exit, teleport: true } satisfies WorldMapData);
         });
       }),
+      on('quests:changed', () => {
+        this.renderNpcMarks();
+      }),
+      on('inventory:changed', () => {
+        this.renderNpcMarks();
+      }),
+      // Pergaminho de viagem: o teletransporte abre-se a partir de onde se está.
+      on('scroll:use', () => {
+        const player = gameState.data.player;
+        const exit = { x: player.x, y: player.y };
+        const from = this.zoneId;
+        this.leave(() => {
+          this.scene.start(SceneKey.WorldMap, { from, exit, teleport: true } satisfies WorldMapData);
+        });
+      }),
       on('player:died', () => {
         // O jogador já está na base (GameState): se morreu noutra zona, muda de cena.
         if (this.zoneId !== BASE_ZONE_ID) {
@@ -996,6 +1032,16 @@ export class ZoneScene extends Phaser.Scene {
    * da zona atual); ao passar a borda, a cena recomeça na vizinha com a mesma vista.
    * @returns a área (px, coordenadas desta zona) com mapas desenhados — os limites da câmara.
    */
+  /** "!" nos NPCs com missão para dar; "?" nos que têm uma missão pronta a entregar. */
+  private renderNpcMarks(): void {
+    if (!gameState.hasGame) return;
+    const quests = simulation.quests;
+    for (const { npc, label } of this.npcMarks) {
+      const ready = quests.handIns(npc).some((q) => quests.ready(q.id));
+      label.setText(ready ? '?' : quests.offers(npc).length > 0 ? '!' : '');
+    }
+  }
+
   private createNeighbors(): { x: number; y: number; w: number; h: number } {
     const map = content.zoneMap(this.zoneId);
     const size = map.tileSize;
@@ -1035,6 +1081,10 @@ export class ZoneScene extends Phaser.Scene {
         if (chestSprite) for (const p of other.chests) place(p, chestSprite);
         for (const p of other.containers) {
           const def = content.lootTables[p.id];
+          if (def) place(p, def.sprite);
+        }
+        for (const p of other.npcs ?? []) {
+          const def = content.npcs[p.id];
           if (def) place(p, def.sprite);
         }
         // A casa construída na base vê-se dos caminhos.

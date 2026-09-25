@@ -1,0 +1,32 @@
+{
+  "$comment": "NPCs (§7.18): sprite 16×32; role quests (dá missões), shop (abre a loja `shop`), waystone (técnico que repara o poste da zona).",
+  "technician": {
+    "sprite": "npc_technician",
+    "role": "waystone"
+  },
+  "merchant": {
+    "sprite": "npc_merchant",
+    "role": "shop",
+    "shop": "merchant"
+  },
+  "old_man": {
+    "sprite": "npc_old_man",
+    "role": "quests"
+  },
+  "fisher": {
+    "sprite": "npc_fisher",
+    "role": "quests"
+  },
+  "farmer": {
+    "sprite": "npc_farmer",
+    "role": "quests"
+  },
+  "doctor": {
+    "sprite": "npc_doctor",
+    "role": "quests"
+  },
+  "sergeant": {
+    "sprite": "npc_sergeant",
+    "role": "quests"
+  }
+}

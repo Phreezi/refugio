@@ -2224,6 +2224,23 @@ const PHASE10A_ICONS: Sprite[] = [
     },
   },
   {
+    // Pergaminho de viagem (§7.18): rolo de papel com fita azul e um símbolo de poste.
+    file: 'travel_scroll',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(3, 4, 10, 9, c('parchment'));
+      img.fill(3, 4, 10, 1, c('cream'));
+      img.fill(2, 3, 2, 11, c('sand'));
+      img.fill(12, 3, 2, 11, c('sand'));
+      img.fill(2, 3, 1, 11, c('wheat'));
+      img.fill(7, 6, 2, 5, c('water'));
+      img.fill(6, 6, 4, 1, c('sky'));
+      img.fill(3, 8, 10, 1, c('sky'));
+    },
+  },
+  {
     // Bebida energética: lata verde com risca e anilha.
     file: 'energy_drink',
     width: 16,

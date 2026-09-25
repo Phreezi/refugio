@@ -322,6 +322,7 @@ class Coop {
           tutorial: sim.tutorial,
           combat: sim.combat,
           progression: sim.progression,
+          quests: sim.quests,
         };
         const target = targets[sys];
         const fn: unknown = Reflect.get(target, method);
@@ -342,7 +343,7 @@ class Coop {
     if (!content.zones[zoneId]) return;
     const map = content.zoneMap(zoneId);
     if (method === 'teleport') {
-      sim.teleport(zoneId, map);
+      sim.teleport(zoneId, map, args[1] === 'scroll' ? 'scroll' : 'coins');
     } else if (method === 'crossTo') {
       sim.crossTo(zoneId, map, Number(args[1]) || 0, Number(args[2]) || 0);
     } else if (method === 'travel') {
@@ -511,6 +512,7 @@ class Coop {
       tutorial: simulation.tutorial,
       combat: simulation.combat,
       progression: simulation.progression,
+      quests: simulation.quests,
       sim: simulation,
     };
     for (const sys of Object.keys(GUEST_COMMANDS) as CommandSystem[]) {

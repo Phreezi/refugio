@@ -1711,6 +1711,94 @@
         "border": "ink",
         "letter": "T"
       }
+    },
+    "npc_technician": {
+      "type": "image",
+      "file": "sprites/npc_technician.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "orange",
+        "border": "ink",
+        "letter": "N"
+      }
+    },
+    "npc_merchant": {
+      "type": "image",
+      "file": "sprites/npc_merchant.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "forest",
+        "border": "ink",
+        "letter": "N"
+      }
+    },
+    "npc_old_man": {
+      "type": "image",
+      "file": "sprites/npc_old_man.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "plum",
+        "border": "ink",
+        "letter": "N"
+      }
+    },
+    "npc_fisher": {
+      "type": "image",
+      "file": "sprites/npc_fisher.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "teal",
+        "border": "ink",
+        "letter": "N"
+      }
+    },
+    "npc_farmer": {
+      "type": "image",
+      "file": "sprites/npc_farmer.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "leaf",
+        "border": "ink",
+        "letter": "N"
+      }
+    },
+    "npc_doctor": {
+      "type": "image",
+      "file": "sprites/npc_doctor.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "cream",
+        "border": "ink",
+        "letter": "N"
+      }
+    },
+    "npc_sergeant": {
+      "type": "image",
+      "file": "sprites/npc_sergeant.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "forest_dark",
+        "border": "ink",
+        "letter": "N"
+      }
+    },
+    "icon_travel_scroll": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "parchment",
+        "border": "ink",
+        "letter": "P"
+      },
+      "file": "sprites/icons/travel_scroll.png"
     }
   }
 }

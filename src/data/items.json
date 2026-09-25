@@ -827,5 +827,12 @@
     },
     "stack": 10,
     "rarity": "common"
+  },
+  "travel_scroll": {
+    "name": "item.travel_scroll",
+    "icon": "icon_travel_scroll",
+    "type": "scroll",
+    "stack": 10,
+    "rarity": "uncommon"
   }
 }

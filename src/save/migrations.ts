@@ -151,6 +151,11 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     if (chests && typeof chests === 'object') for (const chest of Object.values(chests)) takeCoins(chest);
     return { ...s, player: { ...player, coins, buffs: [] }, waystones: [] };
   },
+  // v21 → v22: missões (§7.18) — nenhuma aceite nem feita.
+  21: (s) => {
+    const player = s.player as Record<string, unknown>;
+    return { ...s, player: { ...player, quests: { active: {}, done: [] } } };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

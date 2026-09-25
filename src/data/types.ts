@@ -59,7 +59,7 @@ export interface PropDef extends WorldObjectDef {
 export type PropDefs = Readonly<Record<string, PropDef>>;
 
 export type ItemType =
-  'resource' | 'consumable' | 'tool' | 'weapon' | 'ammo' | 'armor' | 'backpack' | 'key' | 'note';
+  'resource' | 'consumable' | 'tool' | 'weapon' | 'ammo' | 'armor' | 'backpack' | 'key' | 'note' | 'scroll';
 const ITEM_TYPES: readonly ItemType[] = [
   'resource',
   'consumable',
@@ -70,6 +70,7 @@ const ITEM_TYPES: readonly ItemType[] = [
   'backpack',
   'key',
   'note',
+  'scroll',
 ];
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
 const RARITIES: readonly Rarity[] = ['common', 'uncommon', 'rare', 'epic'];
