@@ -4,6 +4,7 @@
   "menu.hint": "Tap the button or press Enter",
   "boot.loading": "Loading…",
   "boot.error": "Error while starting the game:",
+  "error.runtime": "Something went wrong (the game tries to carry on). Please take a screenshot and send it:",
   "menu.continue": "Continue (day {day})",
   "menu.confirm_new": "Erase and restart?",
   "save.export": "Export",

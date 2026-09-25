@@ -5,6 +5,20 @@ import { textResolution } from '../display/view';
 /** Fonte da interface (até haver uma fonte pixel própria, Fase 12). */
 export const UI_FONT = '"Trebuchet MS", "Segoe UI", system-ui, sans-serif';
 
+let measureContext: CanvasRenderingContext2D | null = null;
+
+/**
+ * Largura (px de jogo) de uma linha de texto na fonte da interface — medida no browser, porque
+ * a mesma fonte tem larguras diferentes em cada sistema (ex.: iPhone vs Windows).
+ */
+export function measureTextWidth(content: string, size: number, bold = false): number {
+  measureContext ??= document.createElement('canvas').getContext('2d');
+  if (!measureContext) return content.length * size * 0.6;
+  // Medido 4× maior (mais preciso) e reduzido.
+  measureContext.font = `${bold ? 'bold ' : ''}${String(size * 4)}px ${UI_FONT}`;
+  return measureContext.measureText(content).width / 4;
+}
+
 export interface LabelStyle {
   /** Tamanho em píxeis de jogo (é desenhado à resolução do dispositivo). */
   size: number;

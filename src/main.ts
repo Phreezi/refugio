@@ -13,6 +13,9 @@ import { UIScene } from './scenes/UIScene';
 import { installSaveOnHide } from './save';
 import { preferences } from './ui/preferences';
 import { installSfx } from './audio/sfx';
+import { installRuntimeErrors } from './ui/runtimeErrors';
+
+installRuntimeErrors();
 
 const params = new URLSearchParams(window.location.search);
 const language = params.get(LANGUAGE_QUERY_PARAM);
