@@ -12,6 +12,7 @@ import { PreloadScene } from './scenes/PreloadScene';
 import { UIScene } from './scenes/UIScene';
 import { installSaveOnHide } from './save';
 import { preferences } from './ui/preferences';
+import { installSfx } from './audio/sfx';
 
 const params = new URLSearchParams(window.location.search);
 const language = params.get(LANGUAGE_QUERY_PARAM);
@@ -43,6 +44,8 @@ const game = new Phaser.Game({
     autoCenter: Phaser.Scale.NO_CENTER,
   },
   disableContextMenu: true,
+  // Os sons são sintetizados à parte (src/audio/sfx.ts): o Phaser não precisa de áudio.
+  audio: { noAudio: true },
   scene: [BootScene, PreloadScene, MainMenuScene, ZoneScene, WorldMapScene, UIScene],
 });
 
@@ -50,3 +53,4 @@ const scaling = installPixelScaling(game, host);
 installDebugOverlay(game, scaling, params.has(DEBUG_QUERY_PARAM));
 
 installSaveOnHide();
+installSfx();

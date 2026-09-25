@@ -133,6 +133,7 @@ refugio/
 │   │   ├── palette.json/.ts  # paleta de 32 cores (fonte de verdade)
 │   │   ├── characterSheet.ts # layout das spritesheets de personagem + desenho do placeholder
 │   │   └── placeholders.ts   # texturas placeholder geradas por código
+│   ├── audio/                # sfx.ts: efeitos sonoros sintetizados (Web Audio), ligados aos eventos
 │   ├── display/              # escala inteira + vista (view.ts) + zoom do jogador (worldZoom.ts)
 │   ├── world/                # mapas: tileset.ts, zoneMap.ts (validação Tiled, puro), content.ts, zoneContext.ts
 │   ├── debug/                # overlay F3 (DOM)
@@ -263,6 +264,7 @@ npm run validate-data   # valida referências cruzadas entre JSONs (paleta, mani
 npm run palette    # regenera public/assets/palette.png
 npm run tiles      # regenera public/assets/tiles/base_tiles.png (ordem = src/world/tileset.ts)
 npm run sprites    # regenera public/assets/sprites/*.png (pixel art de recursos e obstáculos; `-- --preview f.png`)
+npm run characters # regenera public/assets/sprites/player.png (spritesheet da personagem; `-- --preview f.png`)
 npm run map:base   # gera maps/base.json (recusa substituir sem `-- --force`: o mapa edita-se no Tiled)
 npm run map:pine   # gera maps/pine_forest.json (idem)
 npm run map:farm   # gera maps/farm.json (idem; usa scripts/mapgen.ts)
@@ -861,7 +863,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 - [ ] Revisão completa dos controlos touch (tamanho de botões, zonas mortas do joystick). *(Precisa de testes em telemóveis reais; o tamanho da interface já é ajustável nas definições.)*
 - [x] Tutorial curto e contextual (andar, primeira árvore, primeiro craft, primeira peça, comer, primeira zona): dica no topo com texto de teclado ou de toque e × para desligar (`core/Tutorial.ts`, save v13 `tutorial`).
-- [x] Definições (menu de pausa): idioma, tamanho da UI, vibração, hordas, mostrar números de dano. *(Volume quando houver som, Fase 12.)* Preferências do dispositivo no localStorage (`refugio.prefs`, `src/ui/preferences.ts`); as hordas no save.
+- [x] Definições (menu de pausa): idioma, volume, tamanho da UI, vibração, hordas, mostrar números de dano. Preferências do dispositivo no localStorage (`refugio.prefs`, `src/ui/preferences.ts`); as hordas no save.
 - [x] Raridade nos slots (contorno verde/azul/rosa) e modo daltónico (1–3 marcas no canto, além da cor).
 - [x] Menu de pausa (Esc / botão "II"; o tempo de jogo pára), estatísticas do jogador (save v12 `stats`), "Gravar e sair".
 - [ ] Testes em 3+ telemóveis Android de gamas diferentes.
@@ -875,12 +877,24 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 **Objetivo:** substituir placeholders pelo estilo Stardew-like.
 
-- [ ] Definir guia de estilo (paleta final, contornos, luz de cima-esquerda, proporções).
+**Como se faz a arte (decidido em 2026-09-25):** sem custos extra e sem licenças de terceiros — a pixel art é **desenhada em código** pelo Claude (scripts em `scripts/`, grelhas de letras → PNG, só com a paleta) e os **sons são sintetizados** no browser (`src/audio/sfx.ts`, Web Audio, estilo sfxr). Tudo é nosso (uso comercial livre, pode estar no repositório público).
+
+**Guia de estilo:**
+- **Paleta**: só as 32 cores de `src/assets/palette.json` (nada de cores "quase iguais"). Sombras no chão: `ink` semitransparente.
+- **Contorno**: 1 px `ink` à volta de personagens, objetos e ícones (os tiles de chão não têm).
+- **Luz**: de cima-esquerda — cada material tem 3 tons (luz, base, sombra): luz no lado de cima/esquerdo, sombra em baixo/direita.
+- **Proporções**: tiles 16×16; personagens 16×32 com os pés na última linha, cabeça grande (12 px de largura, ~11 de altura), corpo 7 linhas, pernas 8; vista 3/4 (vê-se a frente e o topo).
+- **Personagens**: 4 direções (a esquerda é o espelho da direita), andar em 4 frames com o corpo a descer 1 px no cruzamento, ataque em 2 (levantar/estender), agachado 4 px mais baixo.
+- **Tom**: cores quentes e saturação média; sem sangue explícito.
+
+**Alternativa com IA (para mais tarde):** o **ComfyUI** (grátis) a correr num PC com placa gráfica boa (NVIDIA com ~8 GB+), ligado ao Claude Code **local** por um servidor MCP (ex.: [artokun/comfyui-mcp](https://github.com/artokun/comfyui-mcp), [Peleke/comfyui-mcp](https://github.com/Peleke/comfyui-mcp)). Modelos com uso comercial: **FLUX.1 schnell** (Apache 2.0) ou **SDXL** (OpenRAIL++); **não** o FLUX.1 dev (não comercial). O que a IA gerar passa depois por um script nosso que o reduz à grelha de 16 px e à paleta, e fica registado no `LICENSES.md`. (Pagos/serviços externos, como a Ludo.ai, e packs CraftPix/GameArt2D ficam de fora: custo, ou licenças que proíbem os ficheiros num repositório público.)
+
+- [x] Definir guia de estilo (paleta final, contornos, luz de cima-esquerda, proporções). *(Acima.)*
 - [ ] Tilesets finais por bioma (base, floresta, quinta, lago, estrada, aldeia, industrial, militar, cidade).
-- [ ] Personagem com mais frames e peças de equipamento visíveis (camadas de sprite).
+- [ ] Personagem com mais frames e peças de equipamento visíveis (camadas de sprite). *(Feito: a personagem em pixel art, `npm run characters` → `sprites/player.png`, 10×4 frames; falta o equipamento visível.)*
 - [ ] Inimigos, recursos, estruturas, ícones finais.
 - [ ] UI final (moldura de madeira/tecido, fonte pixel legível com acentos portugueses).
-- [ ] Música por zona (loops curtos) e efeitos sonoros; tudo com licença registada.
+- [ ] Música por zona (loops curtos) e efeitos sonoros; tudo com licença registada. *(Efeitos feitos: sintetizados em `src/audio/sfx.ts` — golpes, recolha, dano, fabrico, construção, pesca, nível, alarme da horda, cliques — com volume nas definições; falta a música.)*
 - [ ] Partículas: folhas, pó, chuva; clima simples.
 
 **Aceitação:** nenhum placeholder no jogo; todos os assets com licença documentada em `LICENSES.md`.
@@ -1078,4 +1092,6 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Convidado com previsão: as ações dos painéis fazem-se logo no ecrã dele e são repetidas no anfitrião (comandos numerados; o estado só se aplica depois de o anfitrião os fazer todos) | Painéis sem atraso de rede e sem estado a "saltar para trás" |
 | 2026-09-25 | Inimigos 1,5× mais fortes (vida e dano) em co-op | Pedido do jogador |
 | 2026-09-25 | Dependência nova: **PeerJS** (MIT) + servidor de sinalização gratuito do PeerJS | Sem servidor próprio a alojar; o servidor recusa ids repetidos, o que garante códigos únicos entre as sessões ativas. Contrapartida: depende de um serviço de terceiros (pode trocar-se por um próprio com `?peer=`) |
+| 2026-09-25 | Fase 12: arte desenhada em código pelo Claude e sons sintetizados; ComfyUI local como opção futura | Pedido do jogador: sem pagar mais. Os packs grátis testados (CraftPix, GameArt2D) proíbem redistribuir os ficheiros (o repositório é público) e não encaixam no estilo; a Ludo.ai é paga |
+| 2026-09-25 | Volume nas preferências do dispositivo (`volume`, 0–100% em passos de 25%) | Os sons são novos; ficam no localStorage como as outras preferências |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

@@ -17,6 +17,8 @@ export interface Preferences {
   vibration: boolean;
   /** Modo daltónico: marcas de raridade nos slots, além da cor. */
   colorblind: boolean;
+  /** Volume dos sons (0–1; 0 = sem som). */
+  volume: number;
 }
 
 const STORAGE_KEY = 'refugio.prefs';
@@ -27,7 +29,11 @@ export const DEFAULT_PREFERENCES: Preferences = {
   damageNumbers: true,
   vibration: true,
   colorblind: false,
+  volume: 0.6,
 };
+
+/** Níveis de volume das definições (tocar muda para o seguinte). */
+export const VOLUME_STEPS: readonly number[] = [0, 0.25, 0.5, 0.75, 1];
 
 /** Lado curto alvo (px de jogo) para cada tamanho: menos píxeis de jogo = tudo maior. */
 export const UI_SIZE_TARGET: Readonly<Record<UiSize, number>> = { small: 320, normal: 270, large: 230 };
@@ -50,6 +56,7 @@ export function parsePreferences(text: string | null): Preferences {
   for (const key of ['damageNumbers', 'vibration', 'colorblind'] as const) {
     if (typeof r[key] === 'boolean') prefs[key] = r[key];
   }
+  if (typeof r.volume === 'number' && r.volume >= 0 && r.volume <= 1) prefs.volume = r.volume;
   return prefs;
 }
 

@@ -23,7 +23,8 @@
         "color": "sky",
         "border": "ink",
         "style": "character"
-      }
+      },
+      "file": "sprites/player.png"
     },
     "zombie_walker": {
       "type": "image",

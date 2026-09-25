@@ -322,5 +322,6 @@
   "coop.join_failed": "Couldn't join. Try again.",
   "coop.lost": "The connection to your friend's game ended.",
   "coop.partner_joined": "Your partner joined the game!",
-  "coop.partner_left": "Your partner left."
+  "coop.partner_left": "Your partner left.",
+  "pause.volume": "Volume"
 }
