@@ -84,5 +84,13 @@
       "width": 28,
       "height": 8
     }
+  },
+  "waystone": {
+    "sprite": "waystone",
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "action": "teleport"
   }
 }

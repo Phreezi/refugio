@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import { paletteNumber } from '../assets/palette';
-import { secondsToTicks, TICKS_PER_SECOND } from '../core/Clock';
+import { gameHoursToTicks, secondsToTicks, TICKS_PER_SECOND } from '../core/Clock';
+import { BALANCE } from '../data/balance';
 import { stationType } from '../core/Crafting';
 import { eventBus } from '../core/EventBus';
 import { gameState, stationState } from '../core/GameState';
@@ -10,7 +11,7 @@ import { HANDS, RECIPE_CATEGORIES, type Recipe, type RecipeCategory, isTradeCate
 import { getView } from '../display/view';
 import { itemName, t, tKey } from '../i18n';
 import { describeItem, ownedCount } from './itemInfo';
-import { missingInputs, outputCount } from '../systems/crafting/crafting';
+import { haveInput, missingInputs, outputCount } from '../systems/crafting/crafting';
 import { countItem } from '../systems/inventory/inventory';
 import { content } from '../world/content';
 import { Button, CLOSE_ICON } from './Button';
@@ -130,6 +131,11 @@ export class CraftingUI {
     return true;
   }
 
+  /** A estação aberta é de encomendas (entrega à porta, §7.17)? */
+  private delivers(): boolean {
+    return this.station !== null && content.stations[stationType(this.station)]?.deliver === true;
+  }
+
   /** Barras de progresso da fila (chamar em todos os frames). */
   update(): void {
     if (!this.station || this.bars.length === 0 || !gameState.hasGame) return;
@@ -138,9 +144,15 @@ export class CraftingUI {
       const job = queue[bar.index];
       const recipe = job ? content.recipes.find((r) => r.id === job[0]) : undefined;
       if (!job || !recipe) continue;
-      const total = secondsToTicks(recipe.timeSec);
-      bar.fill.width = Math.max(1, Math.round((BAR_W * (total - job[1])) / total));
-      bar.time.setText(t('craft.seconds', { s: Math.ceil(job[1] / TICKS_PER_SECOND) }));
+      // Encomendas: `orderHours` horas de jogo; o que falta em minutos de jogo.
+      const deliver = this.delivers();
+      const total = deliver ? gameHoursToTicks(BALANCE.orderHours) : secondsToTicks(recipe.timeSec);
+      bar.fill.width = Math.max(1, Math.min(BAR_W, Math.round((BAR_W * (total - job[1])) / total)));
+      bar.time.setText(
+        deliver
+          ? t('fridge.eta', { m: Math.ceil((job[1] * 60) / gameHoursToTicks(1)) })
+          : t('craft.seconds', { s: Math.ceil(job[1] / TICKS_PER_SECOND) }),
+      );
     }
   }
 
@@ -316,7 +328,8 @@ export class CraftingUI {
         .filter(
           (r) =>
             !this.canMakeOnly ||
-            (this.sim.progression.isRecipeUnlocked(r) && missingInputs(containers, r).length === 0),
+            (this.sim.progression.isRecipeUnlocked(r) &&
+              missingInputs(containers, r, gameState.data.player).length === 0),
         )
         // As que ainda não se sabem fazer ficam no fim (a cinzento), por nível.
         .map((r, i) => ({ r, i, locked: !this.sim.progression.isRecipeUnlocked(r) }))
@@ -361,7 +374,11 @@ export class CraftingUI {
           this.message([itemName(recipe.output), ...describeItem(recipe.output, def)].join('\n'));
         });
         const qty = recipe.qty > 1 ? ` ×${String(recipe.qty)}` : '';
-        const time = recipe.timeSec > 0 ? ` · ${t('craft.seconds', { s: recipe.timeSec })}` : '';
+        const time = this.delivers()
+          ? ` · ${t('fridge.hours', { h: BALANCE.orderHours })}`
+          : recipe.timeSec > 0
+            ? ` · ${t('craft.seconds', { s: recipe.timeSec })}`
+            : '';
         this.label(x + PAD + 20, ry + 1, `${itemName(recipe.output)}${qty}${time}`, {
           size: 8,
           bold: true,
@@ -370,7 +387,7 @@ export class CraftingUI {
         // Ingredientes: "tem/precisa nome", a vermelho se faltar.
         let ix = x + PAD + 20;
         for (const { item, qty: need } of recipe.inputs) {
-          const have = countItem(containers, item);
+          const have = haveInput(containers, item, gameState.data.player);
           const text = `${String(Math.min(have, need))}/${String(need)} ${itemName(item)}`;
           const lbl = this.label(ix, ry + 12, text, {
             size: 7,
@@ -379,9 +396,10 @@ export class CraftingUI {
           ix += lbl.text.width + 8;
         }
         const unlocked = this.sim.progression.isRecipeUnlocked(recipe);
-        const ok = unlocked && missingInputs(containers, recipe).length === 0;
+        const ok = unlocked && missingInputs(containers, recipe, gameState.data.player).length === 0;
+        const bw = this.delivers() ? 58 : 44;
         this.button(
-          x + w - PAD - 22,
+          x + w - PAD - bw / 2,
           ry + 9,
           !unlocked
             ? t('craft.locked', { level: recipe.unlockLevel })
@@ -391,8 +409,10 @@ export class CraftingUI {
                 ? t('craft.sell')
                 : isTradeCategory(recipe.category)
                   ? t('craft.trade')
-                  : t('craft.make'),
-          44,
+                  : this.delivers()
+                    ? t('fridge.order')
+                    : t('craft.make'),
+          bw,
           () => {
             const result = this.sim.crafting.craft(recipe.id, this.station);
             if (result === 'locked') this.message(t('craft.locked_msg', { level: recipe.unlockLevel }));
@@ -401,7 +421,8 @@ export class CraftingUI {
             else if (result === 'queue_full') {
               const max = content.stations[recipe.station]?.queue ?? 1;
               this.message(t('craft.queue_full', { max }));
-            } else if (isTradeCategory(recipe.category))
+            } else if (this.delivers()) this.message(t('fridge.ordered', { item: itemName(recipe.output) }));
+            else if (isTradeCategory(recipe.category))
               this.message(t('craft.traded', { item: itemName(recipe.output) }));
             else if (recipe.station === HANDS)
               this.message(

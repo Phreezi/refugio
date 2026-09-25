@@ -1178,5 +1178,93 @@
     "qty": 1,
     "timeSec": 30,
     "unlockLevel": 18
+  },
+  {
+    "id": "order_pizza",
+    "station": "takeaway",
+    "category": "order",
+    "inputs": [["coin", 40]],
+    "output": "pizza",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 15,
+    "xp": 0
+  },
+  {
+    "id": "order_burger",
+    "station": "takeaway",
+    "category": "order",
+    "inputs": [["coin", 35]],
+    "output": "burger",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 15,
+    "xp": 0
+  },
+  {
+    "id": "order_roast_chicken",
+    "station": "takeaway",
+    "category": "order",
+    "inputs": [["coin", 45]],
+    "output": "roast_chicken",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 15,
+    "xp": 0
+  },
+  {
+    "id": "order_bifana",
+    "station": "takeaway",
+    "category": "order",
+    "inputs": [["coin", 30]],
+    "output": "bifana",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 15,
+    "xp": 0
+  },
+  {
+    "id": "order_soup",
+    "station": "takeaway",
+    "category": "order",
+    "inputs": [["coin", 15]],
+    "output": "soup",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 15,
+    "xp": 0
+  },
+  {
+    "id": "order_coffee",
+    "station": "takeaway",
+    "category": "drinks",
+    "inputs": [["coin", 25]],
+    "output": "coffee",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 15,
+    "xp": 0
+  },
+  {
+    "id": "order_smoothie",
+    "station": "takeaway",
+    "category": "drinks",
+    "inputs": [["coin", 20]],
+    "output": "smoothie",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 15,
+    "xp": 0
+  },
+  {
+    "id": "order_lemonade",
+    "station": "takeaway",
+    "category": "drinks",
+    "inputs": [["coin", 8]],
+    "output": "lemonade",
+    "qty": 1,
+    "timeSec": 60,
+    "unlockLevel": 15,
+    "xp": 0
   }
 ]

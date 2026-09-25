@@ -20,6 +20,11 @@ export interface WorldMapData {
   from: string;
   /** Saída por onde se saiu (para voltar pelo mesmo sítio). */
   exit: { x: number; y: number };
+  /**
+   * Aberto num poste de teletransporte (Etapa E): só os postes ativados (e a base) são
+   * destinos, sem custo; "Voltar" deixa o jogador onde estava.
+   */
+  teleport?: boolean;
 }
 
 /** Cor de cada nível de perigo (CLAUDE.md §8.1): base, T1 verde, T2 amarelo, T3 laranja, T4 vermelho. */
@@ -35,6 +40,7 @@ export class WorldMapScene extends Phaser.Scene {
   private from = BASE_ZONE_ID;
   private exit = { x: 0, y: 0 };
   private selected: string | null = null;
+  private teleport = false;
   private panel: { destroy(): void }[] = [];
   private busy = false;
 
@@ -45,6 +51,7 @@ export class WorldMapScene extends Phaser.Scene {
   create(data: WorldMapData): void {
     this.from = data.from;
     this.exit = data.exit;
+    this.teleport = data.teleport === true;
     this.selected = null;
     this.panel = [];
     this.busy = false;
@@ -56,7 +63,11 @@ export class WorldMapScene extends Phaser.Scene {
     camera.fadeIn(FADE_MS);
 
     const onResize = (): void => {
-      this.scene.restart({ from: this.from, exit: this.exit } satisfies WorldMapData);
+      this.scene.restart({
+        from: this.from,
+        exit: this.exit,
+        teleport: this.teleport,
+      } satisfies WorldMapData);
     };
     this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
     const onEsc = (): void => {
@@ -106,7 +117,7 @@ export class WorldMapScene extends Phaser.Scene {
       this,
       Math.round(width / 2),
       5,
-      t('map.title'),
+      t(this.teleport ? 'map.teleport_title' : 'map.title'),
       { size: 10, bold: true, color: 'wheat' },
       [0.5, 0],
     );
@@ -143,7 +154,8 @@ export class WorldMapScene extends Phaser.Scene {
       const here = zoneId === this.surface();
       if (here) this.add.circle(x, y, NODE_R + 3, paletteNumber('gold'));
       this.add.circle(x, y, NODE_R + 1, paletteNumber('ink'));
-      const locked = !here && !simulation.progression.isZoneUnlocked(zoneId);
+      const locked =
+        !here && (this.teleport ? !this.hasPost(zoneId) : !simulation.progression.isZoneUnlocked(zoneId));
       const node = this.add.circle(
         x,
         y,
@@ -158,7 +170,11 @@ export class WorldMapScene extends Phaser.Scene {
         this,
         x,
         y,
-        locked ? String(zone.unlockLevel) : zone.danger === 0 ? 'C' : `T${String(zone.danger)}`,
+        locked && !this.teleport
+          ? String(zone.unlockLevel)
+          : zone.danger === 0
+            ? 'C'
+            : `T${String(zone.danger)}`,
         {
           size: 7,
           bold: true,
@@ -195,7 +211,21 @@ export class WorldMapScene extends Phaser.Scene {
     const zoneId = this.selected;
     const zone = zoneId ? content.zones[zoneId] : undefined;
     if (!zoneId || !zone) {
-      add(new Label(this, cx, top + 20, t('map.hint'), { size: 9, color: 'parchment' }, [0.5, 0]));
+      const hint = t(this.teleport ? 'map.teleport_hint' : 'map.hint');
+      add(
+        new Label(
+          this,
+          cx,
+          top + 20,
+          hint,
+          { size: 9, color: 'parchment', wrap: width - 24, align: 'center' },
+          [0.5, 0],
+        ),
+      );
+      return;
+    }
+    if (this.teleport) {
+      this.showTeleportPanel(zoneId, top, cx);
       return;
     }
     const lines: string[] = [
@@ -254,12 +284,60 @@ export class WorldMapScene extends Phaser.Scene {
     );
   }
 
-  /** Volta à zona de onde se saiu, pela mesma saída (grátis). */
+  /** Volta à zona de onde se saiu, pela mesma saída (grátis); do poste, fica onde estava. */
   private back(): void {
     if (this.busy) return;
     this.busy = true;
-    simulation.enterZone(this.from, content.zoneMap(this.from), this.exit);
+    if (!this.teleport) simulation.enterZone(this.from, content.zoneMap(this.from), this.exit);
     this.go(this.from);
+  }
+
+  /** A zona tem o poste de teletransporte ativado? (a base está sempre) */
+  private hasPost(zoneId: string): boolean {
+    return zoneId === BASE_ZONE_ID || gameState.data.waystones.includes(zoneId);
+  }
+
+  /** Painel do teletransporte: grátis para os postes ativados. */
+  private showTeleportPanel(zoneId: string, top: number, cx: number): void {
+    const { width, height } = getView();
+    const zone = content.zones[zoneId];
+    if (!zone) return;
+    const here = zoneId === this.from;
+    const ok = !here && this.hasPost(zoneId);
+    const line = here ? t('map.here') : ok ? t('map.teleport_free') : t('map.teleport_off');
+    const add = <T extends { destroy(): void }>(obj: T): T => {
+      this.panel.push(obj);
+      return obj;
+    };
+    add(new Label(this, cx, top, tKey(zone.name), { size: 10, bold: true, color: 'wheat' }, [0.5, 0]));
+    add(
+      new Label(
+        this,
+        cx,
+        top + 15,
+        line,
+        { size: 7, color: 'parchment', align: 'center', wrap: width - 24 },
+        [0.5, 0],
+      ),
+    );
+    add(
+      new Button(
+        this,
+        cx,
+        height - 12,
+        here ? t('map.back') : t('map.teleport_go'),
+        { width: 80, height: 16, fontSize: 9, style: ok ? 'primary' : 'secondary' },
+        () => {
+          if (here) this.back();
+          else if (!ok) this.flash(line);
+          else if (!this.busy && simulation.teleport(zoneId, content.zoneMap(zoneId))) {
+            this.busy = true;
+            uiState.pendingNotice = tKey(zone.name);
+            this.go(zoneId);
+          }
+        },
+      ),
+    );
   }
 
   /** A zona do mapa-mundo onde se está (nos pisos de baixo de uma masmorra, a entrada). */

@@ -2,7 +2,7 @@ import { BALANCE } from '../data/balance';
 import { EQUIP_SLOTS } from '../data/types';
 import type { StructureRecord } from '../systems/building/building';
 import type { Skills } from '../systems/combat/skills';
-import type { Talents } from '../systems/progression/talents';
+import type { TalentEffect, Talents } from '../systems/progression/talents';
 import type { GameStatsCounters } from './Stats';
 import { createStationState, type StationState } from '../systems/crafting/crafting';
 import { createContainer, type Container } from '../systems/inventory/inventory';
@@ -46,7 +46,14 @@ export interface PlayerState {
    * couber fica no chão).
    */
   quiver: [item: string, qty: number][];
+  /** Moedas (§7.16): um contador (aparece no HUD), não um item nos slots. */
+  coins: number;
+  /** Efeitos temporários da comida (§7.17): [efeito, valor, tick em que acaba]. */
+  buffs: Buff[];
 }
+
+/** Efeito temporário (comida encomendada): soma-se aos talentos até `until`. */
+export type Buff = [effect: TalentEffect, value: number, until: number];
 
 export type CharacterLook = 'boy' | 'girl';
 /** Nome de quem ainda não escolheu nenhum (saves antigos). */
@@ -133,6 +140,8 @@ export interface GameStateData {
   dungeons: Record<string, number>;
   /** Chefes derrotados: zona → tick em que o chefe volta (respawn semanal). */
   bosses: Record<string, number>;
+  /** Etapa E: zonas com o poste de teletransporte ativado (a base está sempre). */
+  waystones: string[];
   /** Estatísticas do jogador (menu de pausa). */
   stats: GameStatsCounters & { playTicks: number };
   /** Tutorial (Fase 11): passos já feitos e se as dicas estão desligadas. */
@@ -171,6 +180,8 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       skills: {},
       talents: {},
       quiver: [],
+      coins: 0,
+      buffs: [],
     },
     world: { tick: 0, rng: seed >>> 0 },
     base: {
@@ -188,6 +199,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
     horde: { at: 0, count: 0, active: false },
     dungeons: {},
     bosses: {},
+    waystones: [],
     stats: { kills: 0, deaths: 0, crafted: 0, gathered: 0, looted: 0, playTicks: 0 },
     tutorial: { done: [], off: false },
   };
@@ -213,10 +225,11 @@ export function zoneState(data: GameStateData, zoneId: string): ZoneState {
   return data.zones[zoneId];
 }
 
-/** Conteúdo de um baú (criado vazio na primeira vez que se abre). */
-export function chestContents(data: GameStateData, chestId: string): Container {
-  data.base.chests[chestId] ??= createContainer(BALANCE.chestSlots);
-  return data.base.chests[chestId];
+/** Conteúdo de um baú (criado vazio na primeira vez que se abre; `slots` espaços). */
+export function chestContents(data: GameStateData, chestId: string, slots = BALANCE.chestSlots): Container {
+  const chest = (data.base.chests[chestId] ??= createContainer(slots));
+  while (chest.length < slots) chest.push(null);
+  return chest;
 }
 
 /**

@@ -576,7 +576,7 @@ export class Combat {
       this.bus.emit('inventory:changed', {});
       return 0;
     }
-    const left = addItem(this.actions.pickupContainers(), item, qty, items);
+    const left = this.actions.give(item, qty);
     if (left < qty) {
       this.state.markDirty();
       this.bus.emit('inventory:changed', {});
@@ -1110,7 +1110,6 @@ export class Combat {
     const bag = bags[index];
     if (!bag) return false;
     const containers = this.actions.pickupContainers();
-    const items = this.content().items;
     bag.items = bag.items.flatMap((slot) => {
       if (!slot) return [];
       // Itens com durabilidade vão inteiros para um slot vazio (mantêm o desgaste).
@@ -1120,7 +1119,7 @@ export class Combat {
         target[target.indexOf(null)] = slot;
         return [];
       }
-      const left = addItem(containers, slot[0], slot[1], items);
+      const left = this.actions.give(slot[0], slot[1]);
       return left > 0 ? [[slot[0], left]] : [];
     });
     const empty = bag.items.length === 0;

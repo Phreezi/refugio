@@ -1,7 +1,6 @@
 import { BALANCE } from '../data/balance';
 import type { EnemyDefs, Recipe, Recipes, ResourceDefs, StructureDefs, ZoneDefs } from '../data/types';
-import { countItem, removeItem } from '../systems/inventory/inventory';
-import { COIN } from './PlayerActions';
+import { countItem } from '../systems/inventory/inventory';
 import { addXp } from '../systems/progression/progression';
 import { learnTalent, type LearnCheck } from '../systems/progression/talents';
 import { TALENTS, talentOf } from '../data/talents';
@@ -197,9 +196,8 @@ export class Progression {
     const cost = this.talentResetCost();
     if (cost === 0) return 'nothing';
     const player = this.state.data.player;
-    const containers = [player.inventory, player.hotbar];
-    if (countItem(containers, COIN) < cost) return 'no_coins';
-    removeItem(containers, COIN, cost);
+    if (player.coins < cost) return 'no_coins';
+    player.coins -= cost;
     player.talents = {};
     this.state.markDirty();
     this.bus.emit('talents:reset', {});

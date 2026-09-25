@@ -341,7 +341,9 @@ class Coop {
     const zoneId = String(args[0]);
     if (!content.zones[zoneId]) return;
     const map = content.zoneMap(zoneId);
-    if (method === 'travel') {
+    if (method === 'teleport') {
+      sim.teleport(zoneId, map);
+    } else if (method === 'travel') {
       const cost = (args[1] ?? {}) as { hunger?: unknown; thirst?: unknown };
       const hunger = Number(cost.hunger) || 0;
       const thirst = Number(cost.thirst) || 0;

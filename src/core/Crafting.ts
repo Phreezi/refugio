@@ -18,7 +18,8 @@ import {
   repairSlot,
   type CraftResult,
 } from '../systems/crafting/crafting';
-import { secondsToTicks } from './Clock';
+import type { Container } from '../systems/inventory/inventory';
+import { gameHoursToTicks, secondsToTicks } from './Clock';
 import type { EventBus, GameEvents } from './EventBus';
 import { stationState, type GameState } from './GameState';
 import type { PlayerActions, SlotRef } from './PlayerActions';
@@ -49,6 +50,8 @@ export class Crafting {
   private readonly actions: PlayerActions;
   /** A receita está desbloqueada (nível ou nota)? Por omissão, todas. */
   isUnlocked: (recipe: Recipe) => boolean = () => true;
+  /** Entrega o que as estações de encomendas (`deliver`) terminaram (à porta de casa). */
+  deliver: ((items: Container) => void) | null = null;
 
   constructor(
     state: GameState,
@@ -74,32 +77,39 @@ export class Crafting {
     if (!recipe) return 'missing';
     if (!this.isUnlocked(recipe)) return 'locked';
     const containers = this.actions.pickupContainers();
+    const wallet = this.state.data.player;
     let result: CraftResult;
     if (recipe.station === HANDS) {
-      result = craftInstant(containers, recipe, items);
+      result = craftInstant(containers, recipe, items, wallet);
       if (result === 'ok')
         this.bus.emit('craft:finished', { stationKey: HANDS, item: recipe.output, recipe: recipe.id });
     } else if (isTradeCategory(recipe.category)) {
       // Troca com o comerciante: instantânea, mas só junto dele.
       if (!key || stationType(key) !== recipe.station) return 'missing';
-      result = craftInstant(containers, recipe, items);
+      result = craftInstant(containers, recipe, items, wallet);
       if (result === 'ok') this.bus.emit('traded', { item: recipe.output });
     } else {
       if (!key || stationType(key) !== recipe.station) return 'missing';
-      const max = stations[recipe.station]?.queue ?? 1;
+      const def = stations[recipe.station];
+      const max = def?.queue ?? 1;
       result = enqueue(
         stationState(this.state.data, key),
         containers,
         recipe,
         max,
-        // Talento "fabrico rápido" (§7.15) de quem põe o trabalho na fila.
-        Math.max(
-          1,
-          Math.round(
-            secondsToTicks(recipe.timeSec) *
-              (1 - Math.min(BALANCE.talentCapPct, talentOf(this.state.data.player, 'craftSpeedPct')) / 100),
-          ),
-        ),
+        // Encomendas: `orderHours` horas de jogo. Senão, com o talento "fabrico rápido" (§7.15)
+        // de quem põe o trabalho na fila.
+        def?.deliver
+          ? gameHoursToTicks(BALANCE.orderHours)
+          : Math.max(
+              1,
+              Math.round(
+                secondsToTicks(recipe.timeSec) *
+                  (1 -
+                    Math.min(BALANCE.talentCapPct, talentOf(this.state.data.player, 'craftSpeedPct')) / 100),
+              ),
+            ),
+        wallet,
       );
     }
     if (result === 'ok') this.changed();
@@ -114,6 +124,7 @@ export class Crafting {
       recipes,
       this.actions.pickupContainers(),
       items,
+      this.state.data.player,
     );
     if (done) this.changed();
     return done;
@@ -153,13 +164,20 @@ export class Crafting {
   advance(ticks: number): number {
     const busy = Object.entries(this.state.data.stations).filter(([, station]) => station.queue.length > 0);
     if (busy.length === 0) return 0; // o caso normal: nada em fila (e sem ler o conteúdo)
-    const { recipes, items } = this.content();
+    const { recipes, items, stations } = this.content();
     let finished = 0;
     for (const [key, station] of busy) {
+      const delivers = stations[stationType(key)]?.deliver === true && this.deliver !== null;
       for (const recipeId of advanceStation(station, ticks, recipes, items)) {
         finished++;
-        const output = recipes.find((r) => r.id === recipeId)?.output ?? recipeId;
-        this.bus.emit('craft:finished', { stationKey: key, item: output, recipe: recipeId });
+        const recipe = recipes.find((r) => r.id === recipeId);
+        const output = recipe?.output ?? recipeId;
+        if (delivers) this.bus.emit('order:arrived', { item: output, qty: recipe?.qty ?? 1 });
+        else this.bus.emit('craft:finished', { stationKey: key, item: output, recipe: recipeId });
+      }
+      if (delivers && station.output.some((slot) => slot !== null)) {
+        this.deliver?.(station.output.map((slot) => slot));
+        station.output.fill(null);
       }
     }
     if (finished > 0) this.changed();

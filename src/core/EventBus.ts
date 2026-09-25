@@ -53,6 +53,13 @@ export interface GameEvents {
   /** Uma ferramenta chegou a 0 de durabilidade e partiu-se. */
   'item:broken': { item: string };
   'player:consumed': { item: string };
+  /** Comida com efeito temporário (§7.17). */
+  'buff:started': { item: string; effect: string; value: number; hours: number };
+  /** Poste de teletransporte ativado pela primeira vez / usado (Etapa E). */
+  'waystone:activated': { zoneId: string };
+  'waystone:use': { zoneId: string };
+  /** Encomenda entregue à porta de casa (§7.17). */
+  'order:arrived': { item: string; qty: number };
   /** A ação não foi possível (a UI mostra o motivo). */
   'action:blocked': {
     reason:
@@ -66,7 +73,8 @@ export interface GameEvents {
       | 'nothing_yet'
       | 'needs_item'
       | 'no_ammo'
-      | 'needs_level';
+      | 'needs_level'
+      | 'food_only';
     tool?: string;
     /** needs_item: o item que falta; no_ammo: a munição da arma. */
     item?: string;

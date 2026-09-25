@@ -654,6 +654,15 @@ export class ZoneScene extends Phaser.Scene {
           this.scene.restart({ zoneId: to } satisfies ZoneSceneData);
         });
       }),
+      // Poste de teletransporte (Etapa E): escolhe-se o destino no mapa-mundo, sem custo.
+      on('waystone:use', ({ zoneId }) => {
+        if (zoneId !== this.zoneId) return;
+        const player = gameState.data.player;
+        const exit = { x: player.x, y: player.y };
+        this.leave(() => {
+          this.scene.start(SceneKey.WorldMap, { from: zoneId, exit, teleport: true } satisfies WorldMapData);
+        });
+      }),
       on('player:died', () => {
         // O jogador já está na base (GameState): se morreu noutra zona, muda de cena.
         if (this.zoneId !== BASE_ZONE_ID) {

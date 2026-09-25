@@ -42,7 +42,7 @@ function createBox(): HTMLDivElement {
     zIndex: '1000',
     background: PALETTE.blood,
     color: PALETTE.cream,
-    font: '16px "Tiny5", monospace',
+    font: '20px "Jersey 10", monospace',
     padding: '8px 28px 8px 8px',
     borderRadius: '4px',
     maxHeight: '40vh',

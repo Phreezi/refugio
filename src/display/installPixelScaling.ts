@@ -41,6 +41,9 @@ export function installPixelScaling(game: Phaser.Game, host: HTMLElement): Pixel
   const apply = (): void => {
     const canvas = game.canvas as HTMLCanvasElement | null;
     if (!canvas) return;
+    // A escrever num campo de texto: o teclado do telemóvel encolhe a janela, e refazer a vista
+    // reiniciava o menu (fechava o campo — "pisca e não deixa escrever"). Espera-se pelo fim.
+    if (typingInField()) return;
     dpr = window.devicePixelRatio || 1;
     current = measurePixelScale(host);
 
@@ -79,6 +82,11 @@ export function installPixelScaling(game: Phaser.Game, host: HTMLElement): Pixel
   const resizeObserver = new ResizeObserver(apply);
   resizeObserver.observe(host);
   window.addEventListener('resize', apply);
+  // Ao sair do campo de texto (teclado fechado), aplica o tamanho que ficou por aplicar.
+  const onFocusOut = (): void => {
+    setTimeout(apply, 300); // depois do toque que tirou o foco (ex.: "Começar")
+  };
+  document.addEventListener('focusout', onFocusOut);
   watchDpr();
 
   if (game.isBooted) apply();
@@ -94,8 +102,15 @@ export function installPixelScaling(game: Phaser.Game, host: HTMLElement): Pixel
     dispose() {
       resizeObserver.disconnect();
       window.removeEventListener('resize', apply);
+      document.removeEventListener('focusout', onFocusOut);
       dprQuery?.removeEventListener('change', onDprChange);
       game.events.off(Phaser.Core.Events.READY, apply);
     },
   };
+}
+
+/** Há um campo de texto do DOM com o foco (ver ui/textInput.ts)? */
+function typingInField(): boolean {
+  const active = document.activeElement;
+  return active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
 }

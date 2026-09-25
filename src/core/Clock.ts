@@ -1,4 +1,5 @@
 import { FIXED_STEP_MS } from '../config';
+import { BALANCE } from '../data/balance';
 
 /** Ticks de lógica por segundo de jogo (20 com passo de 50 ms). */
 export const TICKS_PER_SECOND = 1000 / FIXED_STEP_MS;
@@ -15,6 +16,11 @@ export interface ClockTime {
 /** Converte segundos de jogo em ticks (arredonda; mínimo 1). */
 export function secondsToTicks(seconds: number): number {
   return Math.max(1, Math.round(seconds * TICKS_PER_SECOND));
+}
+
+/** Ticks de `hours` horas de jogo (1 dia de jogo = `dayLengthSec` segundos). */
+export function gameHoursToTicks(hours: number): number {
+  return secondsToTicks((hours * BALANCE.dayLengthSec) / 24);
 }
 
 /**

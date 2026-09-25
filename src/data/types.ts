@@ -47,8 +47,8 @@ export interface BonusDrop {
 }
 
 export type ResourceDefs = Readonly<Record<string, ResourceDef>>;
-export type PropAction = 'drink' | 'fish';
-const PROP_ACTIONS: readonly PropAction[] = ['drink', 'fish'];
+export type PropAction = 'drink' | 'fish' | 'teleport';
+const PROP_ACTIONS: readonly PropAction[] = ['drink', 'fish', 'teleport'];
 
 /** Obstáculo/decoração; alguns têm uma ação contextual (ex.: beber no poço). */
 export interface PropDef extends WorldObjectDef {
@@ -118,6 +118,8 @@ export interface ItemDef {
   waters?: boolean;
   /** Estanca o sangramento ao usar (ligaduras, kits). */
   stopsBleeding?: boolean;
+  /** Comida com efeito temporário (take-away, §7.17): soma-se aos talentos durante `hours`. */
+  buff?: BuffDef;
   /** Arma à distância (Fase 10): gasta 1 de `ammo` por tiro; mira sozinha ao inimigo mais perto. */
   ranged?: RangedDef;
   /** Armas: perícia que treinam (omisso: `archery` à distância, `blunt` corpo a corpo). */
@@ -365,6 +367,7 @@ const ITEM_KEYS = new Set([
   'plant',
   'waters',
   'stopsBleeding',
+  'buff',
   'ranged',
   'skill',
   'recoverable',
@@ -509,6 +512,24 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
       if (raw.stopsBleeding === true && def.type === 'consumable') def.stopsBleeding = true;
       else problems.push(`"${id}": stopsBleeding tem de ser true (e só em consumíveis)`);
     }
+    if (raw.buff !== undefined) {
+      const buff = raw.buff;
+      const effect = isObject(buff) ? BUFF_EFFECTS.find((e) => e === buff.effect) : undefined;
+      if (
+        isObject(buff) &&
+        effect &&
+        isPositiveInt(buff.value) &&
+        typeof buff.hours === 'number' &&
+        buff.hours > 0 &&
+        buff.hours <= 24 &&
+        def.type === 'consumable'
+      )
+        def.buff = { effect, value: buff.value, hours: buff.hours };
+      else
+        problems.push(
+          `"${id}": buff tem de ser { effect: ${BUFF_EFFECTS.join('|')}, value > 0, hours 0–24 } (só em consumíveis)`,
+        );
+    }
     if (raw.waters !== undefined) {
       if (raw.waters === true) def.waters = true;
       else problems.push(`"${id}": waters tem de ser true`);
@@ -558,6 +579,28 @@ function parsePlant(raw: unknown, itemIds: ReadonlySet<string>): PlantDef | stri
   return { crop: raw.crop, growHours: raw.growHours, yield: raw.yield, seeds: raw.seeds };
 }
 
+/** Efeitos que a comida pode dar (os mesmos nomes dos talentos, §7.15). */
+export const BUFF_EFFECTS = [
+  'meleeDamagePct',
+  'rangedDamagePct',
+  'armorPct',
+  'hungerSlowPct',
+  'thirstSlowPct',
+  'regenPct',
+  'sprintCostPct',
+  'gatherPower',
+  'extraDropPct',
+  'xpPct',
+] as const;
+export type BuffEffect = (typeof BUFF_EFFECTS)[number];
+
+export interface BuffDef {
+  effect: BuffEffect;
+  value: number;
+  /** Duração em horas de jogo. */
+  hours: number;
+}
+
 /** Estação de crafting colocada no mundo (fogueira, bancada…). */
 export interface StationDef extends WorldObjectDef {
   /** Máximo de trabalhos em fila (CLAUDE.md §7.5: 3). */
@@ -566,6 +609,11 @@ export interface StationDef extends WorldObjectDef {
   repair: boolean;
   /** Comerciante (Fase 10): as "receitas" são trocas instantâneas (categoria trade), sem fila. */
   trade: boolean;
+  /**
+   * Encomendas (§7.17): o trabalho demora `orderHours` horas de jogo e o resultado chega à
+   * porta de casa (uma pilha no chão da base), em vez de ficar na estação.
+   */
+  deliver: boolean;
 }
 
 export type StationDefs = Readonly<Record<string, StationDef>>;
@@ -573,7 +621,8 @@ export type StationDefs = Readonly<Record<string, StationDef>>;
 /** Estação especial: craft instantâneo no próprio inventário. */
 export const HANDS = 'hands';
 
-export type RecipeCategory = 'tools' | 'materials' | 'weapons' | 'armor' | 'food' | 'trade' | 'buy' | 'sell';
+export type RecipeCategory =
+  'tools' | 'materials' | 'weapons' | 'armor' | 'food' | 'trade' | 'buy' | 'sell' | 'order' | 'drinks';
 export const RECIPE_CATEGORIES: readonly RecipeCategory[] = [
   'tools',
   'materials',
@@ -583,6 +632,8 @@ export const RECIPE_CATEGORIES: readonly RecipeCategory[] = [
   'trade',
   'buy',
   'sell',
+  'order',
+  'drinks',
 ];
 
 /** Trocas instantâneas (comerciante e loja): sem fila nem tempo. */
@@ -613,10 +664,10 @@ export function parseStations(input: unknown, spriteKeys: Iterable<string>): Sta
     input,
     spriteKeys,
     'stations.json',
-    ['queue', 'repair', 'trade'],
+    ['queue', 'repair', 'trade', 'deliver'],
     (id, raw, problems) => {
       if (!isPositiveInt(raw.queue)) problems.push(`"${id}": queue tem de ser um inteiro > 0`);
-      for (const key of ['repair', 'trade'] as const) {
+      for (const key of ['repair', 'trade', 'deliver'] as const) {
         if (raw[key] !== undefined && typeof raw[key] !== 'boolean')
           problems.push(`"${id}": ${key} tem de ser true/false`);
       }
@@ -624,6 +675,7 @@ export function parseStations(input: unknown, spriteKeys: Iterable<string>): Sta
         queue: isPositiveInt(raw.queue) ? raw.queue : 1,
         repair: raw.repair === true,
         trade: raw.trade === true,
+        deliver: raw.deliver === true,
       };
     },
   );
@@ -743,6 +795,14 @@ export interface StructureDef {
   station?: string;
   /** Baú (guarda itens). */
   chest: boolean;
+  /** Espaços do baú (omisso: `chestSlots` do balance). */
+  chestSlots?: number;
+  /** Baú só para comida e bebida (frigorífico, §7.17). */
+  foodOnly: boolean;
+  /** Baú com "Encomendar": abre as receitas desta estação (take-away, §7.17). */
+  orders?: string;
+  /** Poste de teletransporte (Etapa E): leva aos postes ativados das outras zonas. */
+  teleport: boolean;
   /** Só pode ser colocada sobre fundação (estações e baús, §7.7). */
   needsFoundation: boolean;
   /** Nível do jogador para se poder construir. */
@@ -810,6 +870,10 @@ const STRUCTURE_KEYS = new Set([
   'door',
   'station',
   'chest',
+  'chestSlots',
+  'foodOnly',
+  'orders',
+  'teleport',
   'needsFoundation',
   'unlockLevel',
   'light',
@@ -893,6 +957,8 @@ export function parseStructures(
       connects: flag(id, raw, 'connects'),
       door: flag(id, raw, 'door'),
       chest: flag(id, raw, 'chest'),
+      foodOnly: flag(id, raw, 'foodOnly'),
+      teleport: flag(id, raw, 'teleport'),
       needsFoundation: flag(id, raw, 'needsFoundation'),
       unlockLevel: isPositiveInt(raw.unlockLevel) ? raw.unlockLevel : 1,
       farm: flag(id, raw, 'farm'),
@@ -942,6 +1008,16 @@ export function parseStructures(
       if (typeof raw.station === 'string' && stations.has(raw.station)) def.station = raw.station;
       else problems.push(`"${id}": estação desconhecida ${describe(raw.station)}`);
     }
+    if (raw.chestSlots !== undefined) {
+      if (isPositiveInt(raw.chestSlots) && raw.chestSlots <= 120) def.chestSlots = raw.chestSlots;
+      else problems.push(`"${id}": chestSlots tem de ser um inteiro de 1 a 120`);
+    }
+    if (raw.orders !== undefined) {
+      if (typeof raw.orders === 'string' && stations.has(raw.orders)) def.orders = raw.orders;
+      else problems.push(`"${id}": orders com estação desconhecida ${describe(raw.orders)}`);
+    }
+    if ((def.chestSlots !== undefined || def.foodOnly || def.orders !== undefined) && !def.chest)
+      problems.push(`"${id}": chestSlots, foodOnly e orders só em baús`);
     for (const key of structureSpriteKeys(def)) {
       if (!sprites.has(key)) problems.push(`"${id}": sprite "${key}" não existe no manifest`);
     }
@@ -960,6 +1036,7 @@ export function parseStructures(
       def.farm,
       def.produce !== undefined,
       def.trap !== undefined,
+      def.teleport,
     ];
     if (roles.filter(Boolean).length > 1)
       problems.push(`"${id}": só pode ter um papel (baú, estação, porta, canteiro, produção ou armadilha)`);

@@ -638,6 +638,26 @@ export class InventoryUI {
     }
 
     const other = this.other;
+    // Frigorífico (§7.17): "Encomendar" abre o take-away (receitas pagas em moedas).
+    const orders = other?.startsWith('chest:')
+      ? this.actions.chestRules(other.slice('chest:'.length))?.orders
+      : undefined;
+    if (orders) {
+      const ow = 72;
+      add(
+        new Button(
+          scene,
+          x + w - 96 - 4 - ow / 2,
+          y + INFO_BUTTONS_DY,
+          t('fridge.order'),
+          { ...small, width: ow, style: 'primary' },
+          () => {
+            this.close();
+            eventBus.emit('station:open', { stationKey: orders });
+          },
+        ),
+      ).setDepth(DEPTH.slots);
+    }
     if (other?.startsWith('chest:')) {
       const bw = 96;
       add(

@@ -1,6 +1,14 @@
 import type { ItemDefs, Recipe, Recipes } from '../../data/types';
 import { HANDS } from '../../data/types';
-import { addItem, countItem, removeItem, type Container, type Slot } from '../inventory/inventory';
+import {
+  addItem,
+  COIN,
+  countItem,
+  removeItem,
+  type Container,
+  type Slot,
+  type Wallet,
+} from '../inventory/inventory';
 
 // Crafting (CLAUDE.md §7.5), lógica pura. Nas mãos é instantâneo; nas estações há uma fila
 // (máx. 3) e só o primeiro trabalho avança. O resultado fica na saída da estação até ser
@@ -23,10 +31,23 @@ export interface Missing {
   need: number;
 }
 
-export function missingInputs(containers: readonly Container[], recipe: Recipe): Missing[] {
+/** Quanto há de um ingrediente (as moedas estão na carteira, não nos slots). */
+export function haveInput(containers: readonly Container[], item: string, wallet?: Wallet): number {
+  return item === COIN && wallet ? wallet.coins : countItem(containers, item);
+}
+
+export function missingInputs(containers: readonly Container[], recipe: Recipe, wallet?: Wallet): Missing[] {
   return recipe.inputs
-    .map(({ item, qty }) => ({ item, have: countItem(containers, item), need: qty }))
+    .map(({ item, qty }) => ({ item, have: haveInput(containers, item, wallet), need: qty }))
     .filter((m) => m.have < m.need);
+}
+
+/** Tira os ingredientes (moedas da carteira). */
+function takeInputs(containers: readonly Container[], recipe: Recipe, wallet?: Wallet): void {
+  for (const { item, qty } of recipe.inputs) {
+    if (item === COIN && wallet) wallet.coins -= qty;
+    else removeItem(containers, item, qty);
+  }
 }
 
 function snapshot(containers: readonly Container[]): (Slot | null)[][] {
@@ -42,12 +63,23 @@ function restore(containers: readonly Container[], saved: (Slot | null)[][]): vo
 export type CraftResult = 'ok' | 'missing' | 'no_space' | 'queue_full' | 'locked';
 
 /** Craft nas mãos: consome os ingredientes e dá o resultado já (tudo ou nada). */
-export function craftInstant(containers: readonly Container[], recipe: Recipe, items: ItemDefs): CraftResult {
-  if (missingInputs(containers, recipe).length > 0) return 'missing';
+export function craftInstant(
+  containers: readonly Container[],
+  recipe: Recipe,
+  items: ItemDefs,
+  wallet?: Wallet,
+): CraftResult {
+  if (missingInputs(containers, recipe, wallet).length > 0) return 'missing';
   const saved = snapshot(containers);
-  for (const { item, qty } of recipe.inputs) removeItem(containers, item, qty);
+  const coins = wallet?.coins ?? 0;
+  takeInputs(containers, recipe, wallet);
+  if (recipe.output === COIN && wallet) {
+    wallet.coins += recipe.qty; // vender: as moedas vão para a carteira (cabem sempre)
+    return 'ok';
+  }
   if (addItem(containers, recipe.output, recipe.qty, items) > 0) {
     restore(containers, saved);
+    if (wallet) wallet.coins = coins;
     return 'no_space';
   }
   return 'ok';
@@ -64,10 +96,11 @@ export function enqueue(
   recipe: Recipe,
   maxQueue: number,
   ticks: number,
+  wallet?: Wallet,
 ): CraftResult {
   if (station.queue.length >= maxQueue) return 'queue_full';
-  if (missingInputs(containers, recipe).length > 0) return 'missing';
-  for (const { item, qty } of recipe.inputs) removeItem(containers, item, qty);
+  if (missingInputs(containers, recipe, wallet).length > 0) return 'missing';
+  takeInputs(containers, recipe, wallet);
   station.queue.push([recipe.id, ticks]);
   return 'ok';
 }
@@ -79,17 +112,20 @@ export function cancelJob(
   recipes: Recipes,
   containers: readonly Container[],
   items: ItemDefs,
+  wallet?: Wallet,
 ): boolean {
   const job = station.queue[index];
   const recipe = job ? recipes.find((r) => r.id === job[0]) : undefined;
   if (!recipe) return false;
   const saved = snapshot(containers);
   for (const { item, qty } of recipe.inputs) {
+    if (item === COIN && wallet) continue;
     if (addItem(containers, item, qty, items) > 0) {
       restore(containers, saved);
       return false;
     }
   }
+  for (const { item, qty } of recipe.inputs) if (item === COIN && wallet) wallet.coins += qty;
   station.queue.splice(index, 1);
   return true;
 }

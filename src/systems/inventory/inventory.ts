@@ -10,6 +10,14 @@ export type Slot =
   | [itemId: string, qty: number, durability: number, enchant: number];
 
 /** Nível de encantamento do slot (0 = nenhum). */
+/** Moeda (§7.16): não ocupa slots — é um contador do jogador (`player.coins`). */
+export const COIN = 'coin';
+
+/** Carteira: onde ficam as moedas (o próprio jogador, `player.coins`). */
+export interface Wallet {
+  coins: number;
+}
+
 export function enchantOf(slot: Slot | null | undefined): number {
   return slot?.[3] ?? 0;
 }

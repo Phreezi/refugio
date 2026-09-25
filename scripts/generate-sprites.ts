@@ -468,6 +468,51 @@ const SPRITES: Sprite[] = [
     },
   },
   {
+    // Poste de teletransporte (Etapa E): pilar de pedra com um cristal azul a brilhar em cima.
+    file: 'waystone',
+    width: 16,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 30.5, 6, 1.5);
+      img.fill(4, 26, 8, 4, c('stone_dark'));
+      img.fill(5, 12, 6, 15, c('stone'));
+      img.fill(5, 12, 2, 15, c('stone_light'));
+      img.fill(10, 12, 1, 15, c('stone_dark'));
+      img.fill(6, 17, 4, 1, c('sky'));
+      img.fill(6, 21, 4, 1, c('sky'));
+      // Cristal.
+      img.fill(7, 3, 2, 1, c('ice'));
+      img.fill(6, 4, 4, 6, c('sky'));
+      img.fill(7, 10, 2, 1, c('water'));
+      img.fill(6, 4, 1, 5, c('ice'));
+      img.fill(9, 5, 1, 5, c('water'));
+      img.set(7, 5, c('cream'));
+    },
+  },
+  {
+    // Frigorífico (§7.17): alto, branco-creme, duas portas com puxadores e sombra no lado.
+    file: 'fridge',
+    width: 16,
+    height: 30,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 28.5, 7, 1.5);
+      img.fill(2, 2, 12, 26, c('parchment'));
+      img.fill(2, 2, 12, 1, c('cream'));
+      img.fill(2, 2, 1, 26, c('cream'));
+      img.fill(12, 3, 2, 25, c('stone_light'));
+      img.fill(2, 11, 12, 1, c('stone'));
+      img.fill(2, 27, 12, 1, c('stone'));
+      // Puxadores e um íman de fruta.
+      img.fill(10, 5, 1, 4, c('stone_dark'));
+      img.fill(10, 14, 1, 6, c('stone_dark'));
+      img.fill(4, 15, 2, 2, c('red'));
+      img.set(5, 14, c('leaf'));
+      img.fill(4, 5, 3, 1, c('sky'));
+    },
+  },
+  {
     // Banca de comércio: balcão com toldo às riscas e mercadoria em cima.
     file: 'market_stall',
     width: 32,
@@ -2048,6 +2093,134 @@ const PHASE10A_ICONS: Sprite[] = [
       img.ellipse(8, 12, 3.8, 2.6, c('blood'));
       img.set(5, 9, c('cream'));
       img.set(5, 10, c('rose'));
+    },
+  },
+  {
+    // Pizza: fatia triangular com queijo, tomate e borda de massa.
+    file: 'pizza',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      for (let y = 3; y < 14; y++) {
+        const half = Math.round((y - 3) * 0.55);
+        img.fill(8 - half, y, half * 2 + 1, 1, c('gold'));
+      }
+      img.fill(2, 13, 13, 2, c('wood_light'));
+      img.fill(2, 14, 13, 1, c('wood'));
+      img.fill(8, 6, 2, 2, c('red'));
+      img.fill(6, 10, 2, 2, c('red'));
+      img.fill(10, 11, 2, 2, c('red'));
+      img.set(8, 9, c('forest'));
+    },
+  },
+  {
+    // Hambúrguer: pão com sésamo, carne, alface e queijo.
+    file: 'burger',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(8, 6, 6, 3.5, c('wood_light'));
+      img.fill(2, 6, 13, 2, c('wood_light'));
+      img.set(6, 4, c('cream'));
+      img.set(9, 5, c('cream'));
+      img.set(11, 4, c('cream'));
+      img.fill(2, 8, 13, 1, c('leaf'));
+      img.fill(2, 9, 13, 1, c('gold'));
+      img.fill(2, 10, 13, 2, c('bark'));
+      img.fill(2, 12, 13, 2, c('wood'));
+    },
+  },
+  {
+    // Frango assado: coxa dourada com osso.
+    file: 'roast_chicken',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.ellipse(7, 9, 5, 4.5, c('orange'));
+      img.ellipse(6.5, 8.5, 3.5, 3, c('amber'));
+      img.set(5, 7, c('gold'));
+      img.fill(11, 4, 2, 4, c('cream'));
+      img.fill(12, 3, 2, 2, c('parchment'));
+    },
+  },
+  {
+    // Bifana: pão com carne a sair dos lados.
+    file: 'bifana',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 5, 12, 3, c('wood_light'));
+      img.fill(3, 4, 10, 1, c('wood_light'));
+      img.fill(1, 8, 14, 2, c('bark'));
+      img.fill(1, 8, 2, 1, c('peach'));
+      img.fill(2, 10, 12, 3, c('wood'));
+      img.set(5, 5, c('cream'));
+      img.set(9, 6, c('cream'));
+    },
+  },
+  {
+    // Sopa: tigela com caldo verde e vapor.
+    file: 'soup',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 8, 12, 1, c('grass'));
+      img.ellipse(8, 10, 6, 4, c('stone_light'));
+      img.fill(2, 8, 12, 2, c('grass'));
+      img.fill(3, 8, 3, 1, c('lime'));
+      img.fill(4, 12, 8, 1, c('stone'));
+      img.set(6, 5, c('parchment'));
+      img.set(9, 4, c('parchment'));
+      img.set(7, 3, c('parchment'));
+    },
+  },
+  {
+    // Café: chávena com pires.
+    file: 'coffee',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(3, 6, 8, 7, c('cream'));
+      img.fill(3, 6, 8, 2, c('bark_dark'));
+      img.fill(11, 8, 2, 3, c('cream'));
+      img.fill(1, 13, 13, 1, c('stone_light'));
+      img.set(6, 3, c('parchment'));
+      img.set(8, 4, c('parchment'));
+    },
+  },
+  {
+    // Batido de fruta: copo alto cor-de-rosa com palhinha.
+    file: 'smoothie',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(5, 5, 6, 9, c('rose'));
+      img.fill(5, 5, 6, 1, c('peach'));
+      img.fill(5, 5, 1, 9, c('ice'));
+      img.fill(9, 1, 1, 5, c('red'));
+      img.fill(10, 1, 2, 1, c('red'));
+      img.set(7, 8, c('plum'));
+    },
+  },
+  {
+    // Limonada: copo com limão e gelo.
+    file: 'lemonade',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(4, 5, 8, 9, c('gold'));
+      img.fill(4, 5, 8, 1, c('cream'));
+      img.fill(5, 7, 2, 2, c('ice'));
+      img.fill(8, 10, 2, 2, c('ice'));
+      img.ellipse(11.5, 5, 2, 2, c('lime'));
     },
   },
   {

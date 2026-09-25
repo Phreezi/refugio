@@ -90,7 +90,7 @@ export class SlotView {
       x + size - 1,
       y + size,
       '',
-      { size: 7 + 3 * (scale - 1), bold: true, stroke: true },
+      { size: 6 + 3 * (scale - 1), bold: true, stroke: true },
       [1, 1],
     );
     this.pips = [0, 1, 2].map((i) =>

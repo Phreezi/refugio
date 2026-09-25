@@ -9,7 +9,7 @@ import { talentOf } from '../data/talents';
 import { eventBus, type EventBus, type GameEvents } from './EventBus';
 import { FixedStep } from './FixedStep';
 import { BASE_ZONE_ID, gameState, type GameState, type PlayerState } from './GameState';
-import { Building } from './Building';
+import { Building, structureStationKey } from './Building';
 import { Combat, type CombatContent } from './Combat';
 import { Fishing } from './Fishing';
 import { Homestead } from './Homestead';
@@ -30,6 +30,9 @@ import { buildZoneContext } from '../world/zoneContext';
  * Corre a lógica do jogo em passo fixo. As cenas de jogo (Base, Zona) chamam
  * `update(delta)` uma vez por frame; os sistemas correm dentro de `tick()`.
  */
+/** Prop dos postes de teletransporte nos mapas (`prop:waystone`). */
+export const WAYSTONE_PROP = 'waystone';
+
 export class Simulation {
   private readonly clock = new FixedStep(FIXED_STEP_MS, MAX_STEPS_PER_FRAME);
   private readonly state: GameState;
@@ -145,6 +148,23 @@ export class Simulation {
     );
     this.crafting = new Crafting(state, bus, crafting, this.actions);
     this.crafting.isUnlocked = (recipe) => this.progression.isRecipeUnlocked(recipe);
+    // Baús construídos com regras próprias (frigorífico: 60 espaços, só comida).
+    this.actions.chestRules = (chestId) => {
+      const uid = Number(chestId.slice(1));
+      const record = chestId.startsWith('s')
+        ? state.data.base.structures.find((r) => r[0] === uid)
+        : undefined;
+      const def = record ? this.building.def(record[1]) : undefined;
+      if (!def) return null;
+      // "Encomendar" abre a estação de encomendas deste frigorífico (`<estação>_s<uid>`).
+      const orders = def.orders ? structureStationKey(def.orders, uid) : undefined;
+      return { slots: def.chestSlots, foodOnly: def.foodOnly, ...(orders ? { orders } : {}) };
+    };
+    // Encomendas (§7.17): chegam à porta de casa (junto ao ponto onde se aparece na base).
+    this.crafting.deliver = (items) => {
+      const door = this.respawnPoint ?? { x: 0, y: 0 };
+      this.combat.dropBag(BASE_ZONE_ID, door.x + BALANCE.deliveryOffsetPx, door.y, items, false);
+    };
   }
 
   /** Zona onde o jogador está: colisões, recursos, baús… (null = fora de uma cena de jogo). */
@@ -324,6 +344,22 @@ export class Simulation {
     return true;
   }
 
+  /**
+   * Teletransporte (Etapa E): sem custo, para a base ou para uma zona com o poste ativado;
+   * chega-se ao lado do poste. @returns false se o destino não tiver poste ativado.
+   */
+  teleport(to: string, map: ZoneMap): boolean {
+    if (to !== BASE_ZONE_ID && !this.state.data.waystones.includes(to)) return false;
+    const post = map.props.find((p) => p.id === WAYSTONE_PROP);
+    const at = post ? { x: post.x, y: post.y + BALANCE.teleportArrivalPx } : { ...map.playerSpawn };
+    const player = this.state.data.player;
+    player.zoneId = to;
+    player.x = at.x;
+    player.y = at.y;
+    this.state.markDirty();
+    return true;
+  }
+
   /** Onde o jogador reaparece se morrer (o `player_spawn` da base). */
   setRespawnPoint(point: Vec2 | null): void {
     this.respawnPoint = point;
@@ -405,6 +441,8 @@ export class Simulation {
     this.combat.collectGround();
     this.combat.syncQuiver();
     this.actions.syncBackpack();
+    this.actions.sweepCoins();
+    this.actions.tickBuffs(world.tick);
     this.combat.pruneBags();
     this.checkExits();
     this.runAction(world.tick);
@@ -432,6 +470,8 @@ export class Simulation {
     this.combat.collectGround();
     this.combat.syncQuiver();
     this.actions.syncBackpack();
+    this.actions.sweepCoins();
+    this.actions.tickBuffs(tick);
     this.combat.pruneBags();
     this.runAction(tick);
     if (!this.linked && this.zone) {
