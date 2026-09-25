@@ -786,9 +786,16 @@ export class Combat {
     if (kept.length === 0) return null;
     const bags = zoneState(this.state.data, zoneId).bags;
     const expiresAt = this.now() + BALANCE.deathBagHoursReal * HOURS_MS;
-    const existing = death ? bags.find((bag) => bag.death) : undefined;
+    // A morte junta tudo na mesma mochila; itens largados juntam-se a uma pilha mesmo ao lado.
+    const existing = death
+      ? bags.find((bag) => bag.death)
+      : bags.find((bag) => !bag.death && Math.hypot(bag.x - x, bag.y - y) <= BALANCE.groundPickupPx);
     const bag = existing ?? { x: Math.round(x), y: Math.round(y), items: [], expiresAt, death };
-    bag.items.push(...kept);
+    for (const slot of kept) {
+      const free = bag.items.indexOf(null);
+      if (free >= 0) bag.items[free] = slot;
+      else bag.items.push(slot);
+    }
     bag.x = Math.round(x);
     bag.y = Math.round(y);
     bag.expiresAt = expiresAt;
@@ -796,6 +803,26 @@ export class Combat {
     this.state.markDirty();
     this.bus.emit('bag:changed', { zoneId });
     return bag;
+  }
+
+  /** Larga itens no chão onde está o jogador (pilha que se abre com a ação). */
+  dropHere(items: Container): boolean {
+    const zoneId = this.zone?.zoneId;
+    if (!zoneId) return false;
+    const player = this.state.data.player;
+    return this.dropBag(zoneId, player.x, player.y, items, false) !== null;
+  }
+
+  /** Tira da zona as mochilas/pilhas que ficaram vazias. */
+  pruneBags(): void {
+    const zoneId = this.zone?.zoneId;
+    if (!zoneId) return;
+    const zone = zoneState(this.state.data, zoneId);
+    const kept = zone.bags.filter((bag) => bag.items.some((slot) => slot !== null));
+    if (kept.length === zone.bags.length) return;
+    zone.bags = kept;
+    this.state.markDirty();
+    this.bus.emit('bag:changed', { zoneId });
   }
 
   /** Apanha o que couber da mochila `index` da zona atual. @returns true se ficou vazia. */

@@ -65,7 +65,7 @@ function setup(zone: ZoneMap, player = { x: 240, y: 240 }) {
       sim.update(FIXED_STEP_MS);
     }
   };
-  return { state, sim, events, run };
+  return { state, sim, bus, events, run };
 }
 
 describe('Combate', () => {
@@ -171,7 +171,7 @@ describe('Combate', () => {
   });
 
   it('ao morrer: a mochila fica no chão, hotbar e equipamento ficam, e volta à base', () => {
-    const { state, sim, events, run } = setup(map([]));
+    const { state, sim, bus, events, run } = setup(map([]));
     const player = state.data.player;
     player.inventory[0] = ['wood', 12];
     player.inventory[3] = ['stone_axe', 1, 50];
@@ -198,8 +198,14 @@ describe('Combate', () => {
     if (!bag) throw new Error('sem mochila');
     Object.assign(player, { x: bag.x, y: bag.y + 8, facing: 'up' });
     expect(sim.interaction.currentTarget(PLAYER_FOOTPRINT)?.data.type).toBe('bag');
+    // A ação abre-a ao lado da mochila; "Apanhar tudo" esvazia-a e ela desaparece.
+    const opened: string[] = [];
+    bus.on('container:open', ({ container }) => opened.push(container));
     sim.setActionHeld(true);
     sim.setActionHeld(false);
+    run(0.1);
+    expect(opened).toEqual([`bag:${ZONE}:0`]);
+    expect(sim.actions.takeAll(`bag:${ZONE}:0`)).toBe(true);
     run(0.1);
     expect(state.data.zones[ZONE]?.bags).toEqual([]);
     expect(countItem([player.inventory], 'wood')).toBe(12);
@@ -468,6 +474,36 @@ describe('Arco, mira presa, flechas no chão e perícias', () => {
     expect(player.skills.blade).toBe(15);
     expect(events).toContain('skill:blade:2');
     expect(player.skills.fists).toBeUndefined();
+  });
+});
+
+describe('Largar, apanhar e destruir itens', () => {
+  it('largar põe o item numa pilha no chão; a pilha abre-se e apanha-se o que se quiser', () => {
+    const { state, sim, run } = setup(map([]));
+    const player = state.data.player;
+    player.inventory[0] = ['wood', 7];
+    player.inventory[1] = ['stone_axe', 1, 40];
+    expect(sim.actions.drop({ container: 'inventory', index: 0 })).toBe(true);
+    expect(sim.actions.drop({ container: 'inventory', index: 1 })).toBe(true);
+    const bags = state.data.zones[ZONE]?.bags ?? [];
+    expect(bags).toHaveLength(1); // junta-se à mesma pilha
+    expect(bags[0]?.items).toEqual([
+      ['wood', 7],
+      ['stone_axe', 1, 40],
+    ]);
+    expect(bags[0]?.death).toBe(false);
+    sim.actions.move({ container: `bag:${ZONE}:0`, index: 1 }, { container: 'inventory', index: 5 });
+    expect(player.inventory[5]).toEqual(['stone_axe', 1, 40]);
+    run(0.1);
+    expect(state.data.zones[ZONE]?.bags[0]?.items).toEqual([['wood', 7], null]);
+  });
+
+  it('destruir tira o item de vez', () => {
+    const { state, sim } = setup(map([]));
+    state.data.player.hotbar[0] = ['berries', 5];
+    expect(sim.actions.destroy({ container: 'hotbar', index: 0 })).toBe(true);
+    expect(state.data.player.hotbar[0]).toBeNull();
+    expect(state.data.zones[ZONE]?.bags ?? []).toEqual([]);
   });
 });
 

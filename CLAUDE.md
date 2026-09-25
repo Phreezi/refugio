@@ -244,7 +244,7 @@ refugio/
 1. Antes de começar uma tarefa, identificar a **fase** e a tarefa correspondente na secção 11.
 2. Correr `npm run lint`, `npm run test` e `npm run build` antes de dar uma tarefa por terminada.
 3. Não adicionar dependências novas sem justificar e perguntar.
-4. Qualquer alteração ao formato do save → incrementar `SAVE_VERSION` e escrever migração + teste.
+4. Qualquer alteração ao formato do save → incrementar `SAVE_VERSION` e escrever migração + teste. **As atualizações têm de funcionar nos jogos em curso** (pedido do jogador): nunca obrigar a começar de novo.
 5. Não usar assets, nomes ou textos do LDoE (ver secção 0).
 6. Manter o jogo jogável no fim de cada tarefa (nada de ramos partidos).
 7. Quando uma decisão de design mudar, atualizar este CLAUDE.md.
@@ -368,7 +368,7 @@ Os botões que abrem painéis (Mochila, Fabricar, Construir, "II") fecham-nos se
 - Stacks: recursos 50, consumíveis 10, munições 100 (flechas e seixos 50), ferramentas/armas 1.
 - Slots de equipamento: arma, cabeça, corpo, pernas, pés, mochila.
 - Baús na base: 24 slots cada, sem limite de baús (limitado por recursos).
-- Ações: mover, dividir stack, largar, usar, "guardar tudo semelhante" no baú e **ordenar** (mochila e baú: junta os itens iguais em stacks cheios e agrupa por categoria — ferramentas, armas, armadura, mochilas, consumíveis, recursos, chaves) (qualidade de vida).
+- Ações: mover, dividir stack, **largar no chão** (fica numa pilha — `zones.<zona>.bags` com `death: false` — que se abre com a ação contextual ao lado da mochila, para escolher o que apanhar; largar perto junta-se à mesma pilha), **destruir** (2 toques), usar, "guardar tudo semelhante" no baú e **ordenar** (mochila e baú: junta os itens iguais em stacks cheios e agrupa por categoria — ferramentas, armas, armadura, mochilas, consumíveis, recursos, chaves) (qualidade de vida).
 
 ### 7.4 Recolha
 
@@ -405,6 +405,7 @@ Os nós de recurso reaparecem (ver zonas).
 - Paredes, janelas, vedações e portas fechadas bloqueiam o tile inteiro; estações e baús bloqueiam com o `footprint`. Peças sólidas não se põem em cima do jogador, no ponto onde ele aparece nem nas saídas.
 - Colocação: pré-visualização verde/vermelha (com o motivo), rodar (portas, janelas, vedações: horizontal/vertical), desfazer nos últimos 10 s (de jogo) com reembolso total. A peça vai para o tile à frente do jogador, ou para o tile do rato/toque.
 - Demolir devolve 50% dos materiais (arredondado para baixo); só demole se o reembolso couber na mochila. Não se demole uma fundação com estação/baú por cima, uma estação com trabalhos/itens nem um baú com itens.
+- Vedações (`connects`) viram-se sozinhas para ligar às vizinhas: em fila vertical ficam verticais.
 - Portas abrem/fecham com a ação contextual (não fecham com o jogador lá dentro).
 - Estruturas **não decaem** (só as hordas as danificam, §7.13).
 - Estações e baús só podem ser colocados sobre fundação (o chão da casa em ruínas do mapa também conta).
@@ -458,7 +459,7 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 ### 7.12 Morte
 
 - Reaparece na base com vida 50%, fome/sede 50%.
-- Conteúdo da **mochila** fica numa mochila caída no local da morte (marcada no mapa-mundo, Fase 7), durante `deathBagHoursReal` horas reais; morrer de novo na mesma zona junta tudo na mesma mochila. Apanha-se com a ação contextual (o que não couber fica lá).
+- Conteúdo da **mochila** fica numa mochila caída no local da morte (marcada no mapa-mundo, Fase 7), durante `deathBagHoursReal` horas reais; morrer de novo na mesma zona junta tudo na mesma mochila. A ação contextual abre-a ao lado da mochila ("Apanhar tudo" ou escolher o que apanhar).
 - Itens **equipados** e hotbar mantêm-se.
 - Os drops de inimigos que não cabem na mochila também ficam numa mochila no chão.
 - Nunca se perde nada guardado na base.
@@ -1108,4 +1109,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Erros durante o jogo não o congelam: o passo do Phaser e os handlers do EventBus são protegidos e o erro aparece num aviso em DOM (`src/ui/runtimeErrors.ts`) | O jogo congelou num iPhone ao lutar com um lobo (não se reproduz no Chromium); assim o jogo continua e o jogador pode enviar uma captura com o erro |
 | 2026-09-25 | Separadores do fabrico medidos no browser (`measureTextWidth`) e noutra linha se não couberem; dica do tutorial por baixo das barras em ecrãs estreitos | Ao alto, no iPhone, o separador "Comida" ficava cortado e a dica tapava as barras |
 | 2026-09-25 | Save v15: `player.skills` e `zones.<zona>.ground`; arco, fisga, mira presa, perícias com falhanços, flechas recuperáveis | Pedido do jogador: arco cedo com madeira, várias armas à distância mais fracas, mira presa ao carregar, falhar menos com a prática, flechas falhadas no chão |
+| 2026-09-25 | Largar/destruir itens; mochilas e pilhas no chão abrem-se como contentor (`bag:<zona>:<índice>`); vedações ligam-se sozinhas; descrição dos itens curta, por baixo do nome | Pedido do jogador: não dava para largar, apanhar escolhendo nem apagar itens; as vedações em fila vertical ficavam de lado; a descrição saía do painel |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

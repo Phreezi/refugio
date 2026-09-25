@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import { paletteNumber } from '../assets/palette';
-import { eventBus } from '../core/EventBus';
+import { eventBus, type OtherContainerRef } from '../core/EventBus';
 import { gameState } from '../core/GameState';
 import type { ContainerRef, PlayerActions, SlotRef } from '../core/PlayerActions';
 import { BALANCE } from '../data/balance';
@@ -8,16 +8,20 @@ import { equipSlotOf } from '../data/types';
 import { getView } from '../display/view';
 import { itemName, t } from '../i18n';
 import { content } from '../world/content';
-import { Button, CLOSE_ICON } from './Button';
+import { Button, CLOSE_ICON, type ButtonStyle } from './Button';
 import { SLOT_GAP, SLOT_SIZE, SlotView, slotSize } from './SlotView';
 import { describeItem } from './itemInfo';
-import { Label } from './text';
+import { Label, measureTextWidth } from './text';
 import { REOPEN_GUARD_MS, uiState } from './uiState';
 
 const DEPTH = { hud: 10, dim: 50, panel: 60, slots: 62, hotbar: 70, ghost: 100 } as const;
 const PAD = 8;
 const TITLE_H = 14;
-const INFO_H = 34;
+const INFO_H = 48;
+/** Tempo para confirmar "Destruir" (segundo toque). */
+const DESTROY_CONFIRM_MS = 3000;
+/** Botões da barra de baixo, abaixo do nome e da descrição. */
+const INFO_BUTTONS_DY = 38;
 const INVENTORY_COLS = 5;
 const CHEST_COLS = 6;
 /** Distância (px de jogo) a partir da qual premir um slot passa a ser arrastar. */
@@ -74,7 +78,9 @@ export class InventoryUI {
   private panelObjects: { destroy(): void }[] = [];
   private panelRect: Rect | null = null;
   /** Baú ou contentor com loot aberto ao lado da mochila. */
-  private other: `chest:${string}` | `loot:${string}` | null = null;
+  private other: OtherContainerRef | null = null;
+  /** Destruir pede um segundo toque: o slot à espera de confirmação e até quando (ms). */
+  private confirmDestroy: { ref: SlotRef; until: number } | null = null;
   private selected: SlotRef | null = null;
   private press: { view: SlotView; x: number; y: number; pointerId: number; dragging: boolean } | null = null;
   private ghost: Phaser.GameObjects.Image | null = null;
@@ -128,7 +134,7 @@ export class InventoryUI {
     else if (performance.now() - this.closedAt > REOPEN_GUARD_MS) this.open(null);
   }
 
-  open(other: `chest:${string}` | `loot:${string}` | null): void {
+  open(other: OtherContainerRef | null): void {
     this.other = other;
     this.selected = null;
     uiState.modalOpen = true;
@@ -351,7 +357,9 @@ export class InventoryUI {
       const cx = sideBySide ? gx + bag.w + PAD : gx;
       const cy = sideBySide ? gy : gy + TITLE_H + bag.h + PAD;
       const slots = this.actions.container(other).length;
-      const title = t(other.startsWith('loot:') ? 'inv.container' : 'inv.chest');
+      const title = t(
+        other.startsWith('loot:') ? 'inv.container' : other.startsWith('bag:') ? 'inv.ground' : 'inv.chest',
+      );
       grid(other, slots, Math.min(CHEST_COLS, slots), cx, cy, title);
     }
 
@@ -409,53 +417,76 @@ export class InventoryUI {
     if (slot && def && selected) {
       const name = add(new Label(scene, x, y, itemName(slot[0]), { size: 8, bold: true, color: 'cream' }));
       name.setDepth(DEPTH.slots);
-      // O que o item faz (dano, defesa, efeitos…), ao lado do nome.
-      const infoX = x + Math.ceil(name.text.width) + 8;
+      // O que o item faz (dano, defesa, efeitos…), curto, por baixo do nome (até 2 linhas).
       add(
-        new Label(scene, infoX, y + 1, describeItem(slot[0], def).join(' · '), {
+        new Label(scene, x, y + 11, describeItem(slot[0], def).join(' · '), {
           size: 7,
           color: 'stone_light',
-          wrap: Math.max(40, w - (infoX - x)),
+          wrap: w,
         }),
       ).setDepth(DEPTH.slots);
-      let bx = x + small.width / 2;
-      const by = y + 20;
+      // Botões da largura do texto, lado a lado.
+      let left = x;
+      const by = y + INFO_BUTTONS_DY;
+      const action = (label: string, onClick: () => void, style: ButtonStyle = 'secondary'): void => {
+        const bw = Math.max(40, Math.ceil(measureTextWidth(label, 8, true) / 2) * 2 + 12);
+        add(new Button(scene, left + bw / 2, by, label, { ...small, width: bw, style }, onClick)).setDepth(
+          DEPTH.slots,
+        );
+        left += bw + 4;
+      };
       if (def.type === 'consumable' || def.type === 'note') {
-        add(
-          new Button(scene, bx, by, t(def.type === 'note' ? 'inv.read' : 'inv.use'), small, () => {
-            this.actions.use(selected);
-            this.rebuildSoon();
-          }),
-        ).setDepth(DEPTH.slots);
-        bx += small.width + 4;
+        action(t(def.type === 'note' ? 'inv.read' : 'inv.use'), () => {
+          this.actions.use(selected);
+          this.rebuildSoon();
+        });
       }
       if (selected.container === 'equipment') {
-        add(
-          new Button(scene, bx, by, t('inv.unequip'), small, () => {
-            if (!this.actions.unequip(selected.index))
-              scene.events.emit('ui:message', t('msg.inventory_full'));
-            this.selected = null;
-            this.rebuildSoon();
-          }),
-        ).setDepth(DEPTH.slots);
-        bx += small.width + 4;
+        action(t('inv.unequip'), () => {
+          if (!this.actions.unequip(selected.index)) scene.events.emit('ui:message', t('msg.inventory_full'));
+          this.selected = null;
+          this.rebuildSoon();
+        });
       } else if (equipSlotOf(def)) {
-        add(
-          new Button(scene, bx, by, t('inv.equip'), small, () => {
-            this.actions.equip(selected);
-            this.selected = null;
-            this.rebuildSoon();
-          }),
-        ).setDepth(DEPTH.slots);
-        bx += small.width + 4;
+        action(t('inv.equip'), () => {
+          this.actions.equip(selected);
+          this.selected = null;
+          this.rebuildSoon();
+        });
       }
       if (slot[1] > 1) {
-        add(
-          new Button(scene, bx, by, t('inv.split'), small, () => {
-            this.actions.split(selected);
+        action(t('inv.split'), () => {
+          this.actions.split(selected);
+          this.rebuildSoon();
+        });
+      }
+      // Largar no chão (volta-se a apanhar com a ação) e destruir (2 toques), só do que é nosso.
+      const mine = ['inventory', 'hotbar', 'equipment'].includes(selected.container);
+      if (mine && !this.other) {
+        action(t('inv.drop'), () => {
+          this.actions.drop(selected);
+          this.selected = null;
+          this.rebuildSoon();
+        });
+      }
+      if (mine) {
+        const confirming =
+          this.confirmDestroy !== null &&
+          this.confirmDestroy.ref.container === selected.container &&
+          this.confirmDestroy.ref.index === selected.index &&
+          performance.now() < this.confirmDestroy.until;
+        action(
+          t(confirming ? 'inv.destroy_confirm' : 'inv.destroy'),
+          () => {
+            if (confirming) {
+              this.actions.destroy(selected);
+              this.selected = null;
+              this.confirmDestroy = null;
+            } else this.confirmDestroy = { ref: selected, until: performance.now() + DESTROY_CONFIRM_MS };
             this.rebuildSoon();
-          }),
-        ).setDepth(DEPTH.slots);
+          },
+          'danger',
+        );
       }
     } else {
       add(new Label(scene, x, y + 2, t('inv.hint'), { size: 7, color: 'stone_light', wrap: w })).setDepth(
@@ -467,11 +498,18 @@ export class InventoryUI {
     if (other?.startsWith('chest:')) {
       const bw = 96;
       add(
-        new Button(scene, x + w - bw / 2, y + 20, t('inv.store_similar'), { ...small, width: bw }, () => {
-          const moved = this.actions.storeSimilar(other);
-          if (moved > 0) scene.events.emit('ui:message', t('msg.stored', { qty: moved }));
-          this.rebuildSoon();
-        }),
+        new Button(
+          scene,
+          x + w - bw / 2,
+          y + INFO_BUTTONS_DY,
+          t('inv.store_similar'),
+          { ...small, width: bw },
+          () => {
+            const moved = this.actions.storeSimilar(other);
+            if (moved > 0) scene.events.emit('ui:message', t('msg.stored', { qty: moved }));
+            this.rebuildSoon();
+          },
+        ),
       ).setDepth(DEPTH.slots);
     } else if (other) {
       const bw = 80;
@@ -479,7 +517,7 @@ export class InventoryUI {
         new Button(
           scene,
           x + w - bw / 2,
-          y + 20,
+          y + INFO_BUTTONS_DY,
           t('inv.take_all'),
           { ...small, width: bw, style: 'primary' },
           () => {

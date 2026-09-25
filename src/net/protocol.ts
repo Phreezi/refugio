@@ -42,7 +42,7 @@ export type EnemyFrame = [number, string, number, number, number, number, string
  * logo (para não esperar pela rede) e no anfitrião, que tem a última palavra.
  */
 export const GUEST_COMMANDS = {
-  actions: ['use', 'move', 'equip', 'unequip', 'split', 'sort', 'storeSimilar', 'takeAll'],
+  actions: ['use', 'move', 'equip', 'unequip', 'split', 'sort', 'storeSimilar', 'takeAll', 'drop', 'destroy'],
   crafting: ['craft', 'cancel', 'collect', 'repair'],
   building: ['place', 'undo', 'demolish'],
   fishing: ['cancel'],

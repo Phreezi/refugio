@@ -142,6 +142,8 @@ export class Building {
     const site = createBuildSite(map, areas, [map.playerSpawn, ...map.exits]);
     this.grid = new StructureGrid(site, zone.structures, this.state.data.base.structures);
     for (const record of this.grid.all()) this.applyCollision(record);
+    // Vedações construídas antes de se ligarem sozinhas (e as de jogos antigos) acertam-se já.
+    for (const record of [...this.grid.all()]) if (this.def(record[1])?.connects) this.connect(record);
   }
 
   /** Há onde construir (o jogador está na base)? */
@@ -205,9 +207,45 @@ export class Building {
     this.grid.add(record);
     this.applyCollision(record);
     this.recent.push({ uid, tick: this.state.data.world.tick });
+    if (def.connects) this.connect(record);
     this.changed();
     this.bus.emit('structure:placed', { uid });
     return null;
+  }
+
+  /**
+   * Vedações: a peça nova e as vizinhas iguais viram-se para ligar umas às outras — com
+   * vizinhas só em cima/em baixo ficam verticais; com vizinhas ao lado, horizontais. Sozinha,
+   * fica como foi rodada.
+   */
+  private connect(record: StructureRecord): void {
+    const grid = this.grid;
+    if (!grid) return;
+    const connected = (tx: number, ty: number): StructureRecord | undefined => {
+      const top = grid.at(tx, ty).top;
+      return top && this.def(top[1])?.connects ? top : undefined;
+    };
+    const orient = (r: StructureRecord, isNew: boolean): void => {
+      const [, , tx, ty] = r;
+      const horizontal = connected(tx - 1, ty) ?? connected(tx + 1, ty);
+      const vertical = connected(tx, ty - 1) ?? connected(tx, ty + 1);
+      if (!horizontal && !vertical) return;
+      const rot = horizontal ? 0 : 1;
+      if (r[4] === rot) return;
+      r[4] = rot;
+      if (!isNew) this.bus.emit('structure:changed', { uid: r[0] });
+    };
+    orient(record, true);
+    const [, , tx, ty] = record;
+    for (const [dx, dy] of [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ] as const) {
+      const neighbour = connected(tx + dx, ty + dy);
+      if (neighbour) orient(neighbour, false);
+    }
   }
 
   /** A peça que o Desfazer tiraria: a última colocada há menos de `undoWindowSec`. */
