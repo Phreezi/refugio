@@ -14,13 +14,16 @@ import { missingInputs, outputCount } from '../systems/crafting/crafting';
 import { countItem } from '../systems/inventory/inventory';
 import { content } from '../world/content';
 import { Button, CLOSE_ICON } from './Button';
-import { Label } from './text';
+import { Label, measureTextWidth } from './text';
 import { REOPEN_GUARD_MS, uiState } from './uiState';
 
 const DEPTH = { dim: 50, panel: 60, content: 62 } as const;
 const PAD = 8;
 const ROW_H = 30;
 const TAB_H = 16;
+const TAB_GAP = 3;
+/** Arredonda para cima, para um número par (botões centrados em píxeis inteiros). */
+const evenCeil = (n: number): number => Math.ceil(n / 2) * 2;
 /** Altura da linha de páginas (‹ 1/2 ›) quando a lista não cabe. */
 const PAGER_H = 18;
 const BAR_W = 70;
@@ -137,6 +140,24 @@ export class CraftingUI {
     }
   }
 
+  /** Posição de cada separador (em linhas de `maxWidth`). */
+  private layoutTabs(maxWidth: number): { tab: Tab; text: string; dx: number; row: number; tw: number }[] {
+    const out: { tab: Tab; text: string; dx: number; row: number; tw: number }[] = [];
+    let dx = 0;
+    let row = 0;
+    for (const tab of this.tabs()) {
+      const text = t(tab === 'repair' ? 'craft.cat.repair' : `craft.cat.${tab}`);
+      const tw = Math.max(40, evenCeil(measureTextWidth(text, 8, true)) + 12);
+      if (dx > 0 && dx + tw > maxWidth) {
+        dx = 0;
+        row += 1;
+      }
+      out.push({ tab, text, dx, row, tw });
+      dx += tw + 4;
+    }
+    return out;
+  }
+
   private tabs(): Tab[] {
     const type = this.station ? stationType(this.station) : HANDS;
     const recipes = this.sim.crafting.recipesFor(type);
@@ -191,12 +212,15 @@ export class CraftingUI {
     const w = Math.min(MAX_WIDTH, width - 8);
     const rows = this.tab === 'repair' ? this.repairables().length : this.recipes().length;
     const queueH = this.hasQueue() ? 22 + 3 * 18 + 22 : 0;
-    const h = Math.min(hotbarTop - 8, PAD * 2 + 14 + TAB_H + 6 + Math.max(1, rows) * ROW_H + queueH);
+    // Separadores: passam para outra linha se não couberem (ecrã ao alto).
+    const tabs = this.layoutTabs(w - PAD * 2);
+    const tabsH = (tabs.at(-1)?.row ?? 0) * (TAB_H + TAB_GAP) + TAB_H;
+    const h = Math.min(hotbarTop - 8, PAD * 2 + 14 + tabsH + 6 + Math.max(1, rows) * ROW_H + queueH);
     const x = Math.round((width - w) / 2);
     const y = Math.max(4, Math.round((hotbarTop - 4 - h) / 2));
     this.rect = { x, y, w, h };
     // Se não couberem todas, a lista divide-se em páginas (com ‹ › por baixo).
-    const listSpace = h - (PAD * 2 + 14 + TAB_H + 6) - queueH;
+    const listSpace = h - (PAD * 2 + 14 + tabsH + 6) - queueH;
     const fits = Math.max(1, Math.floor(listSpace / ROW_H));
     this.perPage = rows > fits ? Math.max(1, Math.floor((listSpace - PAGER_H) / ROW_H)) : fits;
     const pages = Math.max(1, Math.ceil(rows / this.perPage));
@@ -220,7 +244,7 @@ export class CraftingUI {
     });
     if (this.tab !== 'repair') {
       const filter = t('craft.filter');
-      const fw = Math.max(52, filter.length * 5 + 12);
+      const fw = Math.max(52, evenCeil(measureTextWidth(filter, 8, true)) + 14);
       this.button(
         x + w - 10 - 10 - fw / 2,
         y + 9,
@@ -236,14 +260,11 @@ export class CraftingUI {
     }
 
     // Separadores.
-    let tx = x + PAD;
     const ty = y + PAD + 14;
-    for (const tab of this.tabs()) {
-      const text = t(tab === 'repair' ? 'craft.cat.repair' : `craft.cat.${tab}`);
-      const tw = Math.max(40, text.length * 5 + 10);
+    for (const { tab, text, dx, row, tw } of tabs) {
       this.button(
-        tx + tw / 2,
-        ty + TAB_H / 2,
+        x + PAD + dx + tw / 2,
+        ty + row * (TAB_H + TAB_GAP) + TAB_H / 2,
         text,
         tw,
         () => {
@@ -253,10 +274,9 @@ export class CraftingUI {
         },
         tab === this.tab,
       );
-      tx += tw + 4;
     }
 
-    const listY = ty + TAB_H + 6;
+    const listY = ty + tabsH + 6;
     if (this.tab === 'repair') this.buildRepair(x, listY, w);
     else this.buildRecipes(x, listY, w);
     if (pages > 1 && this.tab !== 'repair') {

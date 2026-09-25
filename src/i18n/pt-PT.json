@@ -4,6 +4,7 @@
   "menu.hint": "Toca no botão ou carrega em Enter",
   "boot.loading": "A carregar…",
   "boot.error": "Erro ao arrancar o jogo:",
+  "error.runtime": "Ocorreu um erro (o jogo tenta continuar). Tira uma captura de ecrã e envia-a:",
   "menu.continue": "Continuar (dia {day})",
   "menu.confirm_new": "Apagar e recomeçar?",
   "save.export": "Exportar",

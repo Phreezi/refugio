@@ -45,6 +45,9 @@ const ACTION_RADIUS = 20;
 /** Barras do HUD (px de jogo; pares, porque as Shapes não são arredondadas). */
 const HUD_MARGIN = 6;
 const BAR_X = 34;
+/** Abaixo desta largura (ecrã ao alto), a dica do tutorial vai para baixo das barras. */
+const NARROW_HUD_WIDTH = 420;
+const HINT_Y_NARROW = 60;
 const BAR_WIDTH = 60;
 const BAR_HEIGHT = 6;
 const BAR_SPACING = 11;
@@ -103,7 +106,8 @@ export class UIScene extends Phaser.Scene {
   /** Bordas do ecrã avermelhadas ao levar dano (em vez de abanar a câmara). */
   private hurtEdges: Phaser.GameObjects.Container | null = null;
   /** Dica do tutorial (em cima, ao centro) e o × que a desliga. */
-  private hint: { label: Label; close: Button | null; step: string | null; x: number } | null = null;
+  private hint: { label: Label; close: Button | null; step: string | null; x: number; y: number } | null =
+    null;
   /** "A sangrar" (por baixo da barra de XP), a piscar. */
   private bleedLabel: Label | null = null;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
@@ -142,11 +146,14 @@ export class UIScene extends Phaser.Scene {
     );
     const bossX = Math.round(width / 2);
     const cx = Math.round(width / 2);
+    // Num ecrã estreito (ao alto) a dica não cabe entre as barras e o relógio: vai por baixo.
+    const hintY = width < NARROW_HUD_WIDTH ? HINT_Y_NARROW : HUD_MARGIN + 24;
     this.hint = {
+      y: hintY,
       label: new Label(
         this,
         cx,
-        HUD_MARGIN + 24,
+        hintY,
         '',
         {
           size: 8,
@@ -325,7 +332,7 @@ export class UIScene extends Phaser.Scene {
     hint.close = new Button(
       this,
       Math.round(hint.x + hint.label.text.width / 2 + 10),
-      HUD_MARGIN + 30,
+      hint.y + 6,
       CLOSE_ICON,
       { width: 12, height: 12, fontSize: 8, style: 'secondary' },
       () => {

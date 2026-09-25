@@ -107,4 +107,25 @@ describe('EventBus', () => {
     bus.clear();
     expect(bus.listenerCount('other')).toBe(0);
   });
+
+  it('com onListenerError, um handler que falha não impede os outros (o jogo não congela)', () => {
+    const bus = new EventBus<TestEvents>();
+    const errors: string[] = [];
+    const got: number[] = [];
+    EventBus.onListenerError = (error, event) => errors.push(`${event}:${String(error)}`);
+    try {
+      bus.on('ping', () => {
+        throw new Error('boom');
+      });
+      bus.on('ping', ({ n }) => got.push(n));
+      bus.emit('ping', { n: 3 });
+    } finally {
+      EventBus.onListenerError = null;
+    }
+    expect(got).toEqual([3]);
+    expect(errors).toEqual(['ping:Error: boom']);
+    expect(() => {
+      bus.emit('ping', { n: 4 });
+    }).toThrow('boom');
+  });
 });

@@ -107,6 +107,13 @@ export interface GameEvents {
 
 /** Emissor de eventos tipado e sem dependências do Phaser (testável com Vitest). */
 export class EventBus<Events extends object> {
+  /**
+   * No jogo, um erro num handler (som, texto a subir…) é reportado e os outros handlers
+   * continuam: sem isto, a exceção subia até ao ciclo do Phaser e o jogo congelava. Sem
+   * handler (testes), o erro propaga-se.
+   */
+  static onListenerError: ((error: unknown, event: string) => void) | null = null;
+
   private readonly handlers = new Map<keyof Events, Set<Handler<never>>>();
   private readonly anyHandlers = new Set<(event: keyof Events, payload: unknown) => void>();
 
@@ -148,12 +155,30 @@ export class EventBus<Events extends object> {
   }
 
   emit<K extends keyof Events>(event: K, payload: Events[K]): void {
-    for (const handler of [...this.anyHandlers]) handler(event, payload);
+    for (const handler of [...this.anyHandlers])
+      this.call(event, () => {
+        handler(event, payload);
+      });
     const set = this.handlers.get(event);
     if (!set) return;
     // Cópia: um handler pode subscrever/cancelar durante a emissão sem afetar esta volta.
     for (const handler of [...set]) {
-      (handler as Handler<Events[K]>)(payload);
+      this.call(event, () => {
+        (handler as Handler<Events[K]>)(payload);
+      });
+    }
+  }
+
+  private call(event: keyof Events, run: () => void): void {
+    const report = EventBus.onListenerError;
+    if (!report) {
+      run();
+      return;
+    }
+    try {
+      run();
+    } catch (error) {
+      report(error, String(event));
     }
   }
 
