@@ -21,7 +21,7 @@ import { CraftingUI } from '../ui/CraftingUI';
 import { FishingUI } from '../ui/FishingUI';
 import { LevelUpUI } from '../ui/LevelUpUI';
 import { PauseUI } from '../ui/PauseUI';
-import { preferences } from '../ui/preferences';
+import { preferences, setPreference } from '../ui/preferences';
 import { autosave } from '../save';
 import { InventoryUI } from '../ui/InventoryUI';
 import { Label } from '../ui/text';
@@ -116,6 +116,7 @@ export class UIScene extends Phaser.Scene {
   private actionButton: { setVisible(visible: boolean): unknown }[] = [];
   /** Botão "Construir": escondido no modo construção (a paleta ocupa o sítio; há o Sair). */
   private buildButton: Button | null = null;
+  private autoButton: Button | null = null;
   /** Ponteiro que está a segurar a ação (botão de toque ou clique no mundo). */
   private actionPointer: number | null = null;
 
@@ -267,6 +268,7 @@ export class UIScene extends Phaser.Scene {
       this.xpFill = null;
       this.actionButton = [];
       this.buildButton = null;
+      this.autoButton = null;
       this.joystickBase = null;
       this.joystickKnob = null;
       this.bars = [];
@@ -537,7 +539,7 @@ export class UIScene extends Phaser.Scene {
       () => {
         this.pause?.toggle();
       },
-    ).setDepth(70);
+    ).setDepth(86); // por cima do menu de pausa: carregar outra vez fecha-o
   }
 
   private updateCoopLabel(): void {
@@ -609,9 +611,30 @@ export class UIScene extends Phaser.Scene {
       },
     ).setDepth(70);
 
-    if (!this.sys.game.device.input.touch) return;
+    // Ataque automático (canto inferior direito; com toque, por cima do botão de ação).
+    const touch = this.sys.game.device.input.touch;
     const cx = width - ACTION_RADIUS - 10;
     const cy = hotbar.y - ACTION_RADIUS - 12;
+    // Na linha da hotbar, no canto; se não couber ao lado da Mochila, por cima dela.
+    const autoW = 40;
+    const fitsRow = width - 4 - autoW >= bagX + bagWidth / 2 + 6;
+    this.autoButton = new Button(
+      this,
+      touch && !fitsRow ? cx : width - 4 - autoW / 2,
+      fitsRow ? hotbar.y + hotbar.h / 2 : touch ? cy - ACTION_RADIUS - 16 : hotbar.y - 12,
+      t('hud.auto'),
+      {
+        width: autoW,
+        height: fitsRow ? hotbar.h : 16,
+        fontSize: 8,
+        style: preferences().autoAttack ? 'primary' : 'secondary',
+      },
+      () => {
+        this.toggleAutoAttack();
+      },
+    ).setDepth(70);
+
+    if (!touch) return;
     const ring = this.add.circle(cx, cy, ACTION_RADIUS + 1, paletteNumber('ink'), 0.5).setDepth(5);
     const button = this.add.circle(cx, cy, ACTION_RADIUS, paletteNumber('wood'), 0.8).setDepth(6);
     const label = new Label(
@@ -636,6 +659,14 @@ export class UIScene extends Phaser.Scene {
     this.events.on('ui:action-released', () => button.setFillStyle(paletteNumber('wood'), 0.8));
   }
 
+  /** Liga/desliga o ataque automático (botão "Auto" ou tecla F). */
+  private toggleAutoAttack(): void {
+    const on = !preferences().autoAttack;
+    setPreference('autoAttack', on);
+    this.autoButton?.setStyle(on ? 'primary' : 'secondary');
+    this.showNotice(t(on ? 'hud.auto_on' : 'hud.auto_off'));
+  }
+
   /** Teclas: I/Tab mochila, Esc fecha, 1–4 hotbar. (Espaço/WASD estão na cena de jogo.) */
   private createKeys(): void {
     const keyboard = this.input.keyboard;
@@ -648,6 +679,9 @@ export class UIScene extends Phaser.Scene {
     keyboard.on('keydown-TAB', toggle);
     keyboard.on('keydown-C', () => {
       this.toggleCrafting();
+    });
+    keyboard.on('keydown-F', () => {
+      this.toggleAutoAttack();
     });
     keyboard.on('keydown-ESC', () => {
       // Esc fecha o que estiver aberto; sem nada aberto, abre (ou fecha) o menu de pausa.

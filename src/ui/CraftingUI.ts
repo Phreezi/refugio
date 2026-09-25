@@ -9,12 +9,13 @@ import type { Simulation } from '../core/Simulation';
 import { HANDS, RECIPE_CATEGORIES, type Recipe, type RecipeCategory } from '../data/types';
 import { getView } from '../display/view';
 import { itemName, t, tKey } from '../i18n';
+import { describeItem } from './itemInfo';
 import { missingInputs, outputCount } from '../systems/crafting/crafting';
 import { countItem } from '../systems/inventory/inventory';
 import { content } from '../world/content';
 import { Button, CLOSE_ICON } from './Button';
 import { Label } from './text';
-import { uiState } from './uiState';
+import { REOPEN_GUARD_MS, uiState } from './uiState';
 
 const DEPTH = { dim: 50, panel: 60, content: 62 } as const;
 const PAD = 8;
@@ -47,6 +48,8 @@ export class CraftingUI {
   private readonly scene: Phaser.Scene;
   private readonly sim: Simulation;
   private objects: Destroyable[] = [];
+  /** Quando o painel fechou (ms): ver `REOPEN_GUARD_MS`. */
+  private closedAt = -Infinity;
   private bars: JobBar[] = [];
   private rect: { x: number; y: number; w: number; h: number } | null = null;
   /** Estação aberta (`null` = mãos). */
@@ -96,10 +99,12 @@ export class CraftingUI {
 
   toggleHands(): void {
     if (this.isOpen) this.close();
-    else this.open(null);
+    // O toque no botão que fecha o painel (toque "fora") não o volta a abrir.
+    else if (performance.now() - this.closedAt > REOPEN_GUARD_MS) this.open(null);
   }
 
   close(): void {
+    if (this.rect) this.closedAt = performance.now();
     this.clear();
     this.rect = null;
     uiState.modalOpen = false;
@@ -306,6 +311,17 @@ export class CraftingUI {
               .setOrigin(0)
               .setDepth(DEPTH.content),
           );
+        // Tocar no desenho ou no nome diz o que o item faz.
+        const info = this.add(
+          this.scene.add
+            .rectangle(x + PAD, ry, w - PAD * 2 - 50, 11, 0x000000, 0.001)
+            .setOrigin(0)
+            .setDepth(DEPTH.content)
+            .setInteractive({ useHandCursor: true }),
+        );
+        info.on('pointerup', () => {
+          this.message([itemName(recipe.output), ...describeItem(recipe.output, def)].join('\n'));
+        });
         const qty = recipe.qty > 1 ? ` ×${String(recipe.qty)}` : '';
         const time = recipe.timeSec > 0 ? ` · ${t('craft.seconds', { s: recipe.timeSec })}` : '';
         this.label(x + PAD + 20, ry + 1, `${itemName(recipe.output)}${qty}${time}`, {

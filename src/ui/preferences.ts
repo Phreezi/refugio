@@ -4,13 +4,8 @@
 
 import { DEFAULT_LANGUAGE, isLanguage, type Language } from '../i18n';
 
-export type UiSize = 'small' | 'normal' | 'large';
-export const UI_SIZES: readonly UiSize[] = ['small', 'normal', 'large'];
-
 export interface Preferences {
   language: Language;
-  /** Tamanho da interface: muda o "zoom" (quantos píxeis de jogo cabem no lado curto do ecrã). */
-  uiSize: UiSize;
   /** Números de dano a subir (nos inimigos e no jogador). */
   damageNumbers: boolean;
   /** Vibrar ao levar dano (telemóvel). */
@@ -19,24 +14,23 @@ export interface Preferences {
   colorblind: boolean;
   /** Volume dos sons (0–1; 0 = sem som). */
   volume: number;
+  /** Ataque automático ligado (botão "Auto" do HUD). */
+  autoAttack: boolean;
 }
 
 const STORAGE_KEY = 'refugio.prefs';
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: DEFAULT_LANGUAGE,
-  uiSize: 'normal',
   damageNumbers: true,
   vibration: true,
   colorblind: false,
   volume: 0.6,
+  autoAttack: false,
 };
 
 /** Níveis de volume das definições (tocar muda para o seguinte). */
 export const VOLUME_STEPS: readonly number[] = [0, 0.25, 0.5, 0.75, 1];
-
-/** Lado curto alvo (px de jogo) para cada tamanho: menos píxeis de jogo = tudo maior. */
-export const UI_SIZE_TARGET: Readonly<Record<UiSize, number>> = { small: 320, normal: 270, large: 230 };
 
 /** Lê preferências gravadas, ignorando valores estranhos (ficam os de omissão). */
 export function parsePreferences(text: string | null): Preferences {
@@ -51,9 +45,7 @@ export function parsePreferences(text: string | null): Preferences {
   if (typeof raw !== 'object' || raw === null) return prefs;
   const r = raw as Record<string, unknown>;
   if (typeof r.language === 'string' && isLanguage(r.language)) prefs.language = r.language;
-  const size = UI_SIZES.find((s) => s === r.uiSize);
-  if (size) prefs.uiSize = size;
-  for (const key of ['damageNumbers', 'vibration', 'colorblind'] as const) {
+  for (const key of ['damageNumbers', 'vibration', 'colorblind', 'autoAttack'] as const) {
     if (typeof r[key] === 'boolean') prefs[key] = r[key];
   }
   if (typeof r.volume === 'number' && r.volume >= 0 && r.volume <= 1) prefs.volume = r.volume;

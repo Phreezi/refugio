@@ -9,14 +9,13 @@ describe('Preferências (Fase 11)', () => {
       parsePreferences(
         JSON.stringify({
           language: 'en',
-          uiSize: 'large',
           damageNumbers: false,
           colorblind: 'sim',
           extra: 1,
         }),
       ),
-    ).toEqual({ ...DEFAULT_PREFERENCES, language: 'en', uiSize: 'large', damageNumbers: false });
-    expect(parsePreferences(JSON.stringify({ language: 'fr', uiSize: 'enorme' }))).toEqual(
+    ).toEqual({ ...DEFAULT_PREFERENCES, language: 'en', damageNumbers: false });
+    expect(parsePreferences(JSON.stringify({ language: 'fr', damageNumbers: 'não' }))).toEqual(
       DEFAULT_PREFERENCES,
     );
   });

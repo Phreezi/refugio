@@ -1,3 +1,4 @@
+import { BALANCE } from '../data/balance';
 import type { ItemDefs } from '../data/types';
 import { addItem, removeItem, type Container } from '../systems/inventory/inventory';
 import { secondsToTicks } from './Clock';
@@ -35,6 +36,8 @@ export class Fishing {
   private readonly actions: PlayerActions;
   private readonly items: () => ItemDefs;
   private current: FishingSession | null = null;
+  /** Não se volta a lançar a cana antes deste tick (a pesca não é uma fábrica de XP). */
+  private readyAt = 0;
   private readonly sweepTicks = secondsToTicks(SWEEP_SEC);
 
   constructor(state: GameState, bus: EventBus<GameEvents>, actions: PlayerActions, items: () => ItemDefs) {
@@ -74,6 +77,7 @@ export class Fishing {
     const containers = this.actions.pickupContainers();
     if (this.rod(containers)) {
       const world = this.state.data.world;
+      if (world.tick < this.readyAt) return;
       this.current = {
         startTick: world.tick,
         zone: 0.25 + nextRandom(world) * 0.6,
@@ -101,6 +105,7 @@ export class Fishing {
     if (!session) return;
     const caught = Math.abs(this.markerAt(atTick) - session.zone) <= session.width / 2 || this.hit(atTick);
     this.current = null;
+    this.readyAt = this.state.data.world.tick + secondsToTicks(BALANCE.fishCooldownSec);
     const containers = this.actions.pickupContainers();
     const rod = this.rod(containers);
     if (rod) {

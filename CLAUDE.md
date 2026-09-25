@@ -349,6 +349,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 | Velocidade do jogo x1/x2/x3 | Botão por baixo do relógio | Idem |
 | Pausa (definições, estatísticas, sair) | Esc (sem painéis abertos) / botão "II" | Botão "II" |
 | Ação contextual (bater, recolher, abrir, atacar) | Espaço / clique (manter premido repete golpes ao ritmo da arma) | Botão grande (lado direito) |
+| Ataque automático (liga/desliga): sem a ação premida, bate ou dispara sozinho no inimigo mais perto ao alcance da arma | F / botão "Auto" (canto inferior direito) | Botão "Auto" (por cima do botão de ação) |
 | Inventário | I / Tab | Botão mochila |
 | Equipar arma/roupa | Na mochila: selecionar → "Equipar", ou arrastar para a coluna Arma/Cabeça/Corpo | Idem |
 | Craft | C | Botão "Fabricar" (à esquerda da hotbar) |
@@ -358,6 +359,8 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 Com Ctrl/Cmd premido, os atalhos do browser nas teclas do jogo (Ctrl+S, Ctrl+D, Ctrl+A, Ctrl+F…) são anulados (`src/input/browserShortcuts.ts`); Ctrl+W/T/N não se podem anular, por isso fechar a página com o Ctrl premido pede confirmação.
 
 A **ação contextual** escolhe automaticamente o alvo mais próximo em frente (como no original): zombie > contentor > recurso.
+
+Os botões que abrem painéis (Mochila, Fabricar, Construir, "II") fecham-nos se se carregar outra vez. No fabrico e na mochila, tocar no desenho ou no nome de um item mostra o que ele faz (`src/ui/itemInfo.ts`: dano, golpes por segundo, alcance, defesa, efeitos, durabilidade, espaço).
 
 ### 7.3 Inventário
 
@@ -863,7 +866,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 
 - [ ] Revisão completa dos controlos touch (tamanho de botões, zonas mortas do joystick). *(Precisa de testes em telemóveis reais; o tamanho da interface já é ajustável nas definições.)*
 - [x] Tutorial curto e contextual (andar, primeira árvore, primeiro craft, primeira peça, comer, primeira zona): dica no topo com texto de teclado ou de toque e × para desligar (`core/Tutorial.ts`, save v13 `tutorial`).
-- [x] Definições (menu de pausa): idioma, volume, tamanho da UI, vibração, hordas, mostrar números de dano. Preferências do dispositivo no localStorage (`refugio.prefs`, `src/ui/preferences.ts`); as hordas no save.
+- [x] Definições (menu de pausa): idioma, volume (barra deslizante), vibração, hordas, mostrar números de dano. *(O tamanho da interface saiu: o zoom com Ctrl + roda / pinça já serve para isso.)* Preferências do dispositivo no localStorage (`refugio.prefs`, `src/ui/preferences.ts`); as hordas no save.
 - [x] Raridade nos slots (contorno verde/azul/rosa) e modo daltónico (1–3 marcas no canto, além da cor).
 - [x] Menu de pausa (Esc / botão "II"; o tempo de jogo pára), estatísticas do jogador (save v12 `stats`), "Gravar e sair".
 - [ ] Testes em 3+ telemóveis Android de gamas diferentes.
@@ -1094,4 +1097,8 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Dependência nova: **PeerJS** (MIT) + servidor de sinalização gratuito do PeerJS | Sem servidor próprio a alojar; o servidor recusa ids repetidos, o que garante códigos únicos entre as sessões ativas. Contrapartida: depende de um serviço de terceiros (pode trocar-se por um próprio com `?peer=`) |
 | 2026-09-25 | Fase 12: arte desenhada em código pelo Claude e sons sintetizados; ComfyUI local como opção futura | Pedido do jogador: sem pagar mais. Os packs grátis testados (CraftPix, GameArt2D) proíbem redistribuir os ficheiros (o repositório é público) e não encaixam no estilo; a Ludo.ai é paga |
 | 2026-09-25 | Volume nas preferências do dispositivo (`volume`, 0–100% em passos de 25%) | Os sons são novos; ficam no localStorage como as outras preferências |
+| 2026-09-25 | Pesca: 1 XP por peixe (era 4), cana de 12 lançamentos (era 60) e 2 s entre lançamentos (`fishCooldownSec`) | Pedido do jogador: dava para subir 2 níveis num minuto só a pescar |
+| 2026-09-25 | Ataque automático (botão "Auto"/F, preferência do dispositivo `autoAttack`) | Pedido do jogador ("muito importante"): andar e atacar sozinho o que estiver ao alcance |
+| 2026-09-25 | Tirado o tamanho da interface das definições | Pedido do jogador: o zoom (Ctrl + roda, pinça) já faz isso |
+| 2026-09-25 | Textos com origem vertical 0,5 centrados pelo meio das maiúsculas (medido no browser), não pela caixa do texto | O "Viajar" aparecia descentrado noutra fonte (Windows): a caixa inclui espaço para acentos e descendentes |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

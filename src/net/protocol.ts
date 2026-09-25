@@ -75,7 +75,7 @@ export type HostMessage =
 export type GuestMessage =
   | { t: 'join'; character: GuestCharacter }
   /** Onde está o convidado (15×/s). */
-  | { t: 'me'; x: number; y: number; facing: Facing; moved: 0 | 1; sneak: 0 | 1; zone: string }
+  | { t: 'me'; x: number; y: number; facing: Facing; moved: 0 | 1; sneak: 0 | 1; zone: string; auto?: 0 | 1 }
   /** Botão de ação premido/largado (`tick`: o do ecrã dele, para a pesca). */
   | { t: 'act'; held: 0 | 1; tick: number }
   | { t: 'cmd'; seq: number; sys: CommandSystem; m: string; args: unknown[] }
@@ -121,6 +121,7 @@ export function parseGuestMessage(raw: unknown): GuestMessage | null {
       moved: m.moved === 1 ? 1 : 0,
       sneak: m.sneak === 1 ? 1 : 0,
       zone: m.zone,
+      auto: m.auto === 1 ? 1 : 0,
     };
   return null;
 }

@@ -33,7 +33,7 @@ describe('Mensagens do convidado', () => {
     expect(parseGuestMessage({ t: 'away', on: 1 })).toEqual({ t: 'away', on: 1 });
     expect(
       parseGuestMessage({ t: 'me', x: 1, y: 2, facing: 'up', moved: 1, sneak: 0, zone: 'zone_base' }),
-    ).toEqual({ t: 'me', x: 1, y: 2, facing: 'up', moved: 1, sneak: 0, zone: 'zone_base' });
+    ).toEqual({ t: 'me', x: 1, y: 2, facing: 'up', moved: 1, sneak: 0, zone: 'zone_base', auto: 0 });
     expect(
       parseGuestMessage({ t: 'cmd', seq: 3, sys: 'crafting', m: 'craft', args: ['r_stone_axe', 'hands'] }),
     ).toEqual({ t: 'cmd', seq: 3, sys: 'crafting', m: 'craft', args: ['r_stone_axe', 'hands'] });

@@ -104,7 +104,7 @@ const HEAD: Record<'down' | 'up' | 'side', string[]> = {
     '..ohhhhhhhssso..',
     '..odhhhhhsssso..',
     '..odhhhhssosso..',
-    '...ohhhksssssso.',
+    '...ohhhkssssso..',
     '...ohhksssssko..',
     '....okkkkkko....',
   ],

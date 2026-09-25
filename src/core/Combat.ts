@@ -279,6 +279,30 @@ export class Combat {
   }
 
   /**
+   * Inimigo vivo mais perto cujo corpo esteja ao alcance `reach` do jogador (ataque automático).
+   * @param footprint caixa dos pés do jogador (o golpe sai do meio dela).
+   */
+  nearestInReach(footprint: { width: number; height: number }, reach: number): Enemy | null {
+    const player = this.state.data.player;
+    const fx = player.x;
+    const fy = player.y - footprint.height / 2;
+    let best: Enemy | null = null;
+    let bestDist = reach;
+    for (const enemy of this.enemies) {
+      if (enemy.dying > 0) continue;
+      const b = this.bodyArea(enemy);
+      const dx = Math.max(b.x - fx, 0, fx - (b.x + b.w));
+      const dy = Math.max(b.y - fy, 0, fy - (b.y + b.h));
+      const dist = Math.hypot(dx, dy);
+      if (dist <= bestDist) {
+        best = enemy;
+        bestDist = dist;
+      }
+    }
+    return best;
+  }
+
+  /**
    * Dispara a arma à distância equipada no inimigo mais perto (gasta 1 de munição).
    * @returns 'shot', 'no_ammo' (há alvo mas falta munição) ou null (sem arma à distância/alvo).
    */

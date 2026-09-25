@@ -72,6 +72,11 @@ export class Simulation {
   private linked = false;
   /** Co-op: contexto de uma zona para um convidado que está noutra (substituível nos testes). */
   contextFor: (zoneId: string) => ZoneContext = buildZoneContext;
+  /**
+   * Ataque automático (botão "Auto" do HUD): sem a ação premida, bate ou dispara sozinho no
+   * inimigo mais perto que esteja ao alcance da arma.
+   */
+  autoAttack = false;
   /** Tick (no ecrã do convidado) em que carregou na ação: a pesca usa-o. */
   private strikeTick: number | null = null;
 
@@ -425,7 +430,11 @@ export class Simulation {
   }
 
   private runAction(tick: number): void {
-    if (!(this.actionQueued || this.actionHeld) || tick < this.nextActionTick) return;
+    if (tick < this.nextActionTick) return;
+    if (!(this.actionQueued || this.actionHeld)) {
+      if (this.autoAttack) this.runAutoAttack(tick);
+      return;
+    }
     this.actionQueued = false;
     const strikeTick = this.strikeTick ?? undefined;
     this.strikeTick = null;
@@ -454,6 +463,28 @@ export class Simulation {
     this.nextActionTick = tick + (attack ? this.combat.attackTicks() : this.actionCooldownTicks);
     // Abrir um baú, beber ou abrir uma porta não se repete com a tecla presa (só golpes em recursos).
     if (done !== 'enemy' && done !== 'resource' && done !== 'swing') this.actionHeld = false;
+  }
+
+  /** Ataque automático: vira-se para o inimigo mais perto ao alcance e bate (ou dispara). */
+  private runAutoAttack(tick: number): void {
+    if (this.fishing.active) return;
+    const weapon = this.combat.weapon();
+    const target = weapon.ranged
+      ? this.combat.nearestInRange(weapon.ranged.range)
+      : this.combat.nearestInReach(PLAYER_FOOTPRINT, weapon.reach);
+    if (!target) return;
+    if (weapon.ranged) {
+      // Sem munição não insiste (nem avisa a cada tick).
+      if (this.combat.shoot() === 'shot') this.nextActionTick = tick + this.combat.attackTicks();
+      return;
+    }
+    const player = this.state.data.player;
+    const dx = target.x - player.x;
+    const dy = target.y - player.y;
+    player.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up';
+    this.bus.emit('player:action', { kind: 'attack' });
+    this.combat.attack(target.uid);
+    this.nextActionTick = tick + this.combat.attackTicks();
   }
 
   /**
