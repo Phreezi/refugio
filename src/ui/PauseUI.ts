@@ -1,8 +1,10 @@
 import type Phaser from 'phaser';
 import { paletteNumber } from '../assets/palette';
 import { TICKS_PER_SECOND } from '../core/Clock';
+import { eventBus } from '../core/EventBus';
 import { gameState } from '../core/GameState';
 import { getView } from '../display/view';
+import { coop } from '../net/coop';
 import { getLanguage, LANGUAGES, setLanguage, t, type MessageKey } from '../i18n';
 import { Button } from './Button';
 import { preferences, setPreference, UI_SIZES } from './preferences';
@@ -13,7 +15,7 @@ const DEPTH = { dim: 80, panel: 82, content: 84 } as const;
 const W = 200;
 const ROW = 20;
 
-type View = 'main' | 'settings' | 'stats';
+type View = 'main' | 'settings' | 'stats' | 'coop';
 
 interface Destroyable {
   destroy(): void;
@@ -28,11 +30,19 @@ export class PauseUI {
   private readonly scene: Phaser.Scene;
   private objects: Destroyable[] = [];
   private view: View | null = null;
+  /** Erro ao abrir a sessão de co-op (mostra-se na vista do co-op). */
+  private coopError = false;
   /** Sair para o menu inicial (a UIScene trata de gravar e mudar de cena). */
   onQuit: () => void = () => undefined;
 
+  private readonly offCoop: () => void;
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+    // O parceiro ligou-se ou saiu: a vista do co-op mostra o estado novo.
+    this.offCoop = eventBus.on('coop:changed', () => {
+      if (this.view === 'coop') this.go('coop');
+    });
   }
 
   get isOpen(): boolean {
@@ -59,6 +69,7 @@ export class PauseUI {
   }
 
   destroy(): void {
+    this.offCoop();
     this.close();
   }
 
@@ -86,7 +97,7 @@ export class PauseUI {
   private build(): void {
     this.clear();
     const { width, height } = getView();
-    const lines = this.view === 'main' ? 4 : this.view === 'stats' ? 8 : 7;
+    const lines = this.view === 'main' ? 5 : this.view === 'stats' ? 8 : this.view === 'coop' ? 5 : 7;
     const h = Math.min(height - 8, 34 + lines * ROW + 10);
     const x = Math.round((width - W) / 2);
     const y = Math.max(4, Math.round((height - h) / 2));
@@ -107,12 +118,19 @@ export class PauseUI {
         .setDepth(DEPTH.panel),
     );
     const title: MessageKey =
-      this.view === 'settings' ? 'pause.settings' : this.view === 'stats' ? 'pause.stats' : 'pause.title';
+      this.view === 'settings'
+        ? 'pause.settings'
+        : this.view === 'stats'
+          ? 'pause.stats'
+          : this.view === 'coop'
+            ? 'coop.title'
+            : 'pause.title';
     this.label(Math.round(width / 2), y + 8, t(title), { size: 10, bold: true, color: 'wheat' }, [0.5, 0]);
     const top = y + 34;
     const cx = Math.round(width / 2);
     if (this.view === 'main') this.buildMain(cx, top);
     else if (this.view === 'settings') this.buildSettings(x, top);
+    else if (this.view === 'coop') this.buildCoop(cx, top);
     else this.buildStats(x, top);
   }
 
@@ -134,6 +152,16 @@ export class PauseUI {
         'pause.stats',
         () => {
           this.go('stats');
+        },
+      ],
+      // Co-op: o anfitrião convida (mostra o código); o convidado só pode sair.
+      [
+        coop.isGuest ? 'coop.leave' : 'coop.invite',
+        () => {
+          if (coop.isGuest) {
+            this.close();
+            this.onQuit();
+          } else this.openCoop();
         },
       ],
       [
@@ -188,7 +216,7 @@ export class PauseUI {
     this.setting(x, next(), t('pause.colorblind'), onOff(prefs.colorblind), () => {
       setPreference('colorblind', !prefs.colorblind);
     });
-    if (gameState.hasGame) {
+    if (gameState.hasGame && !coop.isGuest) {
       const data = gameState.data;
       this.setting(x, next(), t('pause.hordes'), onOff(data.settings.hordes), () => {
         data.settings.hordes = !data.settings.hordes;
@@ -197,6 +225,51 @@ export class PauseUI {
       });
     }
     this.button(Math.round(x + W / 2), next() + 6, t('pause.back'), 80, () => {
+      this.go('main');
+    });
+  }
+
+  /** Abre a sessão (se ainda não houver) e mostra o código a partilhar. */
+  private openCoop(): void {
+    this.coopError = false;
+    this.go('coop');
+    if (coop.isHost) return;
+    coop.host().then(
+      () => {
+        if (this.view === 'coop') this.go('coop');
+      },
+      (error: unknown) => {
+        console.warn('[coop] não foi possível abrir a sessão:', error);
+        this.coopError = true;
+        if (this.view === 'coop') this.go('coop');
+      },
+    );
+  }
+
+  private buildCoop(cx: number, top: number): void {
+    const code = coop.isHost ? coop.code : null;
+    const status: MessageKey = this.coopError
+      ? 'coop.error'
+      : !code
+        ? 'coop.creating'
+        : coop.connected
+          ? 'coop.connected'
+          : 'coop.waiting';
+    if (code) this.label(cx, top, code, { size: 20, bold: true, color: 'gold' }, [0.5, 0]);
+    this.label(
+      cx,
+      top + ROW + 10,
+      t(status),
+      { size: 8, color: 'cream', wrap: W - 20, align: 'center' },
+      [0.5, 0],
+    );
+    if (code) {
+      this.button(cx, top + ROW * 3, t('coop.stop'), 120, () => {
+        coop.leave();
+        this.go('main');
+      });
+    }
+    this.button(cx, top + ROW * 4, t('pause.back'), 80, () => {
       this.go('main');
     });
   }

@@ -17,6 +17,7 @@ import { installShortcutGuard } from '../input/browserShortcuts';
 import { keyboardDirection } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
 import { autosave } from '../save';
+import { coop } from '../net/coop';
 import { CROP_SPROUT_SPRITE, cropSprite, structureSprite, type StructureDef } from '../data/types';
 import { structureArea, structureFeet, type StructureRecord } from '../systems/building/building';
 import { CollisionWorld } from '../systems/movement/CollisionWorld';
@@ -28,9 +29,12 @@ import { TILE_LAYERS, type TileLayerName } from '../world/zoneMap';
 import { darknessAt } from '../core/DayNight';
 import { BALANCE } from '../data/balance';
 import { SceneKey } from './keys';
+import type { MainMenuData } from './MainMenuScene';
 import type { WorldMapData } from './WorldMapScene';
 
 const PLAYER_TEXTURE = 'player';
+/** Tinta do boneco do outro jogador (co-op), para se distinguirem. */
+const OTHER_TINT = 0x9fc6ff;
 /** Seta por cima do alvo da ação contextual (textura gerada por código). */
 const MARKER_TEXTURE = 'target_marker';
 /** Duração da animação de golpe (2 frames). */
@@ -106,6 +110,8 @@ export class ZoneScene extends Phaser.Scene {
   private leaving = false;
   private hurtUntil = 0;
   private player: Phaser.GameObjects.Sprite | null = null;
+  /** O outro jogador no co-op (o parceiro, ou o anfitrião visto pelo convidado). */
+  private other: Phaser.GameObjects.Sprite | null = null;
   private keys: MoveKeys | null = null;
   /** Sprites dos recursos, pelo id do objeto no Tiled (para golpes, esconder e reaparecer). */
   private resourceSprites = new Map<number, Phaser.GameObjects.Image>();
@@ -207,6 +213,7 @@ export class ZoneScene extends Phaser.Scene {
     });
     simulation.setRespawnPoint(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     simulation.reset();
+    this.setupCoop();
     for (const [objectId, sprite] of this.resourceSprites) {
       sprite.setVisible(!simulation.interaction.isDepleted(objectId));
     }
@@ -250,7 +257,10 @@ export class ZoneScene extends Phaser.Scene {
       this.demolishTinted = null;
       buildMode.active = false;
       moveInput.reset();
+      coop.onWorldChanged = null;
+      coop.onLost = null;
       this.player = null;
+      this.other = null;
       this.keys = null;
     });
   }
@@ -259,7 +269,7 @@ export class ZoneScene extends Phaser.Scene {
     moveInput.keyboard = this.readKeyboard();
     moveInput.keyboardSneak = this.keys?.sneak.some((key) => key.isDown) ?? false;
     // Com a mochila/baú aberto (ou a sair da zona) o jogador fica parado.
-    const blocked = uiState.modalOpen || this.leaving;
+    const blocked = uiState.modalOpen || this.leaving || coop.guestDown;
     simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction, moveInput.sneak);
     // No modo construção, Espaço/clique colocam peças (UIScene) em vez da ação contextual.
     const actionKey = !buildMode.active && (this.keys?.action.some((key) => key.isDown) ?? false);
@@ -271,7 +281,9 @@ export class ZoneScene extends Phaser.Scene {
     // Menu de pausa aberto: o tempo de jogo pára (o ecrã continua a ser desenhado).
     if (!uiState.paused) simulation.update(this.game.loop.rawDelta * speed);
     if (this.player) this.player.anims.timeScale = speed;
+    coop.update(performance.now());
     this.renderPlayer();
+    this.renderOther();
     this.renderEnemies();
     this.renderShots();
     this.renderHomestead();
@@ -657,7 +669,8 @@ export class ZoneScene extends Phaser.Scene {
   }
 
   private renderEnemies(): void {
-    const alpha = simulation.alpha;
+    // No convidado, os inimigos chegam do anfitrião 10×/s: interpola-se entre frames.
+    const alpha = coop.isGuest ? coop.enemyAlpha(performance.now()) : simulation.alpha;
     const now = this.time.now;
     for (const enemy of simulation.combat.list) {
       const def = content.enemies[enemy.id];
@@ -718,7 +731,8 @@ export class ZoneScene extends Phaser.Scene {
     if (this.player) {
       if (now < this.hurtUntil) this.player.setTint(0xb33a3a).setTintMode(Phaser.TintModes.FILL);
       else this.player.clearTint();
-      this.player.setAlpha(simulation.combat.playerInvulnerable && Math.floor(now / 80) % 2 === 0 ? 0.4 : 1);
+      const blink = simulation.combat.playerInvulnerable && Math.floor(now / 80) % 2 === 0;
+      this.player.setAlpha(blink || coop.guestDown ? 0.4 : 1);
     }
   }
 
@@ -949,6 +963,58 @@ export class ZoneScene extends Phaser.Scene {
   private toScreenGrid(value: number): number {
     const zoom = this.cameras.main.zoom;
     return Math.round(value * zoom) / zoom;
+  }
+
+  /**
+   * Co-op: o anfitrião manda o mundo ao convidado ao entrar numa zona; o convidado refaz a cena
+   * quando o anfitrião muda de zona ou de peças, e volta ao menu se a ligação cair.
+   */
+  private setupCoop(): void {
+    if (coop.isHost) coop.hostZoneEntered();
+    if (!coop.isGuest) return;
+    coop.onWorldChanged = (zoneId) => {
+      if (!this.leaving) this.scene.restart({ zoneId } satisfies ZoneSceneData);
+    };
+    coop.onLost = () => {
+      gameState.clear();
+      this.scene.start(SceneKey.MainMenu, { message: 'coop.lost' } satisfies MainMenuData);
+    };
+  }
+
+  /** O outro jogador do co-op: posição interpolada, andar, golpe; meio transparente se caiu. */
+  private renderOther(): void {
+    const view = coop.otherAvatar();
+    if (!view) {
+      this.other?.setVisible(false);
+      return;
+    }
+    this.other ??= this.add
+      .sprite(view.x, view.y, PLAYER_TEXTURE, characterFrame(view.facing, CHARACTER_COLUMNS.idle))
+      .setOrigin(0.5, 1)
+      .setTint(OTHER_TINT);
+    const other = this.other;
+    const now = performance.now();
+    const a = coop.alpha(now, view.at, coop.otherInterval);
+    const x = this.toScreenGrid(view.px + (view.x - view.px) * a);
+    const y = this.toScreenGrid(view.py + (view.y - view.py) * a);
+    other
+      .setVisible(true)
+      .setPosition(x, y)
+      .setDepth(y)
+      .setAlpha(view.down ? 0.4 : 1);
+    const sinceAttack = now - coop.otherAttackAt;
+    if (sinceAttack < ATTACK_MS) {
+      const [raised, extended] = CHARACTER_COLUMNS.attack;
+      other.stop();
+      other.setFrame(characterFrame(view.facing, sinceAttack < ATTACK_MS / 2 ? raised : extended));
+    } else if (view.moved && !view.down) {
+      other.play(view.sneak ? sneakAnimationKey(view.facing) : walkAnimationKey(view.facing), true);
+    } else {
+      other.stop();
+      other.setFrame(
+        characterFrame(view.facing, view.sneak ? CHARACTER_COLUMNS.sneakIdle : CHARACTER_COLUMNS.idle),
+      );
+    }
   }
 
   private renderPlayer(): void {

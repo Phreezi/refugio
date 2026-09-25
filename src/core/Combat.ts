@@ -20,6 +20,7 @@ import type { ZoneContext } from './Interaction';
 import type { PlayerActions } from './PlayerActions';
 import type { Building } from './Building';
 import { isNight } from './DayNight';
+import { partnerUp, type Partner } from './Partner';
 import { nextRandom, randomInt } from './Rng';
 
 /** Projétil em voo (seta, bala). Não se grava. */
@@ -70,6 +71,8 @@ export class Combat {
   private invulnerableUntil = 0;
   /** Peças da base: as hordas partem-nas e as armadilhas ferem os inimigos. */
   building: Building | null = null;
+  /** O boneco do convidado (co-op), ou null. Os inimigos atacam quem estiver mais perto. */
+  partner: Partner | null = null;
   /** Próximo tick em que cada armadilha pode voltar a ferir (não se grava). */
   private trapReady = new Map<number, number>();
   private projectiles: Projectile[] = [];
@@ -278,6 +281,11 @@ export class Combat {
     return this.enemies;
   }
 
+  /** Co-op (convidado): os inimigos vêm do anfitrião; esta lista substitui a local. */
+  setRemote(list: Enemy[]): void {
+    this.enemies = list;
+  }
+
   get(uid: number): Enemy | undefined {
     return this.enemies.find((e) => e.uid === uid);
   }
@@ -326,6 +334,7 @@ export class Combat {
       stuckTicks: secondsToTicks(BALANCE.hordeStuckSec),
       obstacle: (enemy: Enemy) => this.obstacle(enemy),
     };
+    const partner = partnerUp(this.partner) ? this.partner : null;
     for (const enemy of [...this.enemies]) {
       const def = enemies[enemy.id];
       if (!def) continue;
@@ -334,8 +343,16 @@ export class Combat {
         if (enemy.dying === 0) this.explode(enemy);
         continue;
       }
-      const result = stepEnemy(enemy, def, ctx);
-      if (result === 'attack') this.damagePlayer(def.damage, enemy, def.bleedPct ?? 0);
+      // Co-op: cada inimigo vai atrás de quem estiver mais perto (o jogador ou o parceiro).
+      const target =
+        partner &&
+        Math.hypot(partner.x - enemy.x, partner.y - enemy.y) <
+          Math.hypot(player.x - enemy.x, player.y - enemy.y)
+          ? partner
+          : null;
+      const result = stepEnemy(enemy, def, target ? { ...ctx, player: target, sneaking: target.sneak } : ctx);
+      if (result === 'attack' && target) this.damagePartner(def.damage);
+      else if (result === 'attack') this.damagePlayer(def.damage, enemy, def.bleedPct ?? 0);
       else if (result === 'scream' && def.scream) this.scream(enemy, def.scream);
       else if (result === 'siege' && enemy.siege !== null) {
         const amount = Math.round((def.damage * BALANCE.hordeStructureDamagePct) / 100);
@@ -447,6 +464,41 @@ export class Combat {
     return true;
   }
 
+  /**
+   * Golpe do parceiro (co-op) no inimigo `uid`, com o dano da arma dele (sem desgaste: a arma é
+   * do save do convidado). @returns true se acertou.
+   */
+  attackAs(uid: number, from: { x: number; y: number }, damage: number): boolean {
+    const enemy = this.get(uid);
+    const def = enemy ? this.content().enemies[enemy.id] : undefined;
+    if (!enemy || !def || enemy.dying > 0) return false;
+    const died = hitEnemy(
+      enemy,
+      damage,
+      from,
+      BALANCE.enemyKnockbackPx,
+      secondsToTicks(BALANCE.enemyHitStunSec),
+    );
+    this.bus.emit('enemy:hit', { uid, damage, x: enemy.x, y: enemy.y - BODY_HEIGHT });
+    this.state.markDirty();
+    if (died) this.defeated(enemy, def);
+    return true;
+  }
+
+  /** Dano ao parceiro (sem armadura). A 0 fica caído e volta pouco depois ao pé do anfitrião. */
+  damagePartner(amount: number): void {
+    const partner = this.partner;
+    const tick = this.state.data.world.tick;
+    if (!partnerUp(partner) || amount <= 0 || tick < partner.invulnerableUntil) return;
+    partner.hp = Math.max(0, partner.hp - amount);
+    partner.invulnerableUntil = tick + secondsToTicks(BALANCE.playerInvulnSec);
+    this.bus.emit('partner:damaged', { amount, x: partner.x, y: partner.y });
+    if (partner.hp === 0) {
+      partner.downUntil = tick + secondsToTicks(BALANCE.partnerDownSec);
+      this.bus.emit('partner:down', {});
+    }
+  }
+
   /** Vida a 0: morre (ou, o inchado, incha e rebenta ao fim do aviso — dá tempo de fugir). */
   private defeated(enemy: Enemy, def: EnemyDef): void {
     if (def.explode) {
@@ -464,6 +516,9 @@ export class Combat {
       this.bus.emit('enemy:exploded', { x: enemy.x, y: enemy.y, radius: blast.radius });
       if (Math.hypot(player.x - enemy.x, player.y - enemy.y) <= blast.radius)
         this.damagePlayer(blast.damage, enemy);
+      const partner = this.partner;
+      if (partnerUp(partner) && Math.hypot(partner.x - enemy.x, partner.y - enemy.y) <= blast.radius)
+        this.damagePartner(blast.damage);
     }
     this.kill(enemy);
   }

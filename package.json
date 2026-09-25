@@ -32,6 +32,7 @@
     "map:events": "node scripts/generate-events.ts"
   },
   "dependencies": {
+    "peerjs": "^1.5.5",
     "phaser": "^4.2.1"
   },
   "devDependencies": {

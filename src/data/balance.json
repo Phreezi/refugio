@@ -59,5 +59,6 @@
   "xpProduce": 1,
   "playerLightPx": 44,
   "bleedSec": 30,
-  "bleedEverySec": 2
+  "bleedEverySec": 2,
+  "partnerDownSec": 5
 }

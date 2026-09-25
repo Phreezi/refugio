@@ -9,6 +9,7 @@ import { BALANCE } from '../data/balance';
 import { getView, setupFixedCamera } from '../display/view';
 import { pinchStep, stepWorldZoom } from '../display/worldZoom';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
+import { coop } from '../net/coop';
 import { content } from '../world/content';
 import { readJoystick } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
@@ -107,6 +108,9 @@ export class UIScene extends Phaser.Scene {
   private bleedLabel: Label | null = null;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
   private hordeLabel: Label | null = null;
+  /** Estado do co-op (código / ligado / convidado). */
+  private coopLabel: Label | null = null;
+  private coopWasConnected = coop.connected;
   private xpFill: Phaser.GameObjects.Rectangle | null = null;
   /** Botão de ação (toque): escondido no modo construção. */
   private actionButton: { setVisible(visible: boolean): unknown }[] = [];
@@ -173,6 +177,15 @@ export class UIScene extends Phaser.Scene {
         .rectangle(bossX - BOSS_BAR / 2, HUD_MARGIN + 13, BOSS_BAR, 4, paletteNumber('red'))
         .setOrigin(0),
     };
+    this.coopLabel = new Label(
+      this,
+      width - HUD_MARGIN,
+      HUD_MARGIN + 40,
+      '',
+      { size: 7, color: 'wheat', bold: true, stroke: true },
+      [1, 0],
+    ).setDepth(70);
+    this.updateCoopLabel();
     this.hordeLabel = new Label(
       this,
       width - HUD_MARGIN,
@@ -246,6 +259,7 @@ export class UIScene extends Phaser.Scene {
       this.levelUp = null;
       this.levelLabel = null;
       this.hordeLabel = null;
+      this.coopLabel = null;
       this.bleedLabel = null;
       this.bossBar = null;
       this.hint = null;
@@ -393,6 +407,16 @@ export class UIScene extends Phaser.Scene {
 
   private listenForMessages(): () => void {
     const offs = [
+      eventBus.on('coop:changed', () => {
+        this.updateCoopLabel();
+        // Anfitrião: o parceiro entrou ou saiu.
+        if (coop.isHost && coop.connected !== this.coopWasConnected)
+          this.showNotice(t(coop.connected ? 'coop.partner_joined' : 'coop.partner_left'));
+        this.coopWasConnected = coop.connected;
+      }),
+      eventBus.on('partner:down', () => {
+        this.showNotice(t(coop.isGuest ? 'coop.you_down' : 'coop.partner_down'));
+      }),
       eventBus.on('player:died', ({ zoneId, bag }) => {
         const zone = tKey(content.zones[zoneId]?.name ?? zoneId);
         // A cena de jogo pode mudar (morreu noutra zona): a mensagem fica para o HUD novo.
@@ -519,8 +543,32 @@ export class UIScene extends Phaser.Scene {
     ).setDepth(70);
   }
 
+  private updateCoopLabel(): void {
+    const text = coop.isGuest
+      ? t('coop.hud_guest')
+      : coop.isHost && coop.code
+        ? t(coop.connected ? 'coop.hud_connected' : 'coop.hud_waiting', { code: coop.code })
+        : '';
+    this.coopLabel?.setText(text);
+  }
+
+  /** O convidado só anda e bate: mochila, fabrico e construção são do anfitrião. */
+  private guestBlocked(): boolean {
+    if (coop.isGuest) this.showNotice(t('coop.host_only'));
+    return coop.isGuest;
+  }
+
   /** Grava e volta ao menu inicial (a cena de jogo, ao parar, também pára o HUD). */
   private quitToMenu(): void {
+    // Co-op: o convidado sai (não tem nada a gravar); o anfitrião fecha a sessão.
+    if (coop.isGuest) {
+      coop.leave();
+      gameState.clear();
+      this.game.scene.stop(SceneKey.Zone);
+      this.game.scene.start(SceneKey.MainMenu, {});
+      return;
+    }
+    coop.leave();
     void autosave.flush().then(() => {
       this.game.scene.stop(SceneKey.Zone);
       this.game.scene.start(SceneKey.MainMenu, {});
@@ -652,25 +700,28 @@ export class UIScene extends Phaser.Scene {
     );
     ['ONE', 'TWO', 'THREE', 'FOUR'].forEach((key, index) => {
       keyboard.on(`keydown-${key}`, () => {
-        if (!uiState.modalOpen) this.inventory?.useHotbar(index);
+        if (!uiState.modalOpen && !this.guestBlocked()) this.inventory?.useHotbar(index);
       });
     });
   }
 
   /** Só um painel aberto de cada vez (mochila/baú, crafting ou construção). */
   private toggleInventory(): void {
+    if (this.guestBlocked()) return;
     if (this.crafting?.isOpen) this.crafting.close();
     this.build?.close();
     this.inventory?.toggle();
   }
 
   private toggleCrafting(): void {
+    if (this.guestBlocked()) return;
     if (this.inventory?.isOpen) this.inventory.close();
     this.build?.close();
     this.crafting?.toggleHands();
   }
 
   private toggleBuild(): void {
+    if (this.guestBlocked()) return;
     if (this.inventory?.isOpen) this.inventory.close();
     if (this.crafting?.isOpen) this.crafting.close();
     this.build?.toggle();
