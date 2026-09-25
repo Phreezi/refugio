@@ -114,6 +114,17 @@ export interface ItemDef {
   skill?: WeaponSkill;
   /** Munição que, se falhar o alvo, fica no chão e se apanha ao passar por cima (flechas…). */
   recoverable?: boolean;
+  /** Munição que também serve nas armas que gastam `ammoOf` (ex.: flechas de pedra → arco). */
+  ammoOf?: string;
+  /** Munição: dano somado ao da arma. */
+  ammoDamage?: number;
+  /** Munição recuperável: % de partir ao acertar (o resto pode apanhar-se do corpo). */
+  breakPct?: number;
+}
+
+/** A munição `ammo` serve numa arma que gasta `weaponAmmo`? */
+export function ammoFits(ammo: string, def: ItemDef | undefined, weaponAmmo: string): boolean {
+  return ammo === weaponAmmo || def?.ammoOf === weaponAmmo;
 }
 
 /** Perícias de combate: cada uma sobe com o uso e faz falhar menos (CLAUDE.md §7.8). */
@@ -329,6 +340,9 @@ const ITEM_KEYS = new Set([
   'ranged',
   'skill',
   'recoverable',
+  'ammoOf',
+  'ammoDamage',
+  'breakPct',
 ]);
 const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
 const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach'] as const;
@@ -447,6 +461,20 @@ export function parseItems(input: unknown, iconKeys: Iterable<string>): ItemDefs
     if (raw.recoverable !== undefined) {
       if (raw.recoverable === true && def.type === 'ammo') def.recoverable = true;
       else problems.push(`"${id}": recoverable tem de ser true (e só em munições)`);
+    }
+    if (raw.ammoOf !== undefined) {
+      if (typeof raw.ammoOf === 'string' && ids.has(raw.ammoOf) && def.type === 'ammo')
+        def.ammoOf = raw.ammoOf;
+      else problems.push(`"${id}": ammoOf tem de ser o id de outra munição (e só em munições)`);
+    }
+    if (raw.ammoDamage !== undefined) {
+      if (isPositiveInt(raw.ammoDamage) && def.type === 'ammo') def.ammoDamage = raw.ammoDamage;
+      else problems.push(`"${id}": ammoDamage tem de ser um inteiro > 0 (e só em munições)`);
+    }
+    if (raw.breakPct !== undefined) {
+      if (typeof raw.breakPct === 'number' && raw.breakPct >= 0 && raw.breakPct <= 100 && def.type === 'ammo')
+        def.breakPct = raw.breakPct;
+      else problems.push(`"${id}": breakPct tem de ser 0–100 (e só em munições)`);
     }
     if (raw.stopsBleeding !== undefined) {
       if (raw.stopsBleeding === true && def.type === 'consumable') def.stopsBleeding = true;

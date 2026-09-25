@@ -463,9 +463,10 @@
     "name": "item.bolt",
     "icon": "icon_bolt",
     "type": "ammo",
-    "stack": 100,
+    "stack": 999,
     "rarity": "common",
-    "recoverable": true
+    "recoverable": true,
+    "breakPct": 40
   },
   "pistol_ammo": {
     "name": "item.pistol_ammo",
@@ -563,9 +564,10 @@
     "name": "item.pebble",
     "icon": "icon_pebble",
     "type": "ammo",
-    "stack": 50,
+    "stack": 999,
     "rarity": "common",
-    "recoverable": true
+    "recoverable": true,
+    "breakPct": 30
   },
   "short_bow": {
     "name": "item.short_bow",
@@ -601,8 +603,31 @@
     "name": "item.arrow",
     "icon": "icon_arrow",
     "type": "ammo",
-    "stack": 50,
+    "stack": 999,
     "rarity": "common",
-    "recoverable": true
+    "recoverable": true,
+    "breakPct": 60
+  },
+  "stone_arrow": {
+    "name": "item.stone_arrow",
+    "icon": "icon_stone_arrow",
+    "type": "ammo",
+    "stack": 999,
+    "rarity": "common",
+    "recoverable": true,
+    "ammoOf": "arrow",
+    "ammoDamage": 3,
+    "breakPct": 35
+  },
+  "iron_arrow": {
+    "name": "item.iron_arrow",
+    "icon": "icon_iron_arrow",
+    "type": "ammo",
+    "stack": 999,
+    "rarity": "uncommon",
+    "recoverable": true,
+    "ammoOf": "arrow",
+    "ammoDamage": 6,
+    "breakPct": 15
   }
 }

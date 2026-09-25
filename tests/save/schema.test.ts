@@ -256,6 +256,17 @@ describe('save: migrações', () => {
     expect(() => validateState(bad)).toThrow();
   });
 
+  it('v15 → v16: aljava vazia; valida-se', () => {
+    const v15 = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    delete v15.player.quiver;
+    const stateJson = JSON.stringify(v15);
+    const text = `{"version":15,"timestamp":8,"checksum":"${checksum(`15|8|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.player.quiver).toEqual([]);
+    const bad = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
+    bad.player.quiver = [['arrow', 0]];
+    expect(() => validateState(bad)).toThrow();
+  });
+
   it('v14 → v15: perícias a zero e chão vazio nas zonas; validam-se', () => {
     const v14 = structuredClone(STATE) as unknown as {
       player: Record<string, unknown>;

@@ -381,6 +381,8 @@ export class Simulation {
     this.movePlayer();
     if (this.moved) this.tutorial.playerMoved();
     this.combat.collectGround();
+    this.combat.tickCorpses();
+    this.combat.syncQuiver();
     this.combat.pruneBags();
     this.checkExits();
     this.runAction(world.tick);
@@ -405,6 +407,8 @@ export class Simulation {
     if (this.combat.away) return;
     this.combat.sneaking = this.sneaking;
     this.combat.collectGround();
+    this.combat.tickCorpses();
+    this.combat.syncQuiver();
     this.combat.pruneBags();
     this.runAction(tick);
     if (!this.linked && this.zone) {

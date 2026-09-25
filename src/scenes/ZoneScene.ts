@@ -50,6 +50,7 @@ const SHARED_VIEW_EVENTS: ReadonlySet<keyof GameEvents> = new Set<keyof GameEven
   'bag:changed',
   'ground:changed',
   'enemy:missed',
+  'corpse:gone',
   'inventory:changed',
 ]);
 /** Tinta do boneco do outro jogador (co-op), para se distinguirem. */
@@ -128,6 +129,8 @@ export class ZoneScene extends Phaser.Scene {
   private containerSprites = new Map<number, Phaser.GameObjects.Image>();
   private bagSprites: Phaser.GameObjects.Image[] = [];
   private groundSprites: Phaser.GameObjects.Image[] = [];
+  /** Corpos no chão, pelo uid do inimigo. */
+  private corpseSprites = new Map<number, Phaser.GameObjects.Sprite | Phaser.GameObjects.Image>();
   /** Véu escuro da noite, com as luzes "apagadas" nele. */
   private night: Phaser.GameObjects.RenderTexture | null = null;
   /** A sair da zona (fade em curso): o jogador fica parado. */
@@ -262,6 +265,7 @@ export class ZoneScene extends Phaser.Scene {
       this.night = null;
       this.bagSprites = [];
       this.groundSprites = [];
+      this.corpseSprites.clear();
       this.marker = null;
       this.ghost = null;
       this.ghostArea = null;
@@ -576,14 +580,10 @@ export class ZoneScene extends Phaser.Scene {
         if (!view) return;
         view.bar.destroy();
         view.barBack.destroy();
-        this.tweens.add({
-          targets: view.sprite,
-          alpha: 0,
-          duration: 400,
-          onComplete: () => {
-            view.sprite.destroy();
-          },
-        });
+        // O corpo fica no chão um bocado (de pernas para o ar, escurecido) até `corpse:gone`.
+        view.sprite.setFlipY(true).setTint(0x8a7f7a);
+        view.sprite.setDepth(view.sprite.y - 12);
+        this.corpseSprites.set(uid, view.sprite);
       }),
       on('enemy:exploded', ({ x, y, radius }) => {
         const blast = this.add
@@ -623,6 +623,19 @@ export class ZoneScene extends Phaser.Scene {
       }),
       on('inventory:changed', () => {
         this.renderContainers();
+      }),
+      on('corpse:gone', ({ uid }) => {
+        const sprite = this.corpseSprites.get(uid);
+        this.corpseSprites.delete(uid);
+        if (!sprite) return;
+        this.tweens.add({
+          targets: sprite,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => {
+            sprite.destroy();
+          },
+        });
       }),
       on('ground:changed', ({ zoneId }) => {
         if (zoneId === this.zoneId) this.renderGround();

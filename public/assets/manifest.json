@@ -1195,6 +1195,28 @@
         "letter": "F"
       }
     },
+    "icon_stone_arrow": {
+      "type": "image",
+      "file": "sprites/icons/stone_arrow.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
+    "icon_iron_arrow": {
+      "type": "image",
+      "file": "sprites/icons/iron_arrow.png",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "stone",
+        "border": "ink",
+        "letter": "F"
+      }
+    },
     "icon_crossbow": {
       "type": "image",
       "file": "sprites/icons/crossbow.png",

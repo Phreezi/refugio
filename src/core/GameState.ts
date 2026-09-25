@@ -35,6 +35,12 @@ export interface PlayerState {
   look: CharacterLook;
   /** Experiência de cada perícia de combate (§7.8: quanto mais alta, menos se falha). */
   skills: Skills;
+  /**
+   * Munição "dentro" da arma à distância equipada (aljava): [item, quantidade] sem limite de
+   * stack. Não ocupa espaço na mochila; ao trocar de arma volta para a mochila (o que não
+   * couber fica no chão).
+   */
+  quiver: [item: string, qty: number][];
 }
 
 export type CharacterLook = 'boy' | 'girl';
@@ -151,6 +157,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       bleed: 0,
       look: 'boy',
       skills: {},
+      quiver: [],
     },
     world: { tick: 0, rng: seed >>> 0 },
     base: {

@@ -46,6 +46,8 @@ const ACTION_RADIUS = 20;
 /** Barras do HUD (px de jogo; pares, porque as Shapes não são arredondadas). */
 const HUD_MARGIN = 6;
 const BAR_X = 34;
+/** Caixa da arma equipada, por cima da hotbar (px). */
+const WEAPON_BOX = 20;
 /** Abaixo desta largura (ecrã ao alto), a dica do tutorial vai para baixo das barras. */
 const NARROW_HUD_WIDTH = 420;
 const HINT_Y_NARROW = 60;
@@ -122,6 +124,13 @@ export class UIScene extends Phaser.Scene {
   /** Botão "Construir": escondido no modo construção (a paleta ocupa o sítio; há o Sair). */
   private buildButton: Button | null = null;
   private autoButton: Button | null = null;
+  /** Arma equipada e munição (junto à hotbar): ícone e contagem (até `quiverDisplayMax`). */
+  private weaponView: {
+    box: Phaser.GameObjects.Rectangle;
+    icon: Phaser.GameObjects.Image;
+    count: Label;
+    item: string | null;
+  } | null = null;
   /** Ponteiro que está a segurar a ação (botão de toque ou clique no mundo). */
   private actionPointer: number | null = null;
 
@@ -277,6 +286,7 @@ export class UIScene extends Phaser.Scene {
       this.actionButton = [];
       this.buildButton = null;
       this.autoButton = null;
+      this.weaponView = null;
       this.joystickBase = null;
       this.joystickKnob = null;
       this.bars = [];
@@ -314,6 +324,29 @@ export class UIScene extends Phaser.Scene {
     this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
     this.renderBossBar();
     this.renderHint();
+    this.renderWeapon();
+  }
+
+  /** Arma equipada (ícone) e, se for à distância, quantas munições tem (no máximo mostra 999). */
+  private renderWeapon(): void {
+    const view = this.weaponView;
+    if (!view) return;
+    const slot = gameState.data.player.equipment[0];
+    const item = slot?.[0] ?? null;
+    const def = item ? content.items[item] : undefined;
+    const visible = def !== undefined && !uiState.modalOpen;
+    view.box.setVisible(visible);
+    view.icon.setVisible(visible);
+    if (item !== view.item && def) view.icon.setTexture(def.icon);
+    view.item = item;
+    const ranged = def?.ranged !== undefined;
+    view.count.setVisible(visible && ranged);
+    if (ranged) {
+      const total = simulation.combat.ammoCount();
+      view.count
+        .setText(String(Math.min(total, BALANCE.quiverDisplayMax)))
+        .setColor(total > 0 ? 'cream' : 'red');
+    }
   }
 
   /** Dica do tutorial do passo atual (texto de teclado ou de toque); escondida sem passo. */
@@ -628,6 +661,24 @@ export class UIScene extends Phaser.Scene {
         this.toggleInventory();
       },
     ).setDepth(70);
+
+    // Arma equipada e munição: por cima do último slot da hotbar.
+    const boxX = hotbar.x + hotbar.w - WEAPON_BOX;
+    const boxY = hotbar.y - WEAPON_BOX - 4;
+    const box = this.add
+      .rectangle(boxX, boxY, WEAPON_BOX, WEAPON_BOX, paletteNumber('night'), 0.85)
+      .setOrigin(0)
+      .setDepth(70);
+    const icon = this.add.image(boxX + WEAPON_BOX / 2, boxY + WEAPON_BOX / 2, 'icon_short_bow').setDepth(71);
+    const count = new Label(
+      this,
+      boxX - 3,
+      boxY + WEAPON_BOX / 2,
+      '',
+      { size: 8, bold: true, color: 'cream', stroke: true },
+      [1, 0.5],
+    ).setDepth(71);
+    this.weaponView = { box, icon, count, item: null };
 
     // Ataque automático (canto inferior direito; com toque, por cima do botão de ação).
     const touch = this.sys.game.device.input.touch;
