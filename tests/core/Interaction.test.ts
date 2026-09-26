@@ -162,3 +162,26 @@ describe('PlayerActions', () => {
     expect(state.data.base.chests.base_1).toHaveLength(BALANCE.chestSlots);
   });
 });
+
+describe('Toque duplo: baú ↔ mochila', () => {
+  it('passa o slot inteiro para o outro lado (junta às pilhas iguais) e avisa se não couber', () => {
+    const { state, sim, events } = setup();
+    const player = state.data.player;
+    const chest = sim.actions.container('chest:base_1');
+    chest.fill(null);
+    player.inventory[0] = ['wood', 20];
+    chest[3] = ['wood', 10];
+    expect(sim.actions.quickMove({ container: 'inventory', index: 0 }, 'chest:base_1')).toBe(true);
+    expect(player.inventory[0]).toBeNull();
+    expect(chest[3]).toEqual(['wood', 30]);
+    expect(sim.actions.quickMove({ container: 'chest:base_1', index: 3 }, 'inventory')).toBe(true);
+    expect(chest[3]).toBeNull();
+    expect(player.inventory.filter(Boolean)).toEqual([['wood', 30]]);
+    // Mochila cheia: não passa e avisa.
+    player.inventory.fill(['stone', 50]);
+    player.hotbar.fill(['stone', 50]);
+    chest[0] = ['fiber', 3];
+    expect(sim.actions.quickMove({ container: 'chest:base_1', index: 0 }, 'inventory')).toBe(false);
+    expect(events).toContain('blocked:inventory_full');
+  });
+});

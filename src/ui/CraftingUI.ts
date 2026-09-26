@@ -11,13 +11,16 @@ import { HANDS, RECIPE_CATEGORIES, type Recipe, type RecipeCategory, isTradeCate
 import { getView } from '../display/view';
 import { itemName, t, tKey } from '../i18n';
 import { describeItem, ownedCount } from './itemInfo';
+import { tapMaterial } from './itemSources';
 import { haveInput, missingInputs, outputCount } from '../systems/crafting/crafting';
-import { countItem } from '../systems/inventory/inventory';
+import { COIN, countItem } from '../systems/inventory/inventory';
 import { content } from '../world/content';
 import { Button, CLOSE_ICON } from './Button';
 import { Label, measureTextWidth } from './text';
 import { panelTop, REOPEN_GUARD_MS, uiState } from './uiState';
 
+/** O painel fica sempre a esta altura do topo (ou menos, em ecrãs baixos). */
+const PANEL_TOP_MAX = 8;
 const DEPTH = { dim: 50, panel: 60, content: 62 } as const;
 const PAD = 8;
 const ROW_H = 30;
@@ -231,10 +234,10 @@ export class CraftingUI {
     // Separadores: passam para outra linha se não couberem (ecrã ao alto).
     const tabs = this.layoutTabs(w - PAD * 2);
     const tabsH = (tabs.at(-1)?.row ?? 0) * (TAB_H + TAB_GAP) + TAB_H;
-    const h = Math.min(hotbarTop - 8, PAD * 2 + 14 + tabsH + 6 + Math.max(1, rows) * ROW_H + queueH);
     const x = Math.round((width - w) / 2);
-    // Fixo perto do topo (não salta ao trocar de separador: só a altura muda).
-    const y = Math.max(4, Math.min(panelTop(height), hotbarTop - 4 - h));
+    // Fixo no topo (pedido do jogador: não sobe nem desce ao escolher; só a altura muda).
+    const y = Math.max(4, Math.min(panelTop(height), PANEL_TOP_MAX));
+    const h = Math.min(hotbarTop - 4 - y, PAD * 2 + 14 + tabsH + 6 + Math.max(1, rows) * ROW_H + queueH);
     this.rect = { x, y, w, h };
     // Se não couberem todas, a lista divide-se em páginas (com ‹ › por baixo).
     const listSpace = h - (PAD * 2 + 14 + tabsH + 6) - queueH;
@@ -407,6 +410,12 @@ export class CraftingUI {
             size: 7,
             color: locked ? 'stone' : have >= need ? 'lime' : 'red',
           });
+          // Tocar no ingrediente: faz 1 aqui se der; senão, diz onde se arranja.
+          if (item !== COIN)
+            lbl.text.setInteractive({ useHandCursor: true }).on('pointerup', () => {
+              this.message(tapMaterial(this.sim, item, this.station));
+              this.build();
+            });
           ix += lbl.text.width + 8;
         }
         const unlocked = this.sim.progression.isRecipeUnlocked(recipe);

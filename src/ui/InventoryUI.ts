@@ -16,6 +16,8 @@ import { enchantOf } from '../systems/inventory/inventory';
 import { Label, measureTextWidth } from './text';
 import { panelTop, REOPEN_GUARD_MS, uiState } from './uiState';
 
+/** Dois toques no mesmo slot dentro deste tempo passam-no para o outro lado (baú ↔ mochila). */
+const DOUBLE_TAP_MS = 400;
 const DEPTH = { hud: 10, dim: 50, panel: 60, slots: 62, hotbar: 70, ghost: 100 } as const;
 const PAD = 8;
 const TITLE_H = 14;
@@ -98,6 +100,8 @@ export class InventoryUI {
   private builtSlots = 0;
   /** Baú ou contentor com loot aberto ao lado da mochila. */
   private other: OtherContainerRef | null = null;
+  /** Último toque num slot (para o toque duplo). */
+  private lastTap: { container: string; index: number; at: number } | null = null;
   /** Destruir pede um segundo toque: o slot à espera de confirmação e até quando (ms). */
   private confirmDestroy: { ref: SlotRef; until: number } | null = null;
   private selected: SlotRef | null = null;
@@ -141,6 +145,9 @@ export class InventoryUI {
       }),
       eventBus.on('container:open', ({ container }) => {
         this.open(container);
+      }),
+      eventBus.on('bag:changed', () => {
+        if (this.isOpen && this.other && this.otherGone(this.other)) this.close();
       }),
       // Abrir uma estação fecha a mochila (só um painel de cada vez).
       eventBus.on('station:open', () => {
@@ -296,6 +303,26 @@ export class InventoryUI {
       simulation.combat.cycleAmmo();
       return;
     }
+    // Toque duplo com um baú/contentor aberto: passa o slot para o outro lado.
+    const now = performance.now();
+    const last = this.lastTap;
+    this.lastTap = { container: view.ref.container, index: view.ref.index, at: now };
+    const other = this.other;
+    if (
+      other &&
+      last?.container === view.ref.container &&
+      last.index === view.ref.index &&
+      now - last.at < DOUBLE_TAP_MS
+    ) {
+      this.lastTap = null;
+      const to = view.ref.container === other ? 'inventory' : other;
+      if (view.ref.container !== 'equipment') {
+        this.actions.quickMove(view.ref, to);
+        this.selected = null;
+        this.rebuildSoon();
+        return;
+      }
+    }
     const same = this.selected?.container === view.ref.container && this.selected.index === view.ref.index;
     this.selected = same ? null : view.ref;
     if (this.isOpen) this.buildPanel();
@@ -326,6 +353,13 @@ export class InventoryUI {
     for (const view of this.panelSlots) {
       if (view.ref.container === 'equipment' && view.ref.index === WEAPON_INDEX) view.setAmmo(ammo);
     }
+  }
+
+  /** O contentor `ref` (pilha no chão, corpo) já não existe? */
+  private otherGone(ref: OtherContainerRef): boolean {
+    if (!ref.startsWith('bag:')) return false;
+    const [, zoneId = '', index = ''] = ref.split(':');
+    return gameState.data.zones[zoneId]?.bags[Number(index)] === undefined;
   }
 
   private clearPanel(): void {
@@ -370,6 +404,12 @@ export class InventoryUI {
 
   /** (Re)constrói o painel: fundo escurecido, grelhas, título e barra de informação. */
   private buildPanel(): void {
+    // A pilha/corpo aberto desapareceu (ficou vazio): fecha o painel (senão ficava "aberto"
+    // sem se ver e o jogo parecia bloqueado).
+    if (this.other && this.otherGone(this.other)) {
+      this.close();
+      return;
+    }
     this.clearPanel();
     const scene = this.scene;
     const { width, height } = getView();

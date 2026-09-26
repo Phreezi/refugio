@@ -11,6 +11,7 @@ import { content } from '../world/content';
 import { Button, CLOSE_ICON } from './Button';
 import { Label } from './text';
 import { splitSpeech } from './speech';
+import { tapMaterial } from './itemSources';
 import { panelTop, uiState } from './uiState';
 
 const DEPTH = { dim: 80, panel: 82, content: 84 } as const;
@@ -33,6 +34,8 @@ export class DialogUI {
   /** Fala dividida em páginas (frases): tocar/Espaço/OK passa à seguinte; o resto vem no fim. */
   private page = 0;
   private pages = 1;
+  /** Aceitar/entregar a missão desta conversa (Espaço/Enter fazem-no logo). */
+  private quickAction: (() => void) | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -41,6 +44,9 @@ export class DialogUI {
   get isOpen(): boolean {
     return this.npc !== null;
   }
+
+  /** Fundo do painel (px de jogo), para os avisos aparecerem por baixo dele e não tapados. */
+  bottom: number | null = null;
 
   open(npc: string): void {
     if (!gameState.hasGame) return;
@@ -64,6 +70,7 @@ export class DialogUI {
     this.clear();
     if (this.npc !== null) uiState.modalOpen = false;
     this.npc = null;
+    this.bottom = null;
   }
 
   destroy(): void {
@@ -74,6 +81,21 @@ export class DialogUI {
    * Toque fora do painel, OK, Espaço ou Enter: passa à fala seguinte; na última (com as opções),
    * fecha a conversa.
    */
+  /**
+   * Espaço/Enter: aceita ou entrega logo a missão (sem esperar pelas falas); sem missão para
+   * aceitar/entregar, faz o mesmo que `advance`.
+   */
+  confirm(): void {
+    const action = this.quickAction;
+    if (this.npc !== null && action) {
+      this.quickAction = null;
+      this.page = this.pages - 1;
+      action();
+      return;
+    }
+    this.advance();
+  }
+
   advance(): void {
     if (this.npc === null) return;
     if (this.page < this.pages - 1) {
@@ -124,11 +146,12 @@ export class DialogUI {
     const scene = this.scene;
     const { width, height } = getView();
     const w = Math.min(MAX_W, width - 8);
-    const lines: { text: string; color: PaletteColor }[] = [];
+    const lines: { text: string; color: PaletteColor; item?: string }[] = [];
     const buttons: { label: string; onClick: () => void; primary?: boolean }[] = [];
     const quests = simulation.quests;
     const focus = this.focus(npc);
     let text = tKey(`npc.${npc}.hello`);
+    this.quickAction = null;
 
     if (focus) {
       const { quest, state } = focus;
@@ -147,29 +170,28 @@ export class DialogUI {
         lines.push({
           text: `${goalText(goal)} ${String(done)}/${String(total)}`,
           color: done >= total ? 'lime' : 'parchment',
+          ...(goal.type === 'collect' ? { item: goal.item } : {}),
         });
       });
       const reward = rewardText(quest);
       if (reward) lines.push({ text: `${t('quest.reward')}: ${reward}`, color: 'stone_light' });
-      if (state === 'offer')
-        buttons.push({
-          label: t('quest.accept'),
-          primary: true,
-          onClick: () => {
-            quests.accept(quest.id);
-            this.rebuildSoon();
-          },
-        });
-      if (state === 'ready')
-        buttons.push({
-          label: t('quest.turn_in'),
-          primary: true,
-          onClick: () => {
-            quests.turnIn(quest.id);
-            this.message = t('quest.thanks', { reward });
-            this.rebuildSoon();
-          },
-        });
+      if (state === 'offer') {
+        const accept = (): void => {
+          quests.accept(quest.id);
+          this.rebuildSoon();
+        };
+        this.quickAction = accept;
+        buttons.push({ label: t('quest.accept'), primary: true, onClick: accept });
+      }
+      if (state === 'ready') {
+        const turnIn = (): void => {
+          quests.turnIn(quest.id);
+          this.message = t('quest.thanks', { reward });
+          this.rebuildSoon();
+        };
+        this.quickAction = turnIn;
+        buttons.push({ label: t('quest.turn_in'), primary: true, onClick: turnIn });
+      }
     }
 
     // Mercador: a loja.
@@ -206,6 +228,7 @@ export class DialogUI {
           lines.push({
             text: `${itemName(item)} ${String(Math.min(have, qty))}/${String(qty)}`,
             color: have >= qty ? 'lime' : 'red',
+            item,
           });
         }
         const coins = gameState.data.player.coins;
@@ -254,6 +277,7 @@ export class DialogUI {
     const h = 24 + textH + 6 + lines.length * 11 + (message ? 14 : 0) + buttonRows * 20 + 8 + 10;
     const x = Math.round((width - w) / 2);
     const y = Math.max(4, Math.min(panelTop(height), height - 4 - h));
+    this.bottom = y + h;
     this.add(
       scene.add
         .rectangle(0, 0, width, height, paletteNumber('ink'), 0.55)
@@ -291,7 +315,14 @@ export class DialogUI {
     let cy = y + 22;
     cy += this.label(x + PAD, cy, text, 8, 'cream', w - PAD * 2).text.height + 6;
     for (const line of lines) {
-      this.label(x + PAD, cy, line.text, 7, line.color);
+      const label = this.label(x + PAD, cy, line.text, 7, line.color);
+      // Tocar num material: faz 1 aqui se der (nas mãos); senão, diz onde se arranja.
+      const item = line.item;
+      if (item)
+        label.text.setInteractive({ useHandCursor: true }).on('pointerup', () => {
+          this.message = tapMaterial(simulation, item, null);
+          this.rebuildSoon();
+        });
       cy += 11;
     }
     if (message) {

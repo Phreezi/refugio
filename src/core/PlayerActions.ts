@@ -380,6 +380,43 @@ export class PlayerActions {
     return source.every((slot) => slot === null);
   }
 
+  /**
+   * Toque duplo num slot com um baú/contentor aberto: passa o slot inteiro para o outro lado
+   * (junta-se às pilhas iguais, depois ocupa espaços vazios). @returns true se passou algo.
+   */
+  quickMove(from: SlotRef, to: ContainerRef): boolean {
+    const source = this.container(from.container);
+    const slot = source[from.index];
+    if (!slot || from.container === 'equipment') return false;
+    if (!this.accepts(to, slot[0])) {
+      this.bus.emit('action:blocked', { reason: 'food_only' });
+      return false;
+    }
+    // Para a mochila: a mochila e a hotbar (como ao apanhar).
+    const targets = to === 'inventory' ? this.pickupContainers() : [this.container(to)];
+    let moved = false;
+    if (slot[0] === COIN) {
+      this.give(COIN, slot[1]);
+      source[from.index] = null;
+      moved = true;
+    } else if (slot[2] !== undefined || slot[3] !== undefined) {
+      // Com desgaste ou encantamento: vai inteiro para um espaço vazio.
+      const target = targets.find((c) => c.includes(null));
+      if (target) {
+        target[target.indexOf(null)] = slot;
+        source[from.index] = null;
+        moved = true;
+      }
+    } else {
+      const left = addItem(targets, slot[0], slot[1], this.items());
+      moved = left < slot[1];
+      source[from.index] = left > 0 ? [slot[0], left] : null;
+    }
+    if (!moved) this.bus.emit('action:blocked', { reason: 'inventory_full' });
+    else this.changed();
+    return moved;
+  }
+
   /** Beber água diretamente de uma fonte (poço da base). */
   drink(): void {
     const player = this.state.data.player;
