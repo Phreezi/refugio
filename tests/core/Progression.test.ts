@@ -126,11 +126,12 @@ describe('XP e níveis', () => {
 });
 
 describe('Dia e noite', () => {
-  it('escuro à meia-noite, claro ao meio-dia, crepúsculo às 20h30', () => {
+  it('escuro à meia-noite e às 4h, claro ao meio-dia, crepúsculo às 19h30', () => {
     expect(darknessAt(tickAtHour(12), BALANCE)).toBe(0);
     expect(darknessAt(tickAtHour(0), BALANCE)).toBe(BALANCE.nightDarkness);
     expect(darknessAt(tickAtHour(22), BALANCE)).toBe(BALANCE.nightDarkness);
-    const dusk = darknessAt(tickAtHour(20.5), BALANCE);
+    expect(darknessAt(tickAtHour(4), BALANCE)).toBe(BALANCE.nightDarkness);
+    const dusk = darknessAt(tickAtHour(19.5), BALANCE);
     expect(dusk).toBeGreaterThan(0);
     expect(dusk).toBeLessThan(BALANCE.nightDarkness);
     expect(isNight(tickAtHour(6), BALANCE)).toBe(false);

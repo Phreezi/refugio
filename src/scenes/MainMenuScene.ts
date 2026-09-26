@@ -1,3 +1,4 @@
+import { consumeResume } from '../display/contextLoss';
 import Phaser from 'phaser';
 import { PALETTE, paletteNumber } from '../assets/palette';
 import { clockAt } from '../core/Clock';
@@ -181,6 +182,8 @@ export class MainMenuScene extends Phaser.Scene {
         this.continueGame(save);
       };
       new Button(this, cx, y, t('menu.continue', { day: time.day }), MAIN_BUTTON, this.primaryAction);
+      // A página recarregou por o telemóvel ter perdido o contexto gráfico: volta logo ao jogo.
+      if (consumeResume()) this.time.delayedCall(0, this.primaryAction);
       this.confirmButton(
         cx,
         y + spacing,

@@ -44,6 +44,13 @@ export class DialogUI {
 
   open(npc: string): void {
     if (!gameState.hasGame) return;
+    // Mercador sem missão para dar ou entregar: vai direto à loja (sem a fala inicial).
+    const def = content.npcs[npc];
+    const focus = this.focus(npc);
+    if (def?.role === 'shop' && def.shop && (focus === null || focus.state === 'progress')) {
+      eventBus.emit('station:open', { stationKey: `${def.shop}_npc` });
+      return;
+    }
     this.npc = npc;
     this.message = '';
     this.page = 0;

@@ -1,3 +1,4 @@
+import { installContextLossRecovery } from './display/contextLoss';
 import Phaser from 'phaser';
 import { PALETTE } from './assets/palette';
 import { DEBUG_QUERY_PARAM, LANGUAGE_QUERY_PARAM } from './config';
@@ -60,6 +61,7 @@ function start(): void {
 
   // Só em desenvolvimento: o jogo fica à mão na consola (e nos testes no browser).
   if (import.meta.env.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game;
+  installContextLossRecovery(game);
   const scaling = installPixelScaling(game, host);
   installDebugOverlay(game, scaling, params.has(DEBUG_QUERY_PARAM));
 }
