@@ -1,3 +1,5 @@
+import { gameHoursToTicks } from '../../src/core/Clock';
+import { hourAt } from '../../src/core/DayNight';
 import { describe, expect, it } from 'vitest';
 import { FIXED_STEP_MS, PLAYER_FOOTPRINT } from '../../src/config';
 import { secondsToTicks } from '../../src/core/Clock';
@@ -751,5 +753,57 @@ describe('Voltar a casa (botão "Casa")', () => {
     expect(recalls).toEqual(['cancelled', 'cancelled', ZONE]);
     state.data.player.zoneId = BASE_ZONE_ID;
     expect(sim.startRecall()).toBe('home');
+  });
+});
+
+describe('Resistência e sono (§7.19)', () => {
+  const TPH = gameHoursToTicks(1);
+  /** Tick a uma dada hora do dia 1 (o jogo começa às dayStartHour). */
+  const at = (hour: number) => Math.round(((hour - BALANCE.dayStartHour + 24) % 24) * TPH);
+
+  it('correr gasta a resistência (a base toda em staminaRunHours) e sem ela não se corre', () => {
+    const { state, sim, run } = setup(map([]));
+    const player = state.data.player;
+    sim.setMoveIntent({ x: 1, y: 0 }, false, true);
+    run(1);
+    const perSecond = 100 - player.stamina;
+    const hoursToEmpty = 100 / perSecond / (BALANCE.dayLengthSec / 24);
+    expect(hoursToEmpty).toBeCloseTo(BALANCE.staminaRunHours, 1);
+    player.stamina = 0;
+    expect(sim.playerRunning).toBe(false);
+    // O máximo sobe com o nível, até +500%.
+    player.level = 999;
+    expect(sim.staminaMax).toBe(BALANCE.staminaMax * 6);
+  });
+
+  it('a cama só dá a partir das 20h: dorme até às 6h30 com tudo cheio', () => {
+    const { state, sim, events, bus } = setup(map([]));
+    const slept: boolean[] = [];
+    bus.on('player:slept', ({ passedOut }) => slept.push(passedOut));
+    bus.on('action:blocked', ({ reason }) => events.push(reason));
+    const player = state.data.player;
+    state.data.world.tick = at(12);
+    expect(sim.sleep()).toBe(false);
+    expect(events).toContain('not_sleepy');
+    state.data.world.tick = at(22);
+    player.stamina = 5;
+    player.hp = 40;
+    expect(sim.sleep()).toBe(true);
+    expect(hourAt(state.data.world.tick, BALANCE)).toBeCloseTo(6.5, 2);
+    expect(player.stamina).toBe(sim.staminaMax);
+    expect(player.hp).toBe(BALANCE.statMax);
+    expect(slept).toEqual([false]);
+  });
+
+  it('acordado às 2h adormece onde está e acorda às 11h com 10% da resistência', () => {
+    const { state, sim, bus, run } = setup(map([]));
+    const slept: boolean[] = [];
+    bus.on('player:slept', ({ passedOut }) => slept.push(passedOut));
+    state.data.world.tick = at(2) - 2;
+    run(0.2);
+    expect(slept).toEqual([true]);
+    expect(Math.floor(hourAt(state.data.world.tick, BALANCE))).toBe(11);
+    expect(state.data.player.stamina).toBe((sim.staminaMax * BALANCE.staminaPassOutPct) / 100);
+    expect(state.data.player.x).toBe(240);
   });
 });

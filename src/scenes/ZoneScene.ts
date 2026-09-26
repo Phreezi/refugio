@@ -71,6 +71,8 @@ const SHOT_COLORS: Readonly<Record<string, PaletteColor>> = {
 const MARKER_TEXTURE = 'target_marker';
 /** Duração da animação de golpe (2 frames). */
 const ATTACK_MS = 240;
+/** Escurecer/clarear ao dormir. */
+const SLEEP_FADE_MS = 400;
 const FLOAT_TEXT_MS = 900;
 const FLOAT_TEXT_RISE = 14;
 /** "+2 Madeira": desvanece em 5 s, a subir devagar. */
@@ -732,6 +734,14 @@ export class ZoneScene extends Phaser.Scene {
           simulation.enterZone(to, content.zoneMap(to));
           uiState.pendingNotice = tKey(content.zones[to]?.name ?? to);
           this.scene.restart({ zoneId: to } satisfies ZoneSceneData);
+        });
+      }),
+      // Dormir (§7.19): o ecrã escurece e volta a clarear (o tempo já saltou).
+      on('player:slept', () => {
+        const camera = this.cameras.main;
+        camera.fadeOut(SLEEP_FADE_MS, 0, 0, 0);
+        camera.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+          camera.fadeIn(SLEEP_FADE_MS * 2, 0, 0, 0);
         });
       }),
       // Botão "Casa": acabou a contagem, vai para a base (sem custo), ao lado do poste de lá.

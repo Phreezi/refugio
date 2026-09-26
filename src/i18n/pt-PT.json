@@ -480,6 +480,7 @@
   "item.coin": "Moeda",
   "item.health_potion": "Poção de vida",
   "item.big_health_potion": "Poção de vida grande",
+  "item.protein_bar": "Barra proteica",
   "item.energy_drink": "Bebida energética",
   "structure.market_stall": "Banca de comércio",
   "station.market_stall": "Banca de comércio",
@@ -667,5 +668,9 @@
   "src.loot": "Encontra-se em: {list}",
   "src.buy": "Compra-se: {list}",
   "src.none": "Ainda não se sabe onde há.",
-  "src.made": "Fizeste {qty} {item} (tens {total})."
+  "src.made": "Fizeste {qty} {item} (tens {total}).",
+  "hud.stamina": "Energia",
+  "sleep.slept": "Dormiste até às 6h30. Energia e vida cheias.",
+  "sleep.passed_out": "Adormeceste de cansaço onde estavas… acordaste às 11h, sem energia.",
+  "sleep.not_sleepy": "Ainda não tens sono: dorme-se a partir das {h}h."
 }

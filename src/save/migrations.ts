@@ -161,7 +161,48 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     const settings = s.settings as Record<string, unknown>;
     return { ...s, settings: { ...settings, difficulty: 'normal' } };
   },
+  // v23 → v24: resistência cheia (§7.19) e dia de jogo 5× mais longo (1200 → 6000 s). O relógio
+  // passa a ×5 para o dia e a hora ficarem iguais, e os prazos guardados (recursos, contentores,
+  // horta, produção, chefes, efeitos da comida, horda) deslocam-se o mesmo: falta o mesmo tempo.
+  23: (s) => {
+    const world = s.world as Record<string, unknown>;
+    const oldTick = typeof world.tick === 'number' ? world.tick : 0;
+    const shift = oldTick * (DAY_LENGTH_V24 / DAY_LENGTH_V23 - 1);
+    const at = (value: unknown): unknown => (typeof value === 'number' ? value + shift : value);
+    const zones = (s.zones ?? {}) as Record<string, Record<string, unknown>>;
+    for (const zone of Object.values(zones)) {
+      const depleted = zone.depleted as Record<string, unknown> | undefined;
+      if (depleted) for (const key of Object.keys(depleted)) depleted[key] = at(depleted[key]);
+      const loot = zone.loot as Record<string, unknown[]> | undefined;
+      if (loot) for (const entry of Object.values(loot)) if (Array.isArray(entry)) entry[0] = at(entry[0]);
+    }
+    const base = s.base as Record<string, unknown>;
+    const crops = (base.crops ?? {}) as Record<string, unknown[]>;
+    for (const crop of Object.values(crops))
+      if (Array.isArray(crop) && crop[1] !== null) crop[1] = at(crop[1]);
+    const produce = (base.produce ?? {}) as Record<string, unknown>;
+    for (const key of Object.keys(produce)) produce[key] = at(produce[key]);
+    const bosses = (s.bosses ?? {}) as Record<string, unknown>;
+    for (const key of Object.keys(bosses)) bosses[key] = at(bosses[key]);
+    const player = s.player as Record<string, unknown>;
+    const buffs = Array.isArray(player.buffs) ? (player.buffs as unknown[][]) : [];
+    for (const buff of buffs) if (Array.isArray(buff)) buff[2] = at(buff[2]);
+    const horde = s.horde as Record<string, unknown> | undefined;
+    const hordeAt = horde?.at;
+    return {
+      ...s,
+      world: { ...world, tick: oldTick + shift },
+      ...(horde && typeof hordeAt === 'number' && hordeAt > 0
+        ? { horde: { ...horde, at: hordeAt + shift } }
+        : {}),
+      player: { ...player, stamina: 100 },
+    };
+  },
 };
+
+/** Duração do dia de jogo (s) antes e depois da v24 (a migração mantém o dia e a hora). */
+const DAY_LENGTH_V23 = 1200;
+const DAY_LENGTH_V24 = 6000;
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */
 export function migrate(

@@ -1,5 +1,5 @@
 {
-  "dayLengthSec": 1200,
+  "dayLengthSec": 6000,
   "dayStartHour": 6,
   "nightFraction": 0.3334,
   "nightDarkness": 0.72,
@@ -109,5 +109,16 @@
   "teleportArrivalPx": 20,
   "teleportCoinsPerDanger": 5,
   "recallSec": 5,
-  "foodHealPct": 25
+  "foodHealPct": 25,
+  "staminaMax": 100,
+  "staminaPerLevelPct": 5,
+  "staminaMaxBonusPct": 500,
+  "staminaRunHours": 3,
+  "staminaPerAttack": 0.3,
+  "staminaPassOutPct": 10,
+  "sleepFromHour": 20,
+  "sleepLatestHour": 2,
+  "wakeHour": 6.5,
+  "passOutUntilHour": 6,
+  "passOutWakeHour": 11
 }

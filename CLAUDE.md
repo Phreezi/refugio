@@ -232,7 +232,7 @@ refugio/
 
 - Lógica com passo fixo de 50 ms (20 ticks/s); render interpolado.
   - `core/Simulation.ts` recebe `game.loop.rawDelta` (e não o `delta` suavizado do Phaser, que fica limitado a 16,7 ms com a janela sem foco). No máximo 5 ticks por frame; o atraso acima disso é descartado.
-- **Tempo de jogo**: 1 dia de jogo = 20 minutos reais (configurável).
+- **Tempo de jogo**: 1 dia de jogo = 100 minutos reais (`dayLengthSec` 6000; era 20 min até à v0.0.53 — pedido do jogador: o tempo passa 5× mais devagar). A fome e a sede continuam a descer ao mesmo ritmo real.
 - Timers de crafting usam **tempo de jogo**, mas também avançam offline com limite (ver 7.6).
 
 ### 5.3 Convenções
@@ -337,7 +337,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 
 ### 7.1 Jogador
 
-- Stats: **Vida** (100), **Fome** (100), **Sede** (100). Sem stamina na v1 (simplifica).
+- Stats: **Vida** (100), **Fome** (100), **Sede** (100) e **Energia** (resistência, §7.19).
 - Fome desce 1 ponto a cada 18 s de jogo; sede 1 ponto a cada 12 s (valores em `balance.json`).
 - Fome ou sede a 0 → perde 1 de vida a cada 3 s (nunca instantâneo).
 - Regeneração: +1 vida a cada 5 s se fome e sede > 50%.
@@ -487,7 +487,7 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 
 ### 7.11 Dia e noite
 
-- Ciclo de 20 min reais. Noite = 1/3 do ciclo, centrada na meia-noite (20h–4h), com 1 h de crepúsculo e de madrugada (19h–20h e 4h–5h; `core/DayNight.ts`). Escuridão máxima `nightDarkness`.
+- Ciclo de 100 min reais. Noite = 1/3 do ciclo, centrada na meia-noite (20h–4h), com 1 h de crepúsculo e de madrugada (19h–20h e 4h–5h; `core/DayNight.ts`). Escuridão máxima `nightDarkness`.
 - À noite: mais zombies nas zonas (`nightEnemyMultiplier` da zona; grupos `{ "night": true }` só aparecem de noite, ex.: lobos no lago), avaliado ao entrar na zona; visão reduzida (véu escuro numa RenderTexture com círculos de luz em degraus à volta do jogador — `playerLightPx` — e das peças com `light`).
 - Na base: fogueiras e tochas (peça `torch`, sem fundação) iluminam; sem ataques à noite a menos que "Hordas" esteja ativo.
 
@@ -549,6 +549,15 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - **Postes estragados**: cada poste das zonas só ativa depois de o técnico o reparar — entregar os itens e moedas de `waystones.json` (mais caro nas zonas difíceis). Até lá, avisa "O poste está estragado".
 - **Teletransporte**: para um poste ativo custa `teleportCoinsPerDanger` × perigo moedas, ou um **pergaminho de viagem** (`travel_scroll`, `type: "scroll"`; usá-lo na mochila abre o mapa em modo teletransporte). Ir para casa é grátis.
 - Co-op: `quests.accept/turnIn/repairWaystone` são comandos do convidado.
+
+### 7.19 Energia (resistência) e sono
+
+- **Energia** (`player.stamina`, save v24; barra "Energia" no HUD): máximo `staminaMax` (100) +`staminaPerLevelPct`% (5%) por nível, até +`staminaMaxBonusPct`% (500%). Lógica pura em `systems/survival/stamina.ts`.
+- Gasta-se **a correr** (a correr sempre, a base acaba em `staminaRunHours` = 3 horas de jogo; o talento "Fôlego" poupa) e **a atacar** (`staminaPerAttack` por golpe/tiro num inimigo). Sem energia não se corre.
+- Recupera-se **a dormir** e com comida/bebida com `effects.stamina`: **barra proteica** (+35; fogueira: carne cozinhada + bagas, loja, contentores), bebida energética (+25), café (+10).
+- **Cama** (`prop:bed` no quarto da casa, `action: "sleep"`): das `sleepFromHour` (20h) em diante dorme-se até às `wakeHour` (6h30) — o tempo salta (estações e prazos avançam), energia e vida cheias. Antes das 20h avisa.
+- Quem estiver **acordado entre as 2h e as 6h** (`sleepLatestHour`–`passOutUntilHour`) adormece onde está e acorda às `passOutWakeHour` (11h) com `staminaPassOutPct`% (10%) da energia.
+- Co-op: o convidado dorme (energia e vida) mas não mexe no relógio do anfitrião.
 
 ## 8. Mapas e zonas
 
@@ -1215,4 +1224,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. **Dificuldade** (def
 | 2026-09-26 | Perda do contexto WebGL (iPhone sem memória): grava já e recarrega a página, que volta sozinha ao jogo (`display/contextLoss.ts`); menos zonas vizinhas guardadas (`NEIGHBOR_DROP_TILES` 48); noite das 20h às 4h; loja do mercador direta e com quantidades reais; sem lookbehind nas regex (Safari antigo) | Pedido do jogador: o jogo "bloqueou tudo" no iPhone (imagem parada, luz estragada, sem resposta; não se reproduz no Chromium), às 4h estava claro, e a loja mostrava 3/3 em vez de 42/3 |
 | 2026-09-26 | Populações persistentes por zona com respawn de 90 s; base sem a saída de baixo; tamanho da interface Grande/Médio/Pequeno; Espaço 2× apanha tudo; botão "Casa" (5 s parado); comida cura um pouco; número de flechas no slot do arco; animações das armas | Pedidos do jogador. Sem mudar o save: as populações e a contagem do "Casa" só vivem em memória |
 | 2026-09-26 | v0.0.53: versão = número do PR; painel preso ao esvaziar uma pilha corrigido; opções do Auto; toque duplo baú ↔ mochila; loot no chão 6 h de jogo; Espaço aceita/entrega missões; tocar num ingrediente faz-o ou diz onde se arranja; câmara sempre centrada; painel do fabrico fixo no topo | Pedidos do jogador |
+| 2026-09-26 | v0.0.54: dia de jogo 5× mais longo (100 min); energia (correr e atacar gastam; sobe com o nível até +500%); cama e sono (20h–6h30; acordado às 2h adormece e acorda às 11h com 10%); barra proteica. Save v24: `player.stamina`; o relógio passa a ×5 e os prazos deslocam-se para o dia, a hora e o que falta ficarem iguais | Pedido do jogador |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

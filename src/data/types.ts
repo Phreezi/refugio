@@ -47,8 +47,8 @@ export interface BonusDrop {
 }
 
 export type ResourceDefs = Readonly<Record<string, ResourceDef>>;
-export type PropAction = 'drink' | 'fish' | 'teleport';
-const PROP_ACTIONS: readonly PropAction[] = ['drink', 'fish', 'teleport'];
+export type PropAction = 'drink' | 'fish' | 'teleport' | 'sleep';
+const PROP_ACTIONS: readonly PropAction[] = ['drink', 'fish', 'teleport', 'sleep'];
 
 /** Obstáculo/decoração; alguns têm uma ação contextual (ex.: beber no poço). */
 export interface PropDef extends WorldObjectDef {
@@ -79,6 +79,8 @@ export interface ItemEffects {
   hp?: number;
   hunger?: number;
   thirst?: number;
+  /** Resistência (§7.19). */
+  stamina?: number;
 }
 
 /** Item (CLAUDE.md §9.2). */
@@ -377,7 +379,7 @@ const ITEM_KEYS = new Set([
   'breakPct',
   'level',
 ]);
-const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst']);
+const EFFECT_KEYS = new Set(['hp', 'hunger', 'thirst', 'stamina']);
 const OPTIONAL_NUMBERS = ['gatherPower', 'damage', 'durability', 'armor', 'slots', 'reach', 'level'] as const;
 
 /**

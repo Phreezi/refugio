@@ -1,7 +1,7 @@
 {
   "name": "refugio",
   "private": true,
-  "version": "0.0.53",
+  "version": "0.0.54",
   "description": "Refúgio — jogo de sobrevivência top-down em pixel art (HTML5)",
   "type": "module",
   "engines": {

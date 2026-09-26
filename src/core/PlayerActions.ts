@@ -1,5 +1,6 @@
 import { EQUIP_SLOTS, equipSlotOf, type ItemDefs } from '../data/types';
 import { BALANCE } from '../data/balance';
+import { staminaMax } from '../systems/survival/stamina';
 
 import {
   COIN,
@@ -186,6 +187,9 @@ export class PlayerActions {
     const clamp = (value: number): number => Math.max(0, Math.min(BALANCE.statMax, value));
     player.hunger = clamp(player.hunger + (def.effects.hunger ?? 0));
     player.thirst = clamp(player.thirst + (def.effects.thirst ?? 0));
+    // Resistência (§7.19): barras proteicas, bebidas energéticas, café.
+    if (def.effects.stamina)
+      player.stamina = Math.min(staminaMax(player.level, BALANCE), player.stamina + def.effects.stamina);
     // Nunca mata: comida estragada tira vida, mas deixa pelo menos 1. A comida sem efeito na
     // vida cura um pouco (`foodHealPct`% do que mata a fome).
     player.hp = Math.max(Math.min(player.hp, 1), clamp(player.hp + healOf(def.effects)));
