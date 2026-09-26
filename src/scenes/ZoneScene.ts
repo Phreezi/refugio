@@ -252,6 +252,10 @@ export class ZoneScene extends Phaser.Scene {
     const applyZoom = (): void => {
       this.applyCameraZoom(this.viewBounds());
       this.createNightLayer();
+      // Já com o zoom novo: sem isto, se o zoom mudar depois do update deste frame (pinça, na
+      // UIScene), o véu da noite ficava 1 frame escondido e via-se tudo claro.
+      this.renderLighting();
+      this.renderVoid();
     };
     applyZoom();
     this.scale.on(Phaser.Scale.Events.RESIZE, applyZoom);
@@ -872,12 +876,35 @@ export class ZoneScene extends Phaser.Scene {
    * margem; recria-se quando a vista muda.
    */
   private createNightLayer(): void {
-    this.night?.destroy();
     const view = getView();
     const w = view.width * 2 + NIGHT_MARGIN * 2;
     const h = view.height * 2 + NIGHT_MARGIN * 2;
+    // Só se refaz quando a vista muda de tamanho (mudar o zoom não precisa).
+    if (this.night?.width === w && this.night.height === h) return;
+    this.night?.destroy();
     this.night = this.add.renderTexture(0, 0, w, h).setOrigin(0).setDepth(NIGHT_DEPTH).setVisible(false);
     this.lightTexture();
+  }
+
+  /**
+   * O que a câmara vai mostrar NESTE frame (px do mundo). O `worldView` do Phaser só se atualiza
+   * ao desenhar, por isso fica um frame atrasado: depois de mudar de zona (o mundo desloca-se)
+   * ou de zoom, o véu da noite e as montanhas ficavam fora do sítio — um frame todo claro.
+   * A câmara segue o jogador (sem desvio), limitada aos `bounds`.
+   */
+  private cameraView(): { x: number; y: number; width: number; height: number } {
+    const camera = this.cameras.main;
+    const width = camera.width / camera.zoom;
+    const height = camera.height / camera.zoom;
+    const center = this.player ?? { x: camera.worldView.centerX, y: camera.worldView.centerY };
+    let x = center.x - width / 2;
+    let y = center.y - height / 2;
+    if (camera.useBounds) {
+      const b = camera.getBounds();
+      x = b.width <= width ? b.x + (b.width - width) / 2 : Phaser.Math.Clamp(x, b.x, b.right - width);
+      y = b.height <= height ? b.y + (b.height - height) / 2 : Phaser.Math.Clamp(y, b.y, b.bottom - height);
+    }
+    return { x, y, width, height };
   }
 
   /** Círculo de luz em degraus (pixel art): opaco ao centro, a desvanecer para fora. */
@@ -916,7 +943,7 @@ export class ZoneScene extends Phaser.Scene {
       night.setVisible(false);
       return;
     }
-    const view = this.cameras.main.worldView;
+    const view = this.cameraView();
     const x0 = Math.floor(view.x) - NIGHT_MARGIN;
     const y0 = Math.floor(view.y) - NIGHT_MARGIN;
     night.setPosition(x0, y0).setVisible(true);
@@ -1363,7 +1390,7 @@ export class ZoneScene extends Phaser.Scene {
   private renderVoid(): void {
     const fill = this.voidFill;
     if (!fill) return;
-    const view = this.cameras.main.worldView;
+    const view = this.cameraView();
     const x = Math.floor(view.x) - 16;
     const y = Math.floor(view.y) - 16;
     const w = Math.ceil(view.width) + 32;

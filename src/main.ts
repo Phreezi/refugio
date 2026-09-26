@@ -58,6 +58,8 @@ function start(): void {
     scene: [BootScene, PreloadScene, MainMenuScene, ZoneScene, WorldMapScene, UIScene],
   });
 
+  // Só em desenvolvimento: o jogo fica à mão na consola (e nos testes no browser).
+  if (import.meta.env.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game;
   const scaling = installPixelScaling(game, host);
   installDebugOverlay(game, scaling, params.has(DEBUG_QUERY_PARAM));
 }
