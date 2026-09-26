@@ -186,8 +186,9 @@ export class PlayerActions {
     const clamp = (value: number): number => Math.max(0, Math.min(BALANCE.statMax, value));
     player.hunger = clamp(player.hunger + (def.effects.hunger ?? 0));
     player.thirst = clamp(player.thirst + (def.effects.thirst ?? 0));
-    // Nunca mata: comida estragada tira vida, mas deixa pelo menos 1.
-    player.hp = Math.max(Math.min(player.hp, 1), clamp(player.hp + (def.effects.hp ?? 0)));
+    // Nunca mata: comida estragada tira vida, mas deixa pelo menos 1. A comida sem efeito na
+    // vida cura um pouco (`foodHealPct`% do que mata a fome).
+    player.hp = Math.max(Math.min(player.hp, 1), clamp(player.hp + healOf(def.effects)));
     if (def.stopsBleeding) player.bleed = 0;
     if (def.buff) {
       // Comida com efeito (§7.17): o mesmo efeito renova-se (não se acumula).
@@ -391,4 +392,11 @@ export class PlayerActions {
     this.state.markDirty();
     this.bus.emit('inventory:changed', {});
   }
+}
+
+/** Vida que um consumível dá: a do item ou, na comida sem ela, `foodHealPct`% da fome. */
+export function healOf(effects: { hunger?: number; hp?: number }): number {
+  if (effects.hp !== undefined) return effects.hp;
+  const hunger = effects.hunger ?? 0;
+  return hunger > 0 ? Math.max(1, Math.round((hunger * BALANCE.foodHealPct) / 100)) : 0;
 }

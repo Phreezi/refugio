@@ -11,7 +11,8 @@ import { BALANCE } from '../data/balance';
 import { WEAPON_SKILLS } from '../data/types';
 import { missPct, skillLevel } from '../systems/combat/skills';
 import { Button } from './Button';
-import { preferences, setPreference } from './preferences';
+import { preferences, setPreference, UI_SIZES } from './preferences';
+import { applyUiSize } from '../display/installPixelScaling';
 import { sfx } from '../audio/sfx';
 import { music } from '../audio/music';
 import { Label } from './text';
@@ -114,10 +115,10 @@ export class PauseUI {
           ? 8 + this.skillRows().length
           : this.view === 'coop'
             ? 5
-            : // Definições: 6 linhas + hordas e dificuldade (as do jogo) + "Voltar".
+            : // Definições: 7 linhas + hordas e dificuldade (as do jogo) + "Voltar".
               gameState.hasGame && !coop.isGuest
-              ? 9
-              : 7;
+              ? 10
+              : 8;
     const h = Math.min(height - 8, 34 + lines * ROW + 10);
     const x = Math.round((width - W) / 2);
     const y = Math.max(4, Math.round((height - h) / 2));
@@ -301,6 +302,13 @@ export class PauseUI {
       // O HUD e a cena de jogo refazem-se com os textos novos.
       uiState.reopenPause = 'settings';
       this.scene.events.emit('ui:language-changed');
+    });
+    // Tamanho da interface: grande → médio → pequeno; o HUD refaz-se com a vista nova.
+    this.setting(x, next(), t('pause.ui_size'), tKey(`pause.ui_size.${prefs.uiSize}`), () => {
+      const i = UI_SIZES.indexOf(prefs.uiSize);
+      setPreference('uiSize', UI_SIZES[(i + 1) % UI_SIZES.length] ?? 'large');
+      uiState.reopenPause = 'settings';
+      if (!applyUiSize()) uiState.reopenPause = null; // ecrã pequeno: o tamanho não muda
     });
     this.slider(x, next(), t('pause.volume'), 'volume', () => {
       sfx.play('pickup'); // ouve-se o volume novo

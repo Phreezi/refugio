@@ -39,6 +39,8 @@
   "weaponAttackSec": 0.6,
   "weaponReachPx": 14,
   "enemyWindupSec": 0.4,
+  "enemyRespawnSec": 90,
+  "enemyRespawnMinPx": 180,
   "enemyHitStunSec": 0.3,
   "enemyKnockbackPx": 8,
   "skillCurve": {
@@ -105,5 +107,7 @@
   "orderHours": 1,
   "deliveryOffsetPx": 16,
   "teleportArrivalPx": 20,
-  "teleportCoinsPerDanger": 5
+  "teleportCoinsPerDanger": 5,
+  "recallSec": 5,
+  "foodHealPct": 25
 }

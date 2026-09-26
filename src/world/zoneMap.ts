@@ -8,8 +8,11 @@ export type TileLayerName = (typeof TILE_LAYERS)[number];
 
 export const OBJECT_LAYER = 'objects';
 
-/** Número mínimo de saídas para o mapa-mundo em cada zona (§8.4). */
-export const MIN_EXITS = 2;
+/**
+ * Número mínimo de saídas em cada zona (§8.4). No mundo contínuo passa-se de zona a andar pelas
+ * bordas, por isso basta uma (a Casa já não tem a saída de viagem de baixo).
+ */
+export const MIN_EXITS = 1;
 
 /** Bits de rotação/espelho que o Tiled guarda nos gids (a ignorar para saber o tile). */
 const GID_FLAGS_MASK = 0x1fffffff;

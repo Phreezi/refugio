@@ -45,7 +45,8 @@ export interface GameEvents {
   /** Mundo contínuo (Etapa E): passou a borda para a zona vizinha; (x, y) já nas coordenadas dela. */
   'zone:cross': { from: string; to: string; x: number; y: number };
   /** O jogador fez a ação contextual (para a animação de ataque/recolha). */
-  'player:action': { kind: 'gather' | 'use' | 'open' | 'swing' | 'attack' };
+  /** `aim`: direção do disparo (radianos), nas armas à distância; `tool`: a ferramenta da recolha. */
+  'player:action': { kind: 'gather' | 'use' | 'open' | 'swing' | 'attack'; aim?: number; tool?: string };
   /** Um recurso levou um golpe (hp restante; 0 = apanhado). */
   'resource:hit': { zoneId: string; objectId: number; resource: string; hp: number; maxHp: number };
   'resource:respawned': { zoneId: string; objectId: number };
@@ -69,6 +70,10 @@ export interface GameEvents {
   /** Poste de teletransporte ativado pela primeira vez / usado (Etapa E). */
   'waystone:activated': { zoneId: string };
   'waystone:use': { zoneId: string };
+  /** Voltar a casa (botão "Casa"): acabou a contagem, vai-se para a base. */
+  'home:recall': { zoneId: string };
+  /** A contagem do "Casa" foi interrompida (o jogador andou ou levou dano). */
+  'home:recall_cancelled': Record<string, never>;
   /** Encomenda entregue à porta de casa (§7.17). */
   'order:arrived': { item: string; qty: number };
   /** A ação não foi possível (a UI mostra o motivo). */

@@ -7,7 +7,7 @@ import { hoursToTicks } from '../core/Homestead';
 import { simulation } from '../core/Simulation';
 import { BALANCE } from '../data/balance';
 import type { SkillId } from '../data/types';
-import { getView, setupFixedCamera } from '../display/view';
+import { getView, getWorldView, setupFixedCamera } from '../display/view';
 import { pinchStep, stepWorldZoom } from '../display/worldZoom';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
 import { coop } from '../net/coop';
@@ -44,6 +44,8 @@ const JOYSTICK_DEAD_ZONE = 0.25;
 /** Até esta fração do raio anda-se agachado (devagar); acima, a correr normal. */
 const JOYSTICK_SNEAK_ZONE = 0.55;
 const ACTIVE_ALPHA = 0.7;
+/** Largura da barra da contagem do "Casa". */
+const RECALL_BAR_W = 60;
 /** Ponteiros em simultâneo: rato + 2 dedos (joystick + botão de ação, ou pinça). */
 const TOUCH_POINTERS = 2;
 /** Botão de ação (toque), no canto inferior direito, acima da mochila. */
@@ -100,6 +102,11 @@ export class UIScene extends Phaser.Scene {
   private noticeAction: (() => void) | null = null;
   private noticeTimer: Phaser.Time.TimerEvent | null = null;
   private inventory: InventoryUI | null = null;
+  private recallUi: {
+    label: Label;
+    bg: Phaser.GameObjects.Rectangle;
+    fill: Phaser.GameObjects.Rectangle;
+  } | null = null;
   private crafting: CraftingUI | null = null;
   private build: BuildUI | null = null;
   private fishing: FishingUI | null = null;
@@ -317,6 +324,7 @@ export class UIScene extends Phaser.Scene {
       this.worldMap?.destroy();
       this.worldMap = null;
       this.questLabel = null;
+      this.recallUi = null;
       this.sprintButton = null;
       this.sprintVisible = true;
       this.sprintReady = false;
@@ -359,6 +367,7 @@ export class UIScene extends Phaser.Scene {
 
   override update(time: number): void {
     if (!gameState.hasGame) return;
+    this.updateRecall();
     this.crafting?.update();
     this.build?.update();
     this.fishing?.update();
@@ -849,6 +858,17 @@ export class UIScene extends Phaser.Scene {
         this.pause?.toggle();
       },
     ).setDepth(86); // por cima do menu de pausa: carregar outra vez fecha-o
+    // Casa (H), por baixo do Mapa: volta à base de qualquer lado ao fim de uns segundos parado.
+    new Button(
+      this,
+      width - HUD_MARGIN - 12 - 28 - 12 - 4 - 18,
+      HUD_MARGIN + 20 + 16,
+      t('hud.home'),
+      { width: 36, height: 12, fontSize: 8, style: 'secondary' },
+      () => {
+        this.startRecall();
+      },
+    ).setDepth(70);
     // Mapa (M), à esquerda da pausa: no telemóvel é a forma de saber onde se está.
     new Button(
       this,
@@ -860,6 +880,47 @@ export class UIScene extends Phaser.Scene {
         this.toggleMap();
       },
     ).setDepth(70);
+  }
+
+  /** Começa (ou interrompe) a contagem para voltar a casa. */
+  private startRecall(): void {
+    if (simulation.recall) {
+      simulation.cancelRecall();
+      return;
+    }
+    if (simulation.startRecall() === 'home') this.showNotice(t('recall.already_home'));
+  }
+
+  /** Contagem do "Casa" por baixo do centro do ecrã (texto + barra). */
+  private updateRecall(): void {
+    const recall = simulation.recall;
+    if (!recall) {
+      this.recallUi?.label.setVisible(false);
+      this.recallUi?.bg.setVisible(false);
+      this.recallUi?.fill.setVisible(false);
+      return;
+    }
+    if (!this.recallUi) {
+      const { width, height } = getView();
+      const x = Math.round(width / 2);
+      const y = Math.round(height / 2) + 30;
+      this.recallUi = {
+        label: new Label(this, x, y, '', { size: 8, color: 'cream', stroke: true }, [0.5, 1]).setDepth(75),
+        bg: this.add
+          .rectangle(x - RECALL_BAR_W / 2, y + 2, RECALL_BAR_W, 4, paletteNumber('ink'))
+          .setOrigin(0, 0)
+          .setDepth(75),
+        fill: this.add
+          .rectangle(x - RECALL_BAR_W / 2, y + 2, 0, 4, paletteNumber('sky'))
+          .setOrigin(0, 0)
+          .setDepth(76),
+      };
+    }
+    const ui = this.recallUi;
+    ui.label.setText(t('recall.counting', { n: recall.secondsLeft })).setVisible(true);
+    ui.bg.setVisible(true);
+    ui.fill.setVisible(true);
+    ui.fill.width = Math.round(RECALL_BAR_W * recall.progress);
   }
 
   private updateCoopLabel(): void {
@@ -1045,13 +1106,20 @@ export class UIScene extends Phaser.Scene {
       if (this.dialog?.isOpen) this.dialog.advance();
       else this.runNoticeAction();
     });
-    // Conversa com um NPC: Espaço passa à fala seguinte (e, no fim, sai).
+    // Conversa com um NPC: Espaço passa à fala seguinte (e, no fim, sai). Com uma pilha no chão
+    // ou um contentor aberto, Espaço outra vez apanha tudo (Espaço 2× = abrir e apanhar).
     keyboard.on('keydown-SPACE', (event: KeyboardEvent) => {
-      if (!event.repeat && this.dialog?.isOpen && !this.pause?.isOpen) this.dialog.advance();
+      if (event.repeat || this.pause?.isOpen) return;
+      if (this.dialog?.isOpen) this.dialog.advance();
+      else this.inventory?.takeAll();
     });
     // M: mapa do mundo (onde estou?).
     keyboard.on('keydown-M', () => {
       this.toggleMap();
+    });
+    // H: voltar a casa (outra vez: cancela).
+    keyboard.on('keydown-H', (event: KeyboardEvent) => {
+      if (!event.repeat && !uiState.modalOpen) this.startRecall();
     });
     keyboard.on('keydown-K', () => {
       if (this.pause?.isOpen) return;
@@ -1237,7 +1305,7 @@ export class UIScene extends Phaser.Scene {
         const now = distance();
         const step = pinchStep(pinchDistance, now);
         if (step !== 0) {
-          stepWorldZoom(step, getView().zoom);
+          stepWorldZoom(step, getWorldView().zoom);
           pinchDistance = now;
         }
         return;

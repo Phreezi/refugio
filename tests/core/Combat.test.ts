@@ -673,12 +673,83 @@ describe('Tutorial (Fase 11)', () => {
     run(0.2);
     sim.setMoveIntent({ x: 0, y: 0 });
     expect(tutorial.current()).toBe('gather');
-    state.data.tutorial.done.push('gather', 'craft', 'build');
+    state.data.tutorial.done.push('gather', 'craft');
+    // Construir só em casa: fora dela passa à dica seguinte.
+    expect(tutorial.current()).toBe('travel');
+    state.data.player.zoneId = BASE_ZONE_ID;
+    expect(tutorial.current()).toBe('build');
+    state.data.tutorial.done.push('build');
     // "Comer" só aparece com fome.
     expect(tutorial.current()).toBe('travel');
     state.data.player.hunger = 40;
     expect(tutorial.current()).toBe('eat');
     tutorial.dismiss();
     expect(tutorial.current()).toBeNull();
+  });
+});
+
+describe('Populações das zonas (mundo contínuo)', () => {
+  const context = (zoneId: string, zone: ZoneMap) => ({
+    zoneId,
+    map: zone,
+    collision: CollisionWorld.fromZone(zone, content.resources, content.props),
+    ...content,
+  });
+
+  it('os inimigos de uma zona vizinha existem, passeiam e continuam lá ao passar a borda', () => {
+    const { sim, run } = setup(map([]));
+    const farm = context('zone_farm', map([{ id: 'walkers', x: 200, y: 200 }]));
+    sim.combat.keepZones([farm]);
+    const neighbor = sim.combat.neighborEnemies().find((n) => n.zoneId === 'zone_farm');
+    expect(neighbor?.enemies.length).toBeGreaterThan(0);
+    const uids = neighbor?.enemies.map((e) => e.uid) ?? [];
+    run(5); // passeiam (sem ver o jogador, que está noutra zona)
+    sim.setZone(farm, true);
+    expect(sim.combat.list.map((e) => e.uid)).toEqual(uids);
+    // Viajar (sem ser a andar pela borda) recomeça: nascem outros.
+    sim.setZone(farm);
+    expect(sim.combat.list.map((e) => e.uid)).not.toEqual(uids);
+  });
+
+  it('um inimigo derrotado volta ao fim de uns segundos, só com o jogador longe', () => {
+    const { state, sim, run } = setup(map([{ id: 'walker', x: 250, y: 240 }]));
+    const walker = sim.combat.list[0];
+    if (!walker) throw new Error('sem arrastado');
+    sim.combat.roll = () => 0.99;
+    walker.hp = 1;
+    sim.combat.attack(walker.uid);
+    expect(sim.combat.list).toHaveLength(0);
+    run(BALANCE.enemyRespawnSec + 1);
+    expect(sim.combat.list).toHaveLength(0); // o jogador está perto: não volta à frente dele
+    state.data.player.x = 40;
+    state.data.player.y = 40;
+    run(1);
+    expect(sim.combat.list.map((e) => e.id)).toEqual(['zombie_walker']);
+  });
+});
+
+describe('Voltar a casa (botão "Casa")', () => {
+  it('ao fim de recallSec parado vai para casa; andar ou levar dano interrompe', () => {
+    const { state, sim, bus, run } = setup(map([]));
+    const recalls: string[] = [];
+    bus.on('home:recall', ({ zoneId }) => recalls.push(zoneId));
+    bus.on('home:recall_cancelled', () => recalls.push('cancelled'));
+    expect(sim.startRecall()).toBe('started');
+    run(BALANCE.recallSec / 2);
+    expect(sim.recall?.progress).toBeGreaterThan(0.4);
+    sim.setMoveIntent({ x: 1, y: 0 });
+    run(0.1);
+    sim.setMoveIntent({ x: 0, y: 0 });
+    expect(recalls).toEqual(['cancelled']);
+    expect(sim.recall).toBeNull();
+    sim.startRecall();
+    state.data.player.hp -= 5;
+    run(0.1);
+    expect(recalls).toEqual(['cancelled', 'cancelled']);
+    sim.startRecall();
+    run(BALANCE.recallSec + 0.1);
+    expect(recalls).toEqual(['cancelled', 'cancelled', ZONE]);
+    state.data.player.zoneId = BASE_ZONE_ID;
+    expect(sim.startRecall()).toBe('home');
   });
 });

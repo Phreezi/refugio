@@ -426,7 +426,8 @@ export class Interaction {
       return;
     }
 
-    this.bus.emit('player:action', { kind: 'gather' });
+    const toolId = tool?.container[tool.index]?.[0];
+    this.bus.emit('player:action', { kind: 'gather', ...(toolId ? { tool: toolId } : {}) });
     if (tool && !this.combat.beginner && !this.combat.savesWear()) {
       const toolItem = tool.container[tool.index]?.[0];
       if (wearTool(tool) && toolItem) this.bus.emit('item:broken', { item: toolItem });

@@ -11,13 +11,15 @@ import { CHARACTER_COLUMNS, CHARACTER_ROWS, characterFrame } from '../assets/cha
 import { zoneMapKey } from '../config';
 import { BASE_ZONE_ID, CHARACTER_LOOKS, gameState, type CharacterLook } from '../core/GameState';
 import { simulation } from '../core/Simulation';
-import { getView } from '../display/view';
+import { getWorldView } from '../display/view';
+import { WeaponFx } from '../display/weaponFx';
 import { onWorldZoomChange, stepWorldZoom, worldZoomFor } from '../display/worldZoom';
 import { installShortcutGuard } from '../input/browserShortcuts';
 import { keyboardDirection } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
 import { autosave } from '../save';
 import { buildZoneContext } from '../world/zoneContext';
+import type { ZoneContext } from '../core/Interaction';
 import { coop, guestBus } from '../net/coop';
 import { CROP_SPROUT_SPRITE, cropSprite, structureSprite, type StructureDef } from '../data/types';
 import { structureArea, structureFeet, type StructureRecord } from '../systems/building/building';
@@ -144,6 +146,8 @@ interface ZoneView {
   marks: { npc: string; label: Label }[];
   /** Base vista de fora: as peças construídas, só desenhadas. */
   statics: Phaser.GameObjects.Image[];
+  /** Colisões e dados da zona (para os inimigos dela passearem enquanto é vizinha). */
+  context?: ZoneContext;
 }
 
 interface EnemyView {
@@ -197,6 +201,8 @@ export class ZoneScene extends Phaser.Scene {
   /** Peça tingida de vermelho (alvo da demolição). */
   private demolishTinted: number | null = null;
   private attackUntil = 0;
+  /** Animação da arma (ou do punho) por cima do boneco durante o golpe. */
+  private weaponFx: WeaponFx | null = null;
   /** Último "+N item" mostrado (para empilhar os que chegam juntos). */
   private lastGain: { x: number; y: number; at: number; row: number } | null = null;
   /** Co-op (convidado): as peças desenhadas (para saber se o mundo recebido as mudou). */
@@ -244,6 +250,7 @@ export class ZoneScene extends Phaser.Scene {
       .sprite(x, y, PLAYER_TEXTURES[look], characterFrame(facing, CHARACTER_COLUMNS.idle))
       .setOrigin(0.5, 1)
       .setDepth(ysort(y));
+    this.weaponFx = new WeaponFx(this);
 
     const camera = this.cameras.main;
     // Fora do mapa (ecrãs maiores do que ele, ou zoom afastado) vê-se "noite".
@@ -265,6 +272,7 @@ export class ZoneScene extends Phaser.Scene {
 
     this.keys = this.createMoveKeys();
     simulation.setZone(buildZoneContext(this.zoneId));
+    this.updatePopulations();
     simulation.setRespawnPoint(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     simulation.reset();
     this.setupCoop();
@@ -320,6 +328,7 @@ export class ZoneScene extends Phaser.Scene {
       coop.onSnapshot = null;
       coop.onLost = null;
       this.player = null;
+      this.weaponFx = null;
       this.other = null;
       this.nameTags = {};
       this.keys = null;
@@ -553,8 +562,17 @@ export class ZoneScene extends Phaser.Scene {
       };
     };
     const offs = [
-      on('player:action', ({ kind }) => {
-        if (kind !== 'open') this.attackUntil = this.time.now + ATTACK_MS;
+      on('player:action', ({ kind, aim, tool }) => {
+        if (kind === 'open' || kind === 'use') return;
+        this.attackUntil = this.time.now + ATTACK_MS;
+        // Arma equipada (golpe em arco / disparo) ou punho; a recolher sem arma, ferramenta.
+        const player = gameState.data.player;
+        const items = content.items;
+        let weapon = items[player.equipment[0]?.[0] ?? ''];
+        if (kind === 'gather') weapon = tool ? items[tool] : weapon?.ranged ? undefined : weapon;
+        else if (weapon?.ranged && aim === undefined) weapon = undefined; // sem alvo: soco
+        const ammo = aim === undefined ? undefined : simulation.combat.activeAmmo();
+        this.weaponFx?.start(this.time.now, weapon, aim ?? null, ammo ? items[ammo.item] : undefined);
       }),
       on('resource:hit', ({ objectId, hp }) => {
         const sprite = this.resourceSprites.get(objectId);
@@ -714,6 +732,15 @@ export class ZoneScene extends Phaser.Scene {
           this.scene.restart({ zoneId: to } satisfies ZoneSceneData);
         });
       }),
+      // Botão "Casa": acabou a contagem, vai para a base (sem custo), ao lado do poste de lá.
+      on('home:recall', ({ zoneId }) => {
+        if (zoneId !== this.zoneId || this.leaving) return;
+        this.leave(() => {
+          simulation.teleport(BASE_ZONE_ID, content.zoneMap(BASE_ZONE_ID));
+          uiState.pendingNotice = tKey(content.zones[BASE_ZONE_ID]?.name ?? BASE_ZONE_ID);
+          this.scene.restart({ zoneId: BASE_ZONE_ID } satisfies ZoneSceneData);
+        });
+      }),
       // Poste de teletransporte (Etapa E): escolhe-se o destino no mapa-mundo, sem custo.
       on('waystone:use', ({ zoneId }) => {
         if (zoneId !== this.zoneId) return;
@@ -809,53 +836,65 @@ export class ZoneScene extends Phaser.Scene {
     // No convidado, os inimigos chegam do anfitrião 10×/s: interpola-se entre frames.
     const alpha = coop.isGuest ? coop.enemyAlpha(performance.now()) : simulation.alpha;
     const now = this.time.now;
-    for (const enemy of simulation.combat.list) {
-      const def = content.enemies[enemy.id];
-      if (!def) continue;
-      let view = this.enemyViews.get(enemy.uid);
-      if (!view) {
-        view = {
-          sprite: this.add.image(0, 0, def.sprite).setOrigin(0.5, 1),
-          barBack: this.add.rectangle(0, 0, ENEMY_BAR + 2, 4, paletteNumber('ink')).setOrigin(0),
-          bar: this.add.rectangle(0, 0, ENEMY_BAR, 2, paletteNumber('red')).setOrigin(0),
-        };
-        this.enemyViews.set(enemy.uid, view);
+    // Os da zona atual e os das vizinhas (na posição delas no mundo).
+    const groups = [
+      { offset: { x: 0, y: 0 }, enemies: simulation.combat.list },
+      ...simulation.combat
+        .neighborEnemies()
+        .filter((n) => this.views.has(n.zoneId))
+        .map((n) => ({ offset: this.offsetOf(n.zoneId), enemies: n.enemies })),
+    ];
+    const alive = new Set<number>();
+    for (const { offset, enemies } of groups)
+      for (const enemy of enemies) {
+        const def = content.enemies[enemy.id];
+        if (!def) continue;
+        alive.add(enemy.uid);
+        let view = this.enemyViews.get(enemy.uid);
+        if (!view) {
+          view = {
+            sprite: this.add.image(0, 0, def.sprite).setOrigin(0.5, 1),
+            barBack: this.add.rectangle(0, 0, ENEMY_BAR + 2, 4, paletteNumber('ink')).setOrigin(0),
+            bar: this.add.rectangle(0, 0, ENEMY_BAR, 2, paletteNumber('red')).setOrigin(0),
+          };
+          this.enemyViews.set(enemy.uid, view);
+        }
+        const x = this.toScreenGrid(offset.x + enemy.px + (enemy.x - enemy.px) * alpha);
+        const y = this.toScreenGrid(offset.y + enemy.py + (enemy.y - enemy.py) * alpha);
+        const moving = enemy.px !== enemy.x || enemy.py !== enemy.y;
+        const bob = moving && Math.floor(now / 160) % 2 === 1 ? 1 : 0;
+        view.sprite
+          .setPosition(x, y - bob)
+          .setDepth(ysort(y))
+          .setFlipX(enemy.flip);
+        // A rebentar (inchado): pisca a vermelho, cada vez mais depressa.
+        if (enemy.dying > 0) {
+          const fast = Math.floor(now / (enemy.dying > 8 ? 90 : 45)) % 2 === 0;
+          if (fast) view.sprite.setTint(0xdd6f38).setTintMode(Phaser.TintModes.FILL);
+          else view.sprite.clearTint();
+        } else if (enemy.state === 'windup') {
+          // Aviso de ataque (§7.8): pisca a branco durante o windup.
+          if (Math.floor(now / 70) % 2 === 0)
+            view.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+          else view.sprite.clearTint();
+        } else if (view.sprite.tintMode === Phaser.TintModes.FILL && enemy.stun === 0) {
+          view.sprite.clearTint();
+        }
+        const hurt = enemy.hp < enemy.maxHp;
+        const top = y - view.sprite.height - 4;
+        view.barBack
+          .setPosition(x - ENEMY_BAR / 2 - 1, top)
+          .setDepth(ysort(y))
+          .setVisible(hurt);
+        view.bar
+          .setPosition(x - ENEMY_BAR / 2, top + 1)
+          .setSize(Math.max(1, Math.round((ENEMY_BAR * enemy.hp) / enemy.maxHp)), 2)
+          .setDepth(ysort(y))
+          .setVisible(hurt);
       }
-      const x = this.toScreenGrid(enemy.px + (enemy.x - enemy.px) * alpha);
-      const y = this.toScreenGrid(enemy.py + (enemy.y - enemy.py) * alpha);
-      const moving = enemy.px !== enemy.x || enemy.py !== enemy.y;
-      const bob = moving && Math.floor(now / 160) % 2 === 1 ? 1 : 0;
-      view.sprite
-        .setPosition(x, y - bob)
-        .setDepth(ysort(y))
-        .setFlipX(enemy.flip);
-      // A rebentar (inchado): pisca a vermelho, cada vez mais depressa.
-      if (enemy.dying > 0) {
-        const fast = Math.floor(now / (enemy.dying > 8 ? 90 : 45)) % 2 === 0;
-        if (fast) view.sprite.setTint(0xdd6f38).setTintMode(Phaser.TintModes.FILL);
-        else view.sprite.clearTint();
-      } else if (enemy.state === 'windup') {
-        // Aviso de ataque (§7.8): pisca a branco durante o windup.
-        if (Math.floor(now / 70) % 2 === 0) view.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
-        else view.sprite.clearTint();
-      } else if (view.sprite.tintMode === Phaser.TintModes.FILL && enemy.stun === 0) {
-        view.sprite.clearTint();
-      }
-      const hurt = enemy.hp < enemy.maxHp;
-      const top = y - view.sprite.height - 4;
-      view.barBack
-        .setPosition(x - ENEMY_BAR / 2 - 1, top)
-        .setDepth(ysort(y))
-        .setVisible(hurt);
-      view.bar
-        .setPosition(x - ENEMY_BAR / 2, top + 1)
-        .setSize(Math.max(1, Math.round((ENEMY_BAR * enemy.hp) / enemy.maxHp)), 2)
-        .setDepth(ysort(y))
-        .setVisible(hurt);
-    }
     // Inimigos que desapareceram sem morrer (a horda foi-se embora): tirar do ecrã.
-    if (this.enemyViews.size > simulation.combat.list.length) {
-      const alive = new Set(simulation.combat.list.map((e) => e.uid));
+    // Inimigos que já não existem (derrotados, horda que se foi, zona que ficou longe).
+    if (this.enemyViews.size > alive.size) {
       for (const [uid, view] of this.enemyViews) {
         if (alive.has(uid)) continue;
         view.sprite.destroy();
@@ -878,7 +917,7 @@ export class ZoneScene extends Phaser.Scene {
    * margem; recria-se quando a vista muda.
    */
   private createNightLayer(): void {
-    const view = getView();
+    const view = getWorldView();
     const w = view.width * 2 + NIGHT_MARGIN * 2;
     const h = view.height * 2 + NIGHT_MARGIN * 2;
     // Só se refaz quando a vista muda de tamanho (mudar o zoom não precisa).
@@ -1069,7 +1108,7 @@ export class ZoneScene extends Phaser.Scene {
    * Se se vê mais do que o mapa, os limites alargam-se para o mapa ficar centrado.
    */
   private applyCameraZoom(area: { x: number; y: number; w: number; h: number }): void {
-    const view = getView();
+    const view = getWorldView();
     const zoom = worldZoomFor(view.zoom);
     const visibleWidth = (view.width * view.zoom) / zoom;
     const visibleHeight = (view.height * view.zoom) / zoom;
@@ -1313,15 +1352,10 @@ export class ZoneScene extends Phaser.Scene {
     simulation.crossTo(to, map, player.x - dx, player.y - dy);
     this.shiftWorld(dx, dy);
     this.zoneId = to;
-    for (const enemy of this.enemyViews.values()) {
-      enemy.sprite.destroy();
-      enemy.barBack.destroy();
-      enemy.bar.destroy();
-    }
-    this.enemyViews.clear();
+    // Os inimigos continuam onde estavam (a zona nova já era vizinha: os dela já se viam).
     for (const shot of this.shotViews.values()) shot.destroy();
     this.shotViews.clear();
-    simulation.setZone(buildZoneContext(to));
+    simulation.setZone(buildZoneContext(to), true);
     let view = this.views.get(to);
     if (!view) {
       view = this.createZoneView(to) ?? undefined;
@@ -1352,6 +1386,7 @@ export class ZoneScene extends Phaser.Scene {
       .map((r) => r.zoneId)
       .filter((zoneId) => !this.views.has(zoneId));
     this.applyCameraZoom(this.viewBounds());
+    this.updatePopulations();
     void autosave.flush();
     this.scene.get(SceneKey.UI).events.emit(ZONE_CROSSED_EVENT, to);
   }
@@ -1374,6 +1409,19 @@ export class ZoneScene extends Phaser.Scene {
     camera.setScroll(camera.scrollX - dx, camera.scrollY - dy);
   }
 
+  /** As zonas vizinhas desenhadas têm os seus inimigos (sempre visíveis, a passear). */
+  private updatePopulations(): void {
+    if (coop.isGuest) return;
+    const contexts: ZoneContext[] = [];
+    for (const view of this.views.values()) {
+      if (view.zoneId === this.zoneId) continue;
+      if (content.zoneMap(view.zoneId).enemySpawns.length === 0) continue;
+      view.context ??= buildZoneContext(view.zoneId);
+      contexts.push(view.context);
+    }
+    simulation.combat.keepZones(contexts);
+  }
+
   /** Desenha a próxima zona vizinha da fila (uma por frame). */
   private streamNext(): void {
     const zoneId = this.streamQueue.shift();
@@ -1383,6 +1431,7 @@ export class ZoneScene extends Phaser.Scene {
     this.views.set(zoneId, view);
     this.renderNpcMarks();
     this.applyCameraZoom(this.viewBounds());
+    this.updatePopulations();
   }
 
   /**
@@ -1430,15 +1479,15 @@ export class ZoneScene extends Phaser.Scene {
       // Um "clique" da roda gera vários eventos (sobretudo em touchpads): um passo por 150 ms.
       if (event.deltaY === 0 || this.time.now - lastWheel < WHEEL_COOLDOWN_MS) return;
       lastWheel = this.time.now;
-      stepWorldZoom(event.deltaY < 0 ? 1 : -1, getView().zoom);
+      stepWorldZoom(event.deltaY < 0 ? 1 : -1, getWorldView().zoom);
     };
     // passive: false — só assim o preventDefault impede o zoom da página.
     canvas.addEventListener('wheel', onWheel, { passive: false });
     const zoomIn = (): void => {
-      stepWorldZoom(1, getView().zoom);
+      stepWorldZoom(1, getWorldView().zoom);
     };
     const zoomOut = (): void => {
-      stepWorldZoom(-1, getView().zoom);
+      stepWorldZoom(-1, getWorldView().zoom);
     };
     for (const key of ['PLUS', 'NUMPAD_ADD']) this.input.keyboard?.on(`keydown-${key}`, zoomIn);
     for (const key of ['MINUS', 'NUMPAD_SUBTRACT']) this.input.keyboard?.on(`keydown-${key}`, zoomOut);
@@ -1680,6 +1729,7 @@ export class ZoneScene extends Phaser.Scene {
     const x = this.toScreenGrid(previous.x + (state.x - previous.x) * alpha);
     const y = this.toScreenGrid(previous.y + (state.y - previous.y) * alpha);
     player.setPosition(x, y).setDepth(ysort(y));
+    this.weaponFx?.render(this.time.now, x, y, state.facing, ysort(y));
     this.nameTag('self', coop.connected ? gameState.data.player.name : null, x, y);
     // A aparência pode mudar no menu de pausa.
     const texture = PLAYER_TEXTURES[state.look];

@@ -88,6 +88,31 @@ function createPool(nextUid = 1, nextShot = 1): EnemyPool {
   };
 }
 
+/** Um inimigo derrotado que volta ao sítio onde nasceu (para se poder "farmar"). */
+interface Respawn {
+  id: string;
+  home: { x: number; y: number };
+  /** Tick a partir do qual volta. */
+  at: number;
+  /** Só aparece de noite (grupos `night`). */
+  night: boolean;
+}
+
+/**
+ * População de uma zona (a atual ou uma vizinha desenhada): os inimigos continuam lá enquanto
+ * a zona estiver perto (não aparecem nem desaparecem ao passar a borda) e os derrotados voltam.
+ */
+interface ZonePopulation {
+  zone: ZoneContext;
+  pool: EnemyPool;
+  respawns: Respawn[];
+  /** Inimigos dos grupos só de noite. */
+  night: WeakSet<Enemy>;
+}
+
+/** Cada zona tem a sua gama de uids (os uids nunca se repetem entre zonas). */
+const UID_BLOCK = 100_000;
+
 /** Altura dos tiros acima dos pés (px). */
 const SHOT_HEIGHT = 8;
 
@@ -133,6 +158,11 @@ export class Combat {
   private invulnerableUntil = 0;
   /** Peças da base: as hordas partem-nas e as armadilhas ferem os inimigos. */
   building: Building | null = null;
+  /** Populações das zonas perto (a atual e as vizinhas desenhadas), pelo id da zona. */
+  private populations = new Map<string, ZonePopulation>();
+  private nextUidBlock = 1;
+  /** Co-op (convidado): os inimigos vêm do anfitrião (não nascem aqui). */
+  remote = false;
   /** Co-op: multiplicador de vida e dano dos inimigos (`coopEnemyMultiplier`; sozinho, 1). */
   private coopMultiplier = 1;
   /** O jogador anda agachado (atualizado a cada tick; os inimigos veem-no de mais perto). */
@@ -217,7 +247,8 @@ export class Combat {
   /** A dificuldade mudou: os inimigos que já estão na zona ajustam-se (mantendo a fração de vida). */
   refreshDifficulty(): void {
     const multiplier = this.difficulty;
-    for (const enemy of this.enemies) {
+    const all = [this.enemies, ...[...this.populations.values()].map((p) => p.pool.enemies)];
+    for (const enemy of new Set(all.flat())) {
       if (enemy.power === multiplier) continue;
       const ratio = multiplier / enemy.power;
       enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * ratio));
@@ -232,14 +263,22 @@ export class Combat {
     return !this.away && player.hp > 0 && player.zoneId === zoneId;
   }
 
-  /** Entra numa zona: os inimigos nascem nos pontos do mapa; mochilas expiradas desaparecem. */
-  setZone(zone: ZoneContext | null): void {
+  /**
+   * Entra numa zona: os inimigos que já lá estavam (zona vizinha, visível) continuam; se ainda
+   * não havia, nascem nos pontos do mapa. As mochilas expiradas desaparecem.
+   */
+  setZone(zone: ZoneContext | null, seamless = false): void {
     this.unlink();
     for (const other of [...this.others]) other.unlink();
+    // Viajar (mapa-mundo, saídas, teletransporte, morte) ou recarregar recomeça tudo; só a
+    // passagem a andar pela borda mantém as populações das zonas à volta.
+    if (!seamless) this.populations.clear();
     this.zone = zone;
-    this.pool = createPool(this.pool.nextUid, this.pool.nextShot);
     this.invulnerableUntil = 0;
-    if (!zone) return;
+    if (!zone || this.remote) {
+      this.pool = createPool(this.pool.nextUid, this.pool.nextShot);
+      return;
+    }
     const bags = zoneState(this.state.data, zone.zoneId).bags;
     const now = this.now();
     const alive = bags.filter((bag) => bag.expiresAt > now);
@@ -247,7 +286,43 @@ export class Combat {
       bags.splice(0, bags.length, ...alive);
       this.state.markDirty();
     }
-    if (zone.map.enemySpawns.length === 0) return;
+    const population = this.population(zone);
+    population.zone = zone;
+    this.pool = population.pool;
+  }
+
+  /**
+   * Zonas desenhadas à volta (mundo contínuo): cada uma tem a sua população, que passeia e se
+   * vê; as que deixaram de estar perto são esquecidas (a atual fica sempre).
+   */
+  keepZones(zones: readonly ZoneContext[]): void {
+    if (this.remote) return;
+    const keep = new Set(zones.map((z) => z.zoneId));
+    if (this.zone) keep.add(this.zone.zoneId);
+    for (const id of [...this.populations.keys()]) if (!keep.has(id)) this.populations.delete(id);
+    for (const zone of zones) this.population(zone);
+  }
+
+  /** Inimigos das zonas vizinhas (para desenhar), pela zona. */
+  neighborEnemies(): { zoneId: string; enemies: readonly Enemy[] }[] {
+    const current = this.zone?.zoneId;
+    return [...this.populations.entries()]
+      .filter(([id]) => id !== current)
+      .map(([zoneId, p]) => ({ zoneId, enemies: p.pool.enemies }));
+  }
+
+  /** A população de uma zona (nasce nos pontos do mapa na primeira vez). */
+  private population(zone: ZoneContext): ZonePopulation {
+    const existing = this.populations.get(zone.zoneId);
+    if (existing) return existing;
+    const population: ZonePopulation = {
+      zone,
+      pool: createPool(this.nextUidBlock, this.pool.nextShot),
+      respawns: [],
+      night: new WeakSet(),
+    };
+    this.nextUidBlock += UID_BLOCK;
+    this.populations.set(zone.zoneId, population);
     const { enemies, enemyGroups } = this.content();
     const rng = this.state.data.world;
     // À noite há mais inimigos (e aparecem os grupos só de noite, §7.11).
@@ -267,9 +342,61 @@ export class Combat {
             x: Math.round(spawn.x + (nextRandom(rng) - 0.5) * 24),
             y: Math.round(spawn.y + (nextRandom(rng) - 0.5) * 24),
           };
-          this.enemies.push(createEnemy(this.pool.nextUid++, member.enemy, def, at, this.difficulty));
+          const enemy = createEnemy(population.pool.nextUid++, member.enemy, def, at, this.difficulty);
+          if (group.night) population.night.add(enemy);
+          population.pool.enemies.push(enemy);
         }
       }
+    }
+    return population;
+  }
+
+  /** Quem guarda as populações (no co-op, o convidado ligado usa as do anfitrião). */
+  private get owner(): Combat {
+    return this.linkedTo ?? this;
+  }
+
+  /**
+   * Os inimigos das zonas vizinhas passeiam (não veem o jogador: está noutra zona) e os
+   * derrotados voltam ao fim de `enemyRespawnSec` — longe da vista do jogador.
+   */
+  private tickPopulations(): void {
+    if (this.populations.size === 0) return;
+    const tick = this.state.data.world.tick;
+    const current = this.zone?.zoneId;
+    const night = isNight(tick, BALANCE);
+    const { enemies } = this.content();
+    for (const [zoneId, population] of this.populations) {
+      if (zoneId !== current && population.pool.enemies.length > 0) {
+        const ctx = {
+          player: { x: -1e6, y: -1e6 },
+          sneaking: false,
+          world: population.zone.collision,
+          rng: this.state.data.world,
+          ticksPerSec: TICKS_PER_SECOND,
+          windupTicks: secondsToTicks(BALANCE.enemyWindupSec),
+          sneakDetectMultiplier: BALANCE.sneakDetectMultiplier,
+        };
+        for (const enemy of population.pool.enemies) {
+          const def = enemies[enemy.id];
+          if (def && enemy.dying === 0) stepEnemy(enemy, def, ctx);
+        }
+      }
+      if (population.respawns.length === 0) continue;
+      const players = zoneId === current ? [this, ...this.others].filter((c) => c.targetable(zoneId)) : [];
+      population.respawns = population.respawns.filter((r) => {
+        if (tick < r.at || (r.night && !night)) return true;
+        const seen = players.some((c) => {
+          const p = c.state.data.player;
+          return Math.hypot(p.x - r.home.x, p.y - r.home.y) < BALANCE.enemyRespawnMinPx;
+        });
+        const def = enemies[r.id];
+        if (seen || !def) return seen;
+        const enemy = createEnemy(population.pool.nextUid++, r.id, def, r.home, this.difficulty);
+        if (r.night) population.night.add(enemy);
+        population.pool.enemies.push(enemy);
+        return false;
+      });
     }
   }
 
@@ -413,7 +540,7 @@ export class Combat {
       breakPct: ammoDef?.breakPct ?? 100,
     });
     this.state.markDirty();
-    this.bus.emit('player:action', { kind: 'attack' });
+    this.bus.emit('player:action', { kind: 'attack', aim: Math.atan2(dir.y, dir.x) });
     this.bus.emit('inventory:changed', {});
     return 'shot';
   }
@@ -804,6 +931,7 @@ export class Combat {
     const zone = this.zone;
     this.sneaking = sneaking;
     this.flyProjectiles();
+    this.tickPopulations();
     if (!zone || this.enemies.length === 0) return;
     const { enemies } = this.content();
     const player = this.state.data.player;
@@ -1209,6 +1337,15 @@ export class Combat {
     const zone = this.zone;
     const def = this.content().enemies[enemy.id];
     this.enemies = this.enemies.filter((e) => e !== enemy);
+    // Volta ao sítio onde nasceu daqui a pouco (os chefes e as hordas não).
+    const population = zone ? this.owner.populations.get(zone.zoneId) : undefined;
+    if (population && def && !def.boss && !enemy.horde)
+      population.respawns.push({
+        id: enemy.id,
+        home: { ...enemy.home },
+        at: this.state.data.world.tick + secondsToTicks(BALANCE.enemyRespawnSec),
+        night: population.night.has(enemy),
+      });
     // O corpo fica no chão, na posição em que estava, com os drops e as flechas espetadas:
     // abre-se com a ação (como uma mochila) e desaparece quando se apanhar tudo.
     const items: Record<string, number> = { ...enemy.arrows };
