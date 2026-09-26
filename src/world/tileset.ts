@@ -27,6 +27,13 @@ export const BASE_TILES = [
   'floor_dark',
   'stairs_down',
   'stairs_up',
+  // Divisórias naturais (em vez de cercas): monte de terra com erva, rochas, tronco caído,
+  // cascata e penhasco. Todos bloqueiam na camada `collision`.
+  'mound',
+  'rocks',
+  'log',
+  'waterfall',
+  'cliff',
 ] as const;
 
 export type BaseTile = (typeof BASE_TILES)[number];

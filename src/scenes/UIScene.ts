@@ -1041,7 +1041,13 @@ export class UIScene extends Phaser.Scene {
       this.toggleAutoAttack();
     });
     keyboard.on('keydown-ENTER', (event: KeyboardEvent) => {
-      if (!event.repeat) this.runNoticeAction();
+      if (event.repeat) return;
+      if (this.dialog?.isOpen) this.dialog.advance();
+      else this.runNoticeAction();
+    });
+    // Conversa com um NPC: Espaço passa à fala seguinte (e, no fim, sai).
+    keyboard.on('keydown-SPACE', (event: KeyboardEvent) => {
+      if (!event.repeat && this.dialog?.isOpen && !this.pause?.isOpen) this.dialog.advance();
     });
     // M: mapa do mundo (onde estou?).
     keyboard.on('keydown-M', () => {
