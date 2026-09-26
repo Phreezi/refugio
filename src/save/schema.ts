@@ -6,7 +6,7 @@ import { TALENT_EFFECTS } from '../systems/progression/talents';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 23;
+export const SAVE_VERSION = 24;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -138,6 +138,7 @@ export function validateState(input: unknown): GameStateData {
     for (const key of ['hp', 'hunger', 'thirst'] as const) {
       if (!stat(player[key])) problems.push(`player.${key} inválido`);
     }
+    if (!finite(player.stamina) || player.stamina < 0) problems.push('player.stamina inválido');
     if (!validContainer(player.inventory)) problems.push('player.inventory inválido');
     if (!validContainer(player.hotbar)) problems.push('player.hotbar inválido');
     if (!validContainer(player.equipment) || (player.equipment as unknown[]).length !== 6)

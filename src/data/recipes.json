@@ -732,6 +732,17 @@
     "xp": 0
   },
   {
+    "id": "buy_protein_bar",
+    "station": "market_stall",
+    "category": "buy",
+    "inputs": [["coin", 6]],
+    "output": "protein_bar",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
+  },
+  {
     "id": "buy_medkit",
     "station": "market_stall",
     "category": "buy",
@@ -1167,6 +1178,19 @@
     "unlockLevel": 8
   },
   {
+    "id": "r_protein_bar",
+    "station": "campfire",
+    "category": "food",
+    "inputs": [
+      ["cooked_meat", 1],
+      ["berries", 2]
+    ],
+    "output": "protein_bar",
+    "qty": 2,
+    "timeSec": 10,
+    "unlockLevel": 2
+  },
+  {
     "id": "r_big_health_potion",
     "station": "workbench",
     "category": "food",
@@ -1327,6 +1351,17 @@
     "category": "buy",
     "inputs": [["coin", 10]],
     "output": "energy_drink",
+    "qty": 1,
+    "timeSec": 0,
+    "unlockLevel": 1,
+    "xp": 0
+  },
+  {
+    "id": "m_buy_protein_bar",
+    "station": "merchant",
+    "category": "buy",
+    "inputs": [["coin", 6]],
+    "output": "protein_bar",
     "qty": 1,
     "timeSec": 0,
     "unlockLevel": 1,

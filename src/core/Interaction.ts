@@ -66,6 +66,7 @@ export type TargetData =
   | { type: 'repair'; placement: ResourcePlacement; uid: number }
   | { type: 'fish'; placement: ResourcePlacement }
   | { type: 'teleport'; placement: ResourcePlacement }
+  | { type: 'sleep'; placement: ResourcePlacement }
   | { type: 'npc'; placement: ResourcePlacement };
 /** Os recursos que reaparecem verificam-se uma vez por segundo de jogo. */
 const RESPAWN_CHECK_TICKS = 20;
@@ -76,6 +77,8 @@ const RESPAWN_CHECK_TICKS = 20;
  * Corre dentro do passo fixo (Simulation); não usa o Phaser.
  */
 export class Interaction {
+  /** A cama (§7.19): a Simulation trata do sono (salto no tempo). */
+  onSleep: (() => void) | null = null;
   private readonly state: GameState;
   private readonly bus: EventBus<GameEvents>;
   private readonly actions: PlayerActions;
@@ -328,6 +331,8 @@ export class Interaction {
       this.fishing.start();
     } else if (data.type === 'teleport') {
       this.useWaystone();
+    } else if (data.type === 'sleep') {
+      this.onSleep?.();
     } else if (data.type === 'npc') {
       this.bus.emit('player:action', { kind: 'open' });
       this.bus.emit('npc:talk', { npc: data.placement.id });

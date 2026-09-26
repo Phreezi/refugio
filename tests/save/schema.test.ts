@@ -95,7 +95,8 @@ describe('save: migrações', () => {
     expect(parsed.state.player).toMatchObject({ x: 10, y: 20, hp: 70 });
     expect(parsed.state.player.inventory).toHaveLength(20);
     expect(parsed.state.player.hotbar).toEqual([null, null, null, null]);
-    expect(parsed.state.world).toEqual({ tick: 999, rng: 1 });
+    // v24: o dia passou a 5× mais longo e o relógio multiplica-se para manter o dia e a hora.
+    expect(parsed.state.world).toEqual({ tick: 999 * 5, rng: 1 });
     expect(parsed.state.base).toEqual({
       chests: {},
       structures: [
@@ -254,6 +255,37 @@ describe('save: migrações', () => {
     const bad = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
     bad.player.look = 'dragon';
     expect(() => validateState(bad)).toThrow();
+  });
+
+  it('v23 → v24: resistência cheia; relógio ×5 e prazos deslocados (falta o mesmo tempo)', () => {
+    const v23 = structuredClone(STATE) as unknown as {
+      player: Record<string, unknown>;
+      world: { tick: number };
+      zones: Record<string, unknown>;
+      base: Record<string, unknown>;
+      bosses: Record<string, number>;
+    };
+    delete v23.player.stamina;
+    v23.world.tick = 1000;
+    v23.player.buffs = [['xpPct', 20, 1500]];
+    v23.zones = {
+      zone_pine_forest: { depleted: { '7': 1200 }, bags: [], loot: { '9': [1100, []] }, ground: [] },
+    };
+    v23.base.crops = { '3': ['seed_carrot', 1300] };
+    v23.base.produce = { '4': 900 };
+    v23.bosses = { zone_bunker_4: 5000 };
+    const stateJson = JSON.stringify(v23);
+    const text = `{"version":23,"timestamp":9,"checksum":"${checksum(`23|9|${stateJson}`)}","state":${stateJson}}`;
+    const state = parseSave(text).state;
+    const shift = 4000;
+    expect(state.world.tick).toBe(5000);
+    expect(state.player.stamina).toBe(100);
+    expect(state.player.buffs[0]?.[2]).toBe(1500 + shift);
+    expect(state.zones.zone_pine_forest?.depleted['7']).toBe(1200 + shift);
+    expect(state.zones.zone_pine_forest?.loot['9']?.[0]).toBe(1100 + shift);
+    expect(state.base.crops['3']?.[1]).toBe(1300 + shift);
+    expect(state.base.produce['4']).toBe(900 + shift);
+    expect(state.bosses.zone_bunker_4).toBe(5000 + shift);
   });
 
   it('v22 → v23: dificuldade "Normal" nos jogos em curso; valida-se', () => {

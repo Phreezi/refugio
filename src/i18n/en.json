@@ -480,6 +480,7 @@
   "item.coin": "Coin",
   "item.health_potion": "Health potion",
   "item.big_health_potion": "Large health potion",
+  "item.protein_bar": "Protein bar",
   "item.energy_drink": "Energy drink",
   "structure.market_stall": "Market stall",
   "station.market_stall": "Market stall",
@@ -667,5 +668,9 @@
   "src.loot": "Found in: {list}",
   "src.buy": "Bought at: {list}",
   "src.none": "Nowhere known yet.",
-  "src.made": "Made {qty} {item} (you have {total})."
+  "src.made": "Made {qty} {item} (you have {total}).",
+  "hud.stamina": "Energy",
+  "sleep.slept": "You slept until 6:30. Energy and health restored.",
+  "sleep.passed_out": "You collapsed from exhaustion… woke up at 11:00 with no energy.",
+  "sleep.not_sleepy": "You're not sleepy yet: bedtime is from {h}:00."
 }

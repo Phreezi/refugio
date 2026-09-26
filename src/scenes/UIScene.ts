@@ -79,7 +79,7 @@ const TAP_MS = 300;
 const TAP_SLOP = 6;
 
 interface StatBar {
-  key: keyof Pick<PlayerState, 'hp' | 'hunger' | 'thirst'>;
+  key: keyof Pick<PlayerState, 'hp' | 'hunger' | 'thirst' | 'stamina'>;
   label: Label;
   fill: Phaser.GameObjects.Rectangle;
 }
@@ -88,6 +88,7 @@ const STATS: readonly { key: StatBar['key']; label: MessageKey; color: PaletteCo
   { key: 'hp', label: 'hud.hp', color: 'red' },
   { key: 'hunger', label: 'hud.hunger', color: 'amber' },
   { key: 'thirst', label: 'hud.thirst', color: 'sky' },
+  { key: 'stamina', label: 'hud.stamina', color: 'lime' },
 ];
 
 /**
@@ -386,9 +387,11 @@ export class UIScene extends Phaser.Scene {
     const low = (BALANCE.statMax * BALANCE.lowStatPct) / 100;
     const blinkOff = Math.floor(time / BLINK_MS) % 2 === 1;
     for (const bar of this.bars) {
+      // A resistência tem um máximo próprio (sobe com o nível, §7.19).
+      const max = bar.key === 'stamina' ? simulation.staminaMax : BALANCE.statMax;
       const value = player[bar.key];
-      bar.fill.width = Math.round((BAR_WIDTH * value) / BALANCE.statMax);
-      const warn = value <= low;
+      bar.fill.width = Math.round((BAR_WIDTH * Math.min(value, max)) / max);
+      const warn = value <= (low * max) / BALANCE.statMax;
       bar.fill.setAlpha(warn && blinkOff ? 0.35 : 1);
       bar.label.setColor(warn ? 'gold' : 'cream');
     }
@@ -638,6 +641,10 @@ export class UIScene extends Phaser.Scene {
       eventBus.on('quest:done', ({ quest }) => {
         this.showNotice(t('quest.completed', { title: tKey(`quest.${quest}`) }));
       }),
+      // Sono (§7.19): na cama até às 6h30, ou adormeceu de cansaço onde estava.
+      eventBus.on('player:slept', ({ passedOut }) => {
+        this.showNotice(t(passedOut ? 'sleep.passed_out' : 'sleep.slept'));
+      }),
       eventBus.on('waystone:activated', () => {
         this.showNotice(t('msg.waystone_on'));
       }),
@@ -662,6 +669,7 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'post_broken') this.showNotice(t('msg.post_broken'));
         else if (reason === 'food_only') this.showNotice(t('msg.food_only'));
         // "Sem munição" repete-se com o Auto: aviso curto.
+        else if (reason === 'not_sleepy') this.showNotice(t('sleep.not_sleepy', { h: hours ?? 20 }));
         else if (reason === 'no_ammo')
           this.showNotice(t('msg.no_ammo', { item: itemName(item ?? '') }), null, SHORT_NOTICE_MS);
         else if (reason === 'needs_item')

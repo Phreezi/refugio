@@ -22,6 +22,8 @@ export interface PlayerState {
   hp: number;
   hunger: number;
   thirst: number;
+  /** Resistência (§7.19): 0 até ao máximo do nível (com frações; gasta-se a correr e a atacar). */
+  stamina: number;
   /** Mochila (CLAUDE.md §7.3). Slots compactos [itemId, qtd, durabilidade?]. */
   inventory: Container;
   /** Hotbar de acesso rápido (teclas 1–4); mantém-se ao morrer (§7.12). */
@@ -176,6 +178,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
       hp: BALANCE.statMax,
       hunger: BALANCE.statMax,
       thirst: BALANCE.statMax,
+      stamina: BALANCE.staminaMax,
       inventory: createContainer(BALANCE.inventorySlots),
       hotbar,
       equipment: createContainer(EQUIP_SLOTS.length),

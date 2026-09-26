@@ -3038,6 +3038,49 @@ const MONSTERS: Sprite[] = [
   },
 ];
 
+// Cama e sono (§7.19): a cama da casa e a barra proteica (resistência).
+const SLEEP: Sprite[] = [
+  {
+    // Cama de madeira vista de cima (3/4): cabeceira, almofada e manta às riscas.
+    file: 'bed',
+    width: 16,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 8, 30, 8, 2);
+      img.fill(1, 2, 14, 27, c('bark'));
+      img.fill(1, 2, 14, 4, c('wood'));
+      img.fill(1, 2, 14, 1, c('wood_light'));
+      img.fill(2, 7, 12, 20, c('cream'));
+      img.fill(3, 7, 10, 4, c('parchment'));
+      img.fill(3, 10, 10, 1, c('sand'));
+      img.fill(2, 12, 12, 15, c('water'));
+      img.fill(2, 12, 12, 1, c('sky'));
+      for (const y of [15, 19, 23]) img.fill(2, y, 12, 1, c('deep_water'));
+      img.fill(13, 12, 1, 15, c('deep_water'));
+      img.fill(1, 27, 14, 2, c('bark_dark'));
+    },
+  },
+];
+const SLEEP_ICONS: Sprite[] = [
+  {
+    // Barra proteica: embrulho dourado com risca e o chocolate a espreitar.
+    file: 'protein_bar',
+    width: 16,
+    height: 16,
+    outline: 'ink',
+    paint: (img) => {
+      img.fill(2, 6, 12, 5, c('amber'));
+      img.fill(2, 6, 12, 1, c('gold'));
+      img.fill(2, 10, 12, 1, c('orange'));
+      img.fill(6, 6, 4, 5, c('red'));
+      img.fill(7, 7, 2, 1, c('cream'));
+      img.fill(12, 6, 2, 5, c('bark'));
+      img.fill(12, 6, 2, 1, c('wood'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -3055,6 +3098,7 @@ for (const [dir, list] of [
   [outDir, PHASE10C],
   [outDir, PHASE10E],
   [outDir, MONSTERS],
+  [outDir, SLEEP],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
   [iconDir, FOOD_ICONS],
@@ -3067,6 +3111,7 @@ for (const [dir, list] of [
   [iconDir, PHASE10D_ICONS],
   [iconDir, PHASE10E_ICONS],
   [iconDir, RANGED_ICONS],
+  [iconDir, SLEEP_ICONS],
 ] as const) {
   for (const sprite of list) {
     const img = new Bitmap(sprite.width, sprite.height);
@@ -3077,7 +3122,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length + PHASE10E.length + MONSTERS.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length + PHASE10D_ICONS.length + PHASE10E_ICONS.length + RANGED_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length + PHASE10E.length + MONSTERS.length + SLEEP.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length + PHASE10D_ICONS.length + PHASE10E_ICONS.length + RANGED_ICONS.length + SLEEP_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

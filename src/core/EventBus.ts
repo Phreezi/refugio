@@ -70,6 +70,8 @@ export interface GameEvents {
   /** Poste de teletransporte ativado pela primeira vez / usado (Etapa E). */
   'waystone:activated': { zoneId: string };
   'waystone:use': { zoneId: string };
+  /** Dormiu (§7.19): na cama, ou adormeceu onde estava (`passedOut`); `hours` de jogo passaram. */
+  'player:slept': { passedOut: boolean; hours: number };
   /** Voltar a casa (botão "Casa"): acabou a contagem, vai-se para a base. */
   'home:recall': { zoneId: string };
   /** A contagem do "Casa" foi interrompida (o jogador andou ou levou dano). */
@@ -92,7 +94,8 @@ export interface GameEvents {
       | 'needs_level'
       | 'zone_level'
       | 'post_broken'
-      | 'food_only';
+      | 'food_only'
+      | 'not_sleepy';
     tool?: string;
     /** needs_item: o item que falta; no_ammo: a munição da arma. */
     item?: string;

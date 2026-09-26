@@ -22,7 +22,9 @@ import { Progression, type ProgressionContent } from './Progression';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
 import { PlayerActions } from './PlayerActions';
-import { secondsToTicks, TICKS_PER_SECOND } from './Clock';
+import { gameHoursToTicks, secondsToTicks, TICKS_PER_SECOND } from './Clock';
+import { hourAt } from './DayNight';
+import { canSleep, hoursUntil, mustPassOut, runDrainPerTick, staminaMax } from '../systems/survival/stamina';
 import { content } from '../world/content';
 import { arrivalPoint, canTravel, type TravelCost } from '../systems/travel/travel';
 import type { ZoneMap } from '../world/zoneMap';
@@ -195,6 +197,13 @@ export class Simulation {
     );
     this.crafting = new Crafting(state, bus, crafting, this.actions);
     this.crafting.isUnlocked = (recipe) => this.progression.isRecipeUnlocked(recipe);
+    // Resistência (§7.19): a cama faz dormir; cada golpe/tiro gasta um pouco.
+    this.interaction.onSleep = () => {
+      this.sleep();
+    };
+    bus.on('player:action', ({ kind }) => {
+      if (kind === 'attack') this.spendStamina(BALANCE.staminaPerAttack);
+    });
     // Baús construídos com regras próprias (frigorífico: 60 espaços, só comida).
     this.actions.chestRules = (chestId) => {
       const uid = Number(chestId.slice(1));
@@ -429,6 +438,63 @@ export class Simulation {
     return true;
   }
 
+  /** Gasta resistência (nunca abaixo de 0). */
+  private spendStamina(amount: number): void {
+    const player = this.state.data.player;
+    player.stamina = Math.max(0, player.stamina - amount);
+  }
+
+  /** Resistência máxima do jogador (sobe com o nível). */
+  get staminaMax(): number {
+    return staminaMax(this.state.data.player.level, BALANCE);
+  }
+
+  /**
+   * Cama (§7.19): das `sleepFromHour` às `wakeHour` dorme-se até às `wakeHour` (o tempo salta)
+   * e acorda-se com a resistência e a vida cheias. Fora dessas horas, avisa.
+   */
+  sleep(): boolean {
+    const player = this.state.data.player;
+    const hour = hourAt(this.state.data.world.tick, BALANCE);
+    if (!canSleep(hour, BALANCE)) {
+      this.bus.emit('action:blocked', { reason: 'not_sleepy', hours: BALANCE.sleepFromHour });
+      return false;
+    }
+    const hours = hoursUntil(hour, BALANCE.wakeHour);
+    // Co-op: o convidado não mexe no relógio do mundo (só descansa).
+    if (!this.primary) this.skipTime(gameHoursToTicks(hours));
+    player.stamina = this.staminaMax;
+    player.hp = BALANCE.statMax;
+    this.state.markDirty();
+    this.bus.emit('player:slept', { passedOut: false, hours });
+    return true;
+  }
+
+  /**
+   * Acordado entre as `sleepLatestHour` e as `wakeHour`: adormece onde está e acorda às
+   * `passOutWakeHour` com pouca resistência. @returns true se adormeceu.
+   */
+  private checkPassOut(): boolean {
+    const player = this.state.data.player;
+    const hour = hourAt(this.state.data.world.tick, BALANCE);
+    if (!mustPassOut(hour, BALANCE) || player.hp <= 0) return false;
+    const hours = hoursUntil(hour, BALANCE.passOutWakeHour);
+    this.skipTime(gameHoursToTicks(hours));
+    player.stamina = Math.min(player.stamina, (this.staminaMax * BALANCE.staminaPassOutPct) / 100);
+    this.state.markDirty();
+    this.bus.emit('player:slept', { passedOut: true, hours });
+    return true;
+  }
+
+  /** Salta `ticks` de tempo de jogo (dormir): o relógio e as estações avançam; nada ataca. */
+  private skipTime(ticks: number): void {
+    this.state.data.world.tick += ticks;
+    this.crafting.advance(ticks);
+    this.cancelRecall();
+    const { x, y } = this.state.data.player;
+    this.previous = { x, y };
+  }
+
   /**
    * Botão "Casa": ao fim de `recallSec` segundos parado (sem andar nem levar dano), volta-se à
    * base de qualquer lado, sem custo. @returns 'home' se já está na base.
@@ -493,7 +559,7 @@ export class Simulation {
 
   /** O jogador está a correr (e a andar)? (para a animação e o co-op). */
   get playerRunning(): boolean {
-    return this.running && !this.sneaking;
+    return this.running && !this.sneaking && this.state.data.player.stamina > 0;
   }
 
   /** O jogador está agachado (para a animação; e, na Fase 6, para o raio de deteção). */
@@ -554,6 +620,7 @@ export class Simulation {
     if (this.primary) return;
     world.tick += 1;
     this.state.markDirty(); // o tempo de jogo avançou
+    if (this.checkPassOut()) return;
     this.tickRecall();
     this.movePlayer();
     if (this.moved) this.tutorial.playerMoved();
@@ -626,6 +693,11 @@ export class Simulation {
   private tickRunDrain(): void {
     if (!this.running || this.sneaking || !this.moved) return;
     const player = this.state.data.player;
+    // Sem resistência não se corre (§7.19); a correr gasta-se (menos com o "Fôlego").
+    if (player.stamina <= 0) return;
+    this.spendStamina(
+      runDrainPerTick(BALANCE, TICKS_PER_SECOND) * (1 - talentOf(player, 'sprintCostPct') / 100),
+    );
     const rules = this.survivalRules();
     const extra = (BALANCE.sprintDrainMultiplier - 1) * (1 - talentOf(player, 'sprintCostPct') / 100);
     this.runHunger += extra / rules.hungerEveryTicks;
@@ -830,7 +902,7 @@ export class Simulation {
     if (this.world === null || isZero(this.intent) || this.fishing.active) return;
 
     player.facing = facingFromIntent(this.intent, player.facing);
-    const sprinting = this.running && !this.sneaking;
+    const sprinting = this.running && !this.sneaking && player.stamina > 0;
     const speed =
       BALANCE.playerSpeed *
       (this.sneaking ? BALANCE.sneakMultiplier : 1) *

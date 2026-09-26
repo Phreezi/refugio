@@ -705,13 +705,25 @@
     "stack": 10,
     "rarity": "rare"
   },
+  "protein_bar": {
+    "name": "item.protein_bar",
+    "icon": "icon_protein_bar",
+    "type": "consumable",
+    "effects": {
+      "hunger": 10,
+      "stamina": 35
+    },
+    "stack": 10,
+    "rarity": "uncommon"
+  },
   "energy_drink": {
     "name": "item.energy_drink",
     "icon": "icon_energy_drink",
     "type": "consumable",
     "effects": {
       "hunger": 25,
-      "thirst": 40
+      "thirst": 40,
+      "stamina": 25
     },
     "stack": 10,
     "rarity": "uncommon"
@@ -792,7 +804,8 @@
     "icon": "icon_coffee",
     "type": "consumable",
     "effects": {
-      "thirst": 15
+      "thirst": 15,
+      "stamina": 10
     },
     "buff": {
       "effect": "xpPct",

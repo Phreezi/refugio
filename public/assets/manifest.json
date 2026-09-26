@@ -249,6 +249,17 @@
         "letter": "C"
       }
     },
+    "bed": {
+      "type": "image",
+      "file": "sprites/bed.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "water",
+        "border": "bark_dark",
+        "letter": "C"
+      }
+    },
     "well": {
       "type": "image",
       "file": "sprites/well.png",
@@ -1656,6 +1667,17 @@
         "letter": "S"
       },
       "file": "sprites/icons/soup.png"
+    },
+    "icon_protein_bar": {
+      "type": "image",
+      "placeholder": {
+        "width": 16,
+        "height": 16,
+        "color": "amber",
+        "border": "ink",
+        "letter": "B"
+      },
+      "file": "sprites/icons/protein_bar.png"
     },
     "icon_coffee": {
       "type": "image",
