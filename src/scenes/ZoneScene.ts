@@ -60,7 +60,11 @@ const SHARED_VIEW_EVENTS: ReadonlySet<keyof GameEvents> = new Set<keyof GameEven
 /** Tinta do boneco do outro jogador (co-op), para se distinguirem. */
 const OTHER_TINT = 0x9fc6ff;
 /** Cor do risco de cada munição em voo (omisso: madeira, como as flechas). */
-const SHOT_COLORS: Readonly<Record<string, PaletteColor>> = { pistol_ammo: 'gold', pebble: 'stone_light' };
+const SHOT_COLORS: Readonly<Record<string, PaletteColor>> = {
+  pistol_ammo: 'gold',
+  pebble: 'stone_light',
+  spit: 'lime',
+};
 /** Seta por cima do alvo da ação contextual (textura gerada por código). */
 const MARKER_TEXTURE = 'target_marker';
 /** Duração da animação de golpe (2 frames). */
@@ -778,12 +782,15 @@ export class ZoneScene extends Phaser.Scene {
       let view = this.shotViews.get(shot.id);
       if (!view) {
         const color = SHOT_COLORS[shot.ammo] ?? 'wood_light';
-        view = this.add.rectangle(0, 0, 2, 2, paletteNumber(color)).setOrigin(0);
+        // A cuspidela dos inimigos é maior (vê-se bem para se desviar).
+        const size = shot.hostile ? 4 : 2;
+        view = this.add.rectangle(0, 0, size, size, paletteNumber(color)).setOrigin(0);
         this.shotViews.set(shot.id, view);
       }
       const x = Math.round(shot.px + (shot.x - shot.px) * alpha);
       const y = Math.round(shot.py + (shot.y - shot.py) * alpha);
-      view.setPosition(x - 1, y - 1).setDepth(ysort(y + 8));
+      const half = shot.hostile ? 2 : 1;
+      view.setPosition(x - half, y - half).setDepth(ysort(y + 8));
     }
     for (const [id, view] of this.shotViews) {
       if (alive.has(id)) continue;

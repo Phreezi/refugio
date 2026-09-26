@@ -42,7 +42,9 @@ export class Progression {
       if (hp === 0) this.gain(this.content().resources[resource]?.xp ?? BALANCE.xpGather);
     });
     bus.on('enemy:killed', ({ enemy }) => {
-      this.gain(this.content().enemies[enemy]?.xp ?? 0);
+      // Dificuldades mais altas dão mais XP por inimigo (§12).
+      const xpPct = this.state.hasGame ? BALANCE.difficulty[this.state.data.settings.difficulty].xpPct : 100;
+      this.gain(Math.round(((this.content().enemies[enemy]?.xp ?? 0) * xpPct) / 100));
     });
     bus.on('craft:finished', ({ recipe }) => {
       const def = this.content().recipes.find((r) => r.id === recipe);

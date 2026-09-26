@@ -37,7 +37,7 @@ describe('save: formato', () => {
   it('é compacto (sem espaços) e bem abaixo dos 100 KB', () => {
     const text = serializeSave(STATE, 1);
     expect(text).not.toMatch(/\s/);
-    expect(text.length).toBeLessThan(1100);
+    expect(text.length).toBeLessThan(1200);
   });
 
   it('deteta corrupção: JSON partido, checksum errado, campos em falta', () => {
@@ -199,7 +199,7 @@ describe('save: migrações', () => {
     const text = `{"version":8,"timestamp":6,"checksum":"${checksum(`8|6|${stateJson}`)}","state":${stateJson}}`;
     const { state } = parseSave(text);
     expect(state.base.damage).toEqual({});
-    expect(state.settings).toEqual({ hordes: false });
+    expect(state.settings).toEqual({ hordes: false, difficulty: 'normal' });
     expect(state.horde).toEqual({ at: 0, count: 0, active: false });
   });
 
@@ -253,6 +253,17 @@ describe('save: migrações', () => {
     expect(parseSave(text).state.player.look).toBe('boy');
     const bad = structuredClone(STATE) as unknown as { player: Record<string, unknown> };
     bad.player.look = 'dragon';
+    expect(() => validateState(bad)).toThrow();
+  });
+
+  it('v22 → v23: dificuldade "Normal" nos jogos em curso; valida-se', () => {
+    const v22 = structuredClone(STATE) as unknown as { settings: Record<string, unknown> };
+    delete v22.settings.difficulty;
+    const stateJson = JSON.stringify(v22);
+    const text = `{"version":22,"timestamp":9,"checksum":"${checksum(`22|9|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.settings.difficulty).toBe('normal');
+    const bad = structuredClone(STATE) as unknown as { settings: { difficulty: unknown } };
+    bad.settings.difficulty = 'impossible';
     expect(() => validateState(bad)).toThrow();
   });
 

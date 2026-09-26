@@ -156,6 +156,11 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     const player = s.player as Record<string, unknown>;
     return { ...s, player: { ...player, quests: { active: {}, done: [] } } };
   },
+  // v22 → v23: dificuldade (§12) — os jogos em curso ficam em "Normal" (como estavam).
+  22: (s) => {
+    const settings = s.settings as Record<string, unknown>;
+    return { ...s, settings: { ...settings, difficulty: 'normal' } };
+  },
 };
 
 /** Aplica as migrações de `from` até `to`. Lança erro se faltar algum passo. */

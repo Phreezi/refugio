@@ -218,5 +218,142 @@
       ["coin", 80, 120]
     ],
     "xp": 300
+  },
+  "zombie_crawler": {
+    "sprite": "zombie_crawler",
+    "footprint": {
+      "width": 10,
+      "height": 5
+    },
+    "behavior": "hostile",
+    "hp": 18,
+    "damage": 4,
+    "speed": 70,
+    "detectRadius": 56,
+    "leashRadius": 150,
+    "attackRange": 9,
+    "attackSec": 1.0,
+    "bleedPct": 5,
+    "xp": 8,
+    "drops": [
+      ["cloth", 0, 1],
+      ["coin", 0, 2]
+    ]
+  },
+  "zombie_spitter": {
+    "sprite": "zombie_spitter",
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 40,
+    "damage": 4,
+    "speed": 45,
+    "detectRadius": 110,
+    "leashRadius": 220,
+    "attackRange": 10,
+    "attackSec": 1.6,
+    "spit": {
+      "range": 110,
+      "speed": 90,
+      "damage": 9,
+      "everySec": 2.6,
+      "keepAway": 70
+    },
+    "xp": 22,
+    "drops": [
+      ["chemicals", 0, 1],
+      ["cloth", 0, 2],
+      ["coin", 2, 5]
+    ]
+  },
+  "zombie_armored": {
+    "sprite": "zombie_armored",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 90,
+    "damage": 12,
+    "speed": 38,
+    "detectRadius": 72,
+    "leashRadius": 190,
+    "attackRange": 11,
+    "attackSec": 1.7,
+    "armorPct": 45,
+    "xp": 35,
+    "drops": [
+      ["scrap_metal", 1, 3],
+      ["nails", 1, 2],
+      ["coin", 5, 10]
+    ]
+  },
+  "bear": {
+    "sprite": "bear",
+    "footprint": {
+      "width": 18,
+      "height": 8
+    },
+    "behavior": "hostile",
+    "hp": 180,
+    "damage": 18,
+    "speed": 70,
+    "detectRadius": 80,
+    "leashRadius": 200,
+    "attackRange": 14,
+    "attackSec": 1.8,
+    "windupSec": 0.7,
+    "bleedPct": 35,
+    "charge": {
+      "range": 80,
+      "speed": 140,
+      "sec": 0.8
+    },
+    "xp": 50,
+    "drops": [
+      ["raw_meat", 3, 5],
+      ["leather", 2, 3],
+      ["coin", 3, 6]
+    ]
+  },
+  "boss_colossus": {
+    "sprite": "boss_colossus",
+    "footprint": {
+      "width": 22,
+      "height": 9
+    },
+    "behavior": "hostile",
+    "hp": 1600,
+    "damage": 30,
+    "speed": 40,
+    "detectRadius": 150,
+    "leashRadius": 420,
+    "attackRange": 20,
+    "attackSec": 1.9,
+    "windupSec": 0.8,
+    "bleedPct": 35,
+    "armorPct": 25,
+    "charge": {
+      "range": 110,
+      "speed": 160,
+      "sec": 0.8
+    },
+    "spit": {
+      "range": 150,
+      "speed": 110,
+      "damage": 18,
+      "everySec": 4,
+      "keepAway": 0
+    },
+    "boss": true,
+    "xp": 800,
+    "drops": [
+      ["pistol_ammo", 12, 24],
+      ["medkit", 2, 3],
+      ["electronics", 3, 5],
+      ["coin", 200, 300]
+    ]
   }
 }

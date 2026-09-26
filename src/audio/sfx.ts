@@ -64,6 +64,10 @@ export const SOUNDS = {
     { wave: 'sine', from: 90, to: 30, sec: 0.5, gain: 0.5 },
   ],
   scream: [{ wave: 'sawtooth', from: 520, to: 780, sec: 0.35, gain: 0.15 }],
+  spit: [
+    { sec: 0.12, cutoff: 900, cutoffTo: 300, gain: 0.35 },
+    { wave: 'sine', from: 300, to: 120, sec: 0.1, gain: 0.2 },
+  ],
   craft: [
     { wave: 'triangle', from: 523, sec: 0.08, gain: 0.3 },
     { wave: 'triangle', from: 659, sec: 0.08, gain: 0.3, delay: 0.08 },
@@ -231,6 +235,9 @@ export function installSfx(bus: EventBus<GameEvents> = eventBus): void {
   });
   bus.on('enemy:scream', () => {
     sfx.play('scream');
+  });
+  bus.on('enemy:spit', () => {
+    sfx.play('spit');
   });
   bus.on('craft:finished', () => {
     sfx.play('craft');

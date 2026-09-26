@@ -1113,6 +1113,14 @@ export interface EnemyDef {
    * os inimigos a menos de `radius` px à procura do jogador durante `alertSec`.
    */
   scream?: { radius: number; everySec: number; keepAway: number; alertSec: number };
+  /**
+   * Cuspidor: de longe (até `range` px), avisa e cospe um projétil a `speed` px/s que tira
+   * `damage` (desvia-se; pára nas paredes), a cada `everySec`. Com `keepAway` > 0 mantém essa
+   * distância do jogador (senão também morde de perto).
+   */
+  spit?: { range: number; speed: number; damage: number; everySec: number; keepAway: number };
+  /** Blindado: tira esta % a cada golpe e tiro que leva (máx. 80). */
+  armorPct?: number;
   /** Chefe (fim do bunker): derrotado, só volta ao fim de `respawnDays` da zona; barra no HUD. */
   boss?: boolean;
 }
@@ -1138,6 +1146,8 @@ const ENEMY_KEYS = new Set([
   'bleedPct',
   'scream',
   'boss',
+  'spit',
+  'armorPct',
 ]);
 
 function isNonNegativeInt(value: unknown): value is number {
@@ -1233,6 +1243,23 @@ export function parseEnemies(
         keepAway: scream.keepAway ?? 1,
         alertSec: scream.alertSec ?? 1,
       };
+    const spit = nums('spit', ['range', 'speed', 'damage', 'everySec']);
+    if (spit && isObject(raw.spit)) {
+      const keepAway = raw.spit.keepAway ?? 0;
+      if (typeof keepAway !== 'number' || keepAway < 0)
+        problems.push(`"${id}": spit.keepAway tem de ser um número ≥ 0`);
+      defs[id].spit = {
+        range: spit.range ?? 1,
+        speed: spit.speed ?? 1,
+        damage: spit.damage ?? 1,
+        everySec: spit.everySec ?? 1,
+        keepAway: typeof keepAway === 'number' ? keepAway : 0,
+      };
+    }
+    if (raw.armorPct !== undefined) {
+      if (isNonNegativeInt(raw.armorPct) && raw.armorPct <= 80) defs[id].armorPct = raw.armorPct;
+      else problems.push(`"${id}": armorPct tem de ser um inteiro de 0 a 80`);
+    }
     if (raw.windupSec !== undefined) {
       if (positive(raw.windupSec) && raw.windupSec <= 5) defs[id].windupSec = raw.windupSec;
       else problems.push(`"${id}": windupSec tem de ser um número entre 0 e 5`);
@@ -1283,7 +1310,8 @@ export function parseEnemyGroups(input: unknown, enemyIds: Iterable<string>): En
       const [enemy, min, max] = Array.isArray(entry) ? (entry as unknown[]) : [];
       if (typeof enemy !== 'string' || !enemies.has(enemy))
         problems.push(`"${id}": inimigo desconhecido ${describe(enemy)}`);
-      else if (!isPositiveInt(min) || !isPositiveInt(max) || max < min)
+      // mín pode ser 0 (às vezes aparece, às vezes não); máx ≥ 1.
+      else if (!isNonNegativeInt(min) || !isPositiveInt(max) || max < min)
         problems.push(`"${id}": ${enemy} com mín/máx inválidos`);
       else members.push({ enemy, min, max });
     }

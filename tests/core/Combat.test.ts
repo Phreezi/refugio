@@ -370,6 +370,45 @@ describe('Inimigos T3 e medicina (Fase 10)', () => {
     expect(Math.hypot(screamer.x - 240, screamer.y - 240)).toBeGreaterThan((scream?.keepAway ?? 0) * 0.6);
   });
 
+  it('o cuspidor fica longe e cospe um projétil que magoa (e dá para ver no ar)', () => {
+    const { state, sim, events, run } = setup(map([{ id: 'spitters', x: 330, y: 240 }]));
+    const spitter = sim.combat.list[0];
+    if (!spitter) throw new Error('sem cuspidor');
+    let flying = 0;
+    run(6, () => {
+      flying = Math.max(flying, sim.combat.shots.filter((s) => s.hostile).length);
+    });
+    expect(flying).toBeGreaterThan(0);
+    expect(events.some((e) => e.startsWith('hurt:'))).toBe(true);
+    const keepAway = content.enemies.zombie_spitter?.spit?.keepAway ?? 0;
+    const p = state.data.player;
+    expect(Math.hypot(spitter.x - p.x, spitter.y - p.y)).toBeGreaterThan(keepAway * 0.5);
+  });
+
+  it('o blindado leva menos dano de cada golpe', () => {
+    const { sim, bus } = setup(map([{ id: 'armored', x: 250, y: 240 }]));
+    const armored = sim.combat.list[0];
+    if (!armored) throw new Error('sem blindado');
+    const hits: number[] = [];
+    bus.on('enemy:hit', ({ damage }) => hits.push(damage));
+    sim.combat.roll = () => 0.99; // nunca falha
+    sim.combat.attack(armored.uid);
+    const armor = content.enemies.zombie_armored?.armorPct ?? 0;
+    const fist = sim.combat.weapon().damage;
+    expect(hits[0]).toBe(Math.max(1, Math.round((fist * (100 - armor)) / 100)));
+    expect(hits[0]).toBeLessThan(fist);
+  });
+
+  it('a dificuldade muda a vida dos inimigos (e os que já estão ajustam-se)', () => {
+    const { state, sim } = setup(map([{ id: 'walker', x: 330, y: 240 }]));
+    const walker = sim.combat.list[0];
+    const hp = content.enemies.zombie_walker?.hp ?? 0;
+    expect(walker?.maxHp).toBe(hp);
+    state.data.settings.difficulty = 'nightmare';
+    sim.refreshDifficulty();
+    expect(walker?.maxHp).toBe(Math.round((hp * BALANCE.difficulty.nightmare.enemyPct) / 100));
+  });
+
   it('sangrar tira vida devagar; uma ligadura estanca', () => {
     const { state, sim, run } = setup(map([]));
     const player = state.data.player;

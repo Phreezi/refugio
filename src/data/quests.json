@@ -267,5 +267,23 @@
       "xp": 2000,
       "coins": 500
     }
+  },
+  {
+    "id": "q_colossus",
+    "giver": "sergeant",
+    "level": 28,
+    "after": "q_city",
+    "goals": [
+      {
+        "type": "kill",
+        "enemy": "boss_colossus",
+        "qty": 1
+      }
+    ],
+    "reward": {
+      "xp": 3000,
+      "coins": 800,
+      "items": [["medkit", 3]]
+    }
   }
 ]

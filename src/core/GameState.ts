@@ -65,6 +65,10 @@ export const DEFAULT_PLAYER_NAME = 'Sobrevivente';
 export const PLAYER_NAME_MAX = 14;
 export const CHARACTER_LOOKS: readonly CharacterLook[] = ['boy', 'girl'];
 
+/** Dificuldade escolhida (save v23): multiplica a vida e o dano dos inimigos e a XP (§12). */
+export type Difficulty = 'relaxed' | 'normal' | 'hard' | 'nightmare';
+export const DIFFICULTIES: readonly Difficulty[] = ['relaxed', 'normal', 'hard', 'nightmare'];
+
 export interface WorldState {
   /** Ticks de lógica decorridos desde o início do jogo (1 tick = FIXED_STEP_MS). */
   tick: number;
@@ -137,7 +141,7 @@ export interface GameStateData {
   /** Receitas aprendidas em notas (antes do nível que as desbloqueia). */
   unlocks: { recipes: string[] };
   /** Definições do jogo gravadas no save (§10.5). */
-  settings: { hordes: boolean };
+  settings: { hordes: boolean; difficulty: Difficulty };
   horde: HordeState;
   /** Masmorras (bunker): piso mais fundo já alcançado (checkpoint), pelo id da masmorra. */
   dungeons: Record<string, number>;
@@ -199,7 +203,7 @@ export function createNewGameState(spawn: { x: number; y: number }, seed = 1): G
     zones: {},
     stations: {},
     unlocks: { recipes: [] },
-    settings: { hordes: false },
+    settings: { hordes: false, difficulty: 'normal' },
     horde: { at: 0, count: 0, active: false },
     dungeons: {},
     bosses: {},
