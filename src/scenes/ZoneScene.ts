@@ -347,6 +347,8 @@ export class ZoneScene extends Phaser.Scene {
     if (!pressed) uiState.actionLocked = false;
     simulation.setActionHeld(!blocked && !buildMode.active && !uiState.actionLocked && pressed);
     simulation.autoAttack = preferences().autoAttack && !blocked && !buildMode.active;
+    simulation.autoFight = preferences().autoFight;
+    simulation.autoGather = preferences().autoGather;
     // rawDelta = tempo real entre frames; o delta "suavizado" do Phaser fica limitado a
     // 16,7 ms com a janela sem foco, o que atrasaria o relógio do jogo.
     // Velocidade do jogo (x1/x2/x3): mais tempo de jogo por frame (no máx. 5 ticks por frame).
@@ -1112,11 +1114,20 @@ export class ZoneScene extends Phaser.Scene {
     const zoom = worldZoomFor(view.zoom);
     const visibleWidth = (view.width * view.zoom) / zoom;
     const visibleHeight = (view.height * view.zoom) / zoom;
-    const bx = area.x + Math.min(0, (area.w - visibleWidth) / 2);
-    const by = area.y + Math.min(0, (area.h - visibleHeight) / 2);
     const camera = this.cameras.main;
     camera.setZoom(zoom);
-    camera.setBounds(bx, by, Math.max(area.w, visibleWidth), Math.max(area.h, visibleHeight));
+    // Pedido do jogador: o boneco sempre ao centro, também junto às bordas do mundo — fora das
+    // zonas vêem-se as montanhas (renderVoid), por isso a câmara não tem limites. Só as zonas
+    // fora do mundo contínuo (masmorras, eventos) mais pequenas do que a vista ficam centradas.
+    const small = area.w < visibleWidth && area.h < visibleHeight && !content.world.rect(this.zoneId);
+    if (small) {
+      camera.setBounds(
+        area.x + (area.w - visibleWidth) / 2,
+        area.y + (area.h - visibleHeight) / 2,
+        visibleWidth,
+        visibleHeight,
+      );
+    } else camera.removeBounds();
   }
 
   /** "!" nos NPCs com missão para dar; "?" nos que têm uma missão pronta a entregar. */

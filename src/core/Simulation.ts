@@ -121,6 +121,9 @@ export class Simulation {
    * inimigo mais perto que esteja ao alcance da arma.
    */
   autoAttack = false;
+  /** Opções do Auto: atacar e/ou recolher (preferências do dispositivo). */
+  autoFight = true;
+  autoGather = true;
   /** Tick (no ecrã do convidado) em que carregou na ação: a pesca usa-o. */
   private strikeTick: number | null = null;
 
@@ -764,10 +767,13 @@ export class Simulation {
   private runAutoAttack(tick: number): void {
     if (this.fishing.active) return;
     const weapon = this.combat.weapon();
-    const target = weapon.ranged
-      ? this.combat.nearestInRange(weapon.ranged.range)
-      : this.combat.nearestInReach(PLAYER_FOOTPRINT, weapon.reach);
+    const target = !this.autoFight
+      ? null
+      : weapon.ranged
+        ? this.combat.nearestInRange(weapon.ranged.range)
+        : this.combat.nearestInReach(PLAYER_FOOTPRINT, weapon.reach);
     if (!target) {
+      if (!this.autoGather) return;
       // Sem inimigos: recolhe sozinho o recurso à frente (árvores, pedras, bagas…).
       const ahead = this.interaction.currentTarget(PLAYER_FOOTPRINT, true);
       if (ahead?.data.type === 'resource') {

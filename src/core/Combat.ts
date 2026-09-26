@@ -1214,7 +1214,12 @@ export class Combat {
     const kept = items.filter((slot) => slot !== null);
     if (kept.length === 0) return null;
     const bags = zoneState(this.state.data, zoneId).bags;
-    const expiresAt = this.now() + BALANCE.deathBagHoursReal * HOURS_MS;
+    // Mochila da morte: `deathBagHoursReal` horas reais; pilhas largadas: `groundLootHours` de jogo.
+    const expiresAt =
+      this.now() +
+      (death
+        ? BALANCE.deathBagHoursReal * HOURS_MS
+        : (BALANCE.groundLootHours / 24) * BALANCE.dayLengthSec * 1000);
     // A morte junta tudo na mesma mochila; itens largados juntam-se a uma pilha mesmo ao lado.
     const existing = death
       ? bags.find((bag) => bag.death)
@@ -1241,7 +1246,7 @@ export class Combat {
 
   /**
    * O corpo de um inimigo: uma "mochila" no chão com os drops, desenhada como o inimigo a
-   * cinzento; dura `corpseDays` dias de jogo (se o jogador sair e voltar) ou até se esvaziar.
+   * cinzento; dura `groundLootHours` horas de jogo (se o jogador sair e voltar) ou até se esvaziar.
    */
   private corpseBag(zoneId: string, enemy: Enemy, items: Container): void {
     const bags = zoneState(this.state.data, zoneId).bags;
@@ -1249,7 +1254,7 @@ export class Combat {
       x: Math.round(enemy.x),
       y: Math.round(enemy.y),
       items,
-      expiresAt: this.now() + BALANCE.corpseDays * BALANCE.dayLengthSec * 1000,
+      expiresAt: this.now() + (BALANCE.groundLootHours / 24) * BALANCE.dayLengthSec * 1000,
       death: false,
       corpse: enemy.id,
     });

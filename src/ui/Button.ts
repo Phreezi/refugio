@@ -101,6 +101,19 @@ export class Button {
    * Premir e largar (para botões que se seguram, como "Correr"): `down` ao tocar, `up` ao
    * largar ou ao sair do botão.
    */
+  /** Centro e tamanho do botão (px de jogo). */
+  get x(): number {
+    return this.fill.x;
+  }
+
+  get y(): number {
+    return this.fill.y;
+  }
+
+  get height(): number {
+    return this.fill.height;
+  }
+
   onPress(down: () => void, up: () => void): this {
     let held = false;
     this.fill

@@ -102,7 +102,7 @@
   "enchantDamagePct": 15,
   "enchantArmor": 2,
   "talentResetCostPerPoint": 10,
-  "corpseDays": 1,
+  "groundLootHours": 6,
   "groundThingsMax": 300,
   "orderHours": 1,
   "deliveryOffsetPx": 16,

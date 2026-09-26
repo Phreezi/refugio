@@ -19,6 +19,10 @@ export interface Preferences {
   musicVolume: number;
   /** Ataque automático ligado (botão "Auto" do HUD). */
   autoAttack: boolean;
+  /** Com o Auto ligado: atacar sozinho os inimigos ao alcance. */
+  autoFight: boolean;
+  /** Com o Auto ligado: recolher sozinho o recurso à frente. */
+  autoGather: boolean;
   /** Tamanho da interface (menus, HUD): grande (o do mundo), médio ou pequeno. */
   uiSize: UiSize;
 }
@@ -35,6 +39,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   volume: 0.6,
   musicVolume: 0.4,
   autoAttack: false,
+  autoFight: true,
+  autoGather: true,
   uiSize: 'large',
 };
 
@@ -54,7 +60,14 @@ export function parsePreferences(text: string | null): Preferences {
   if (typeof raw !== 'object' || raw === null) return prefs;
   const r = raw as Record<string, unknown>;
   if (typeof r.language === 'string' && isLanguage(r.language)) prefs.language = r.language;
-  for (const key of ['damageNumbers', 'vibration', 'colorblind', 'autoAttack'] as const) {
+  for (const key of [
+    'damageNumbers',
+    'vibration',
+    'colorblind',
+    'autoAttack',
+    'autoFight',
+    'autoGather',
+  ] as const) {
     if (typeof r[key] === 'boolean') prefs[key] = r[key];
   }
   if (typeof r.uiSize === 'string' && (UI_SIZES as readonly string[]).includes(r.uiSize)) {

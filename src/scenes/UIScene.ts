@@ -44,6 +44,11 @@ const JOYSTICK_DEAD_ZONE = 0.25;
 /** Até esta fração do raio anda-se agachado (devagar); acima, a correr normal. */
 const JOYSTICK_SNEAK_ZONE = 0.55;
 const ACTIVE_ALPHA = 0.7;
+/** Avisos que se repetem (ex.: sem munição): desaparecem mais depressa. */
+const SHORT_NOTICE_MS = 1200;
+/** Segurar o "Auto" este tempo abre as opções (atacar/apanhar); fecham-se sozinhas depois. */
+const AUTO_HOLD_MS = 450;
+const AUTO_OPTIONS_MS = 4000;
 /** Largura da barra da contagem do "Casa". */
 const RECALL_BAR_W = 60;
 /** Ponteiros em simultâneo: rato + 2 dedos (joystick + botão de ação, ou pinça). */
@@ -133,6 +138,7 @@ export class UIScene extends Phaser.Scene {
   private questLabel: Label | null = null;
   private dialog: DialogUI | null = null;
   private noticeBg: Phaser.GameObjects.Rectangle | null = null;
+  private noticeY = 0;
   /** Auto e Ação à vista (escondem-se com painéis abertos e no modo construção). */
   private playButtonsVisible = true;
   private worldMap: MapUI | null = null;
@@ -148,6 +154,9 @@ export class UIScene extends Phaser.Scene {
   /** Botão "Construir": escondido no modo construção (a paleta ocupa o sítio; há o Sair). */
   private buildButton: Button | null = null;
   private autoButton: Button | null = null;
+  /** Opções do Auto (segurar o botão): atacar e/ou apanhar. */
+  private autoOptions: Button[] = [];
+  private autoOptionsTimer: Phaser.Time.TimerEvent | null = null;
   /** Talento ativo "Correr" (só aparece depois de o aprender). */
   private sprintButton: Button | null = null;
   private sprintVisible = true;
@@ -325,6 +334,8 @@ export class UIScene extends Phaser.Scene {
       this.worldMap = null;
       this.questLabel = null;
       this.recallUi = null;
+      this.autoOptions = [];
+      this.autoOptionsTimer = null;
       this.sprintButton = null;
       this.sprintVisible = true;
       this.sprintReady = false;
@@ -535,11 +546,11 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** Mensagem curta no centro-alto do ecrã (substitui a anterior). */
-  private showNotice(text: string, action: (() => void) | null = null): void {
+  private showNotice(text: string, action: (() => void) | null = null, ms = NOTICE_MS): void {
     this.noticeAction = action;
     this.notice?.setText(text).setVisible(true);
     this.noticeTimer?.remove();
-    this.noticeTimer = this.time.delayedCall(NOTICE_MS, () => {
+    this.noticeTimer = this.time.delayedCall(ms, () => {
       this.notice?.setVisible(false);
       this.noticeAction = null;
     });
@@ -650,7 +661,9 @@ export class UIScene extends Phaser.Scene {
         else if (reason === 'zone_level') this.showNotice(t('msg.zone_level', { level: level ?? 1 }));
         else if (reason === 'post_broken') this.showNotice(t('msg.post_broken'));
         else if (reason === 'food_only') this.showNotice(t('msg.food_only'));
-        else if (reason === 'no_ammo') this.showNotice(t('msg.no_ammo', { item: itemName(item ?? '') }));
+        // "Sem munição" repete-se com o Auto: aviso curto.
+        else if (reason === 'no_ammo')
+          this.showNotice(t('msg.no_ammo', { item: itemName(item ?? '') }), null, SHORT_NOTICE_MS);
         else if (reason === 'needs_item')
           this.showNotice(t('msg.needs_item', { item: itemName(item ?? '') }));
         else this.needsTool(tool === 'pickaxe' ? 'pickaxe' : 'axe');
@@ -670,7 +683,14 @@ export class UIScene extends Phaser.Scene {
         this.showNotice(t('msg.bleeding'));
       }),
       // Sementes: como se planta (uma vez por sessão).
-      eventBus.on('item:gained', ({ item }) => {
+      eventBus.on('item:gained', ({ item, qty }) => {
+        // Prémios de uma missão (a conversa tapa o "+N" do mundo): aviso por baixo da conversa.
+        if (this.dialog?.isOpen) {
+          const line = `+${String(qty)} ${itemName(item)}`;
+          const current = this.notice?.text.visible ? this.notice.text.text : '';
+          this.showNotice(current && current.split('\n').length < 4 ? `${current}\n${line}` : line);
+          return;
+        }
         if (this.seedHintShown || !content.items[item]?.plant) return;
         this.seedHintShown = true;
         this.showNotice(t('msg.seeds_hint'));
@@ -779,7 +799,16 @@ export class UIScene extends Phaser.Scene {
   private renderNoticeBg(): void {
     const bg = this.noticeBg;
     const text = this.notice?.text;
-    if (!bg || !text) return;
+    if (!bg || !text || !this.notice) return;
+    // A falar com um NPC: o aviso passa para baixo do painel da conversa (senão ficava tapado).
+    const { width, height } = getView();
+    const dialogBottom = this.dialog?.isOpen ? this.dialog.bottom : null;
+    const noticeY =
+      dialogBottom !== null ? Math.min(height - 40, dialogBottom + 14) : Math.round(height * 0.28);
+    if (this.noticeY !== noticeY) {
+      this.noticeY = noticeY;
+      this.notice.setPosition(Math.round(width / 2), noticeY);
+    }
     const visible = text.visible && text.text !== '';
     bg.setVisible(visible);
     if (!visible) return;
@@ -1027,10 +1056,25 @@ export class UIScene extends Phaser.Scene {
         fontSize: 8,
         style: preferences().autoAttack ? 'primary' : 'secondary',
       },
-      () => {
-        this.toggleAutoAttack();
-      },
+      () => undefined,
     ).setDepth(70);
+    // Toque: liga/desliga. Segurar (ou clique direito): escolher atacar e/ou apanhar.
+    let holdTimer: Phaser.Time.TimerEvent | null = null;
+    let held = false;
+    this.autoButton.onPress(
+      () => {
+        held = false;
+        holdTimer = this.time.delayedCall(AUTO_HOLD_MS, () => {
+          held = true;
+          this.showAutoOptions();
+        });
+      },
+      () => {
+        holdTimer?.remove();
+        holdTimer = null;
+        if (!held) this.toggleAutoAttack();
+      },
+    );
     // Correr (por cima do "Auto"): um toque liga/desliga; segurar corre enquanto se segura.
     const autoY = fitsRow ? hotbar.y + hotbar.h / 2 : touch ? cy - ACTION_RADIUS - 16 : hotbar.y - 12;
     const autoH = fitsRow ? hotbar.h : 16;
@@ -1077,6 +1121,51 @@ export class UIScene extends Phaser.Scene {
     this.events.on('ui:action-released', () => button.setFillStyle(paletteNumber('wood'), 0.8));
   }
 
+  /** Opções do Auto, por cima do botão: "Atacar" e "Apanhar" (liga/desliga cada uma). */
+  private showAutoOptions(): void {
+    this.hideAutoOptions();
+    const auto = this.autoButton;
+    if (!auto) return;
+    const { width } = getView();
+    const w = 64;
+    const x = Math.min(width - 4 - w / 2, auto.x);
+    const rows: { key: 'autoFight' | 'autoGather'; label: MessageKey }[] = [
+      { key: 'autoFight', label: 'hud.auto_fight' },
+      { key: 'autoGather', label: 'hud.auto_gather' },
+    ];
+    rows.forEach(({ key, label }, i) => {
+      const text = (): string => `${t(label)}: ${t(preferences()[key] ? 'pause.on' : 'pause.off')}`;
+      const button: Button = new Button(
+        this,
+        x,
+        auto.y - auto.height / 2 - 10 - i * 18,
+        text(),
+        { width: w, height: 14, fontSize: 8, style: preferences()[key] ? 'primary' : 'secondary' },
+        () => {
+          setPreference(key, !preferences()[key]);
+          button.setText(text()).setStyle(preferences()[key] ? 'primary' : 'secondary');
+          this.scheduleHideAutoOptions();
+        },
+      ).setDepth(90);
+      this.autoOptions.push(button);
+    });
+    this.scheduleHideAutoOptions();
+  }
+
+  private scheduleHideAutoOptions(): void {
+    this.autoOptionsTimer?.remove();
+    this.autoOptionsTimer = this.time.delayedCall(AUTO_OPTIONS_MS, () => {
+      this.hideAutoOptions();
+    });
+  }
+
+  private hideAutoOptions(): void {
+    this.autoOptionsTimer?.remove();
+    this.autoOptionsTimer = null;
+    for (const button of this.autoOptions) button.destroy();
+    this.autoOptions = [];
+  }
+
   /** Liga/desliga o ataque automático (botão "Auto" ou tecla F). */
   private toggleAutoAttack(): void {
     const on = !preferences().autoAttack;
@@ -1103,14 +1192,14 @@ export class UIScene extends Phaser.Scene {
     });
     keyboard.on('keydown-ENTER', (event: KeyboardEvent) => {
       if (event.repeat) return;
-      if (this.dialog?.isOpen) this.dialog.advance();
+      if (this.dialog?.isOpen) this.dialog.confirm();
       else this.runNoticeAction();
     });
     // Conversa com um NPC: Espaço passa à fala seguinte (e, no fim, sai). Com uma pilha no chão
     // ou um contentor aberto, Espaço outra vez apanha tudo (Espaço 2× = abrir e apanhar).
     keyboard.on('keydown-SPACE', (event: KeyboardEvent) => {
       if (event.repeat || this.pause?.isOpen) return;
-      if (this.dialog?.isOpen) this.dialog.advance();
+      if (this.dialog?.isOpen) this.dialog.confirm();
       else this.inventory?.takeAll();
     });
     // M: mapa do mundo (onde estou?).
