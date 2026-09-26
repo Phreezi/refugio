@@ -1,7 +1,7 @@
 {
   "dayLengthSec": 1200,
   "dayStartHour": 6,
-  "nightFraction": 0.25,
+  "nightFraction": 0.3334,
   "nightDarkness": 0.72,
   "statMax": 100,
   "hungerDecaySec": 18,

@@ -352,7 +352,10 @@ export class CraftingUI {
       .slice(start, start + this.perPage)
       .forEach((recipe, i) => {
         const ry = y + i * ROW_H;
-        const def = content.items[recipe.output];
+        // Vender (um recurso → moedas): a linha mostra o recurso, quanto se tem e o que se recebe
+        // ("Madeira 410/10 (2× Moeda)").
+        const sale = recipe.category === 'sell' && recipe.inputs.length === 1 ? recipe.inputs[0] : undefined;
+        const def = content.items[sale?.item ?? recipe.output];
         const locked = !this.sim.progression.isRecipeUnlocked(recipe);
         if (def)
           this.add(
@@ -370,8 +373,9 @@ export class CraftingUI {
             .setDepth(DEPTH.content)
             .setInteractive({ useHandCursor: true }),
         );
+        const shown = sale?.item ?? recipe.output;
         info.on('pointerup', () => {
-          this.message([itemName(recipe.output), ...describeItem(recipe.output, def)].join('\n'));
+          this.message([itemName(shown), ...describeItem(shown, def)].join('\n'));
         });
         const qty = recipe.qty > 1 ? ` ×${String(recipe.qty)}` : '';
         const time = this.delivers()
@@ -379,16 +383,26 @@ export class CraftingUI {
           : recipe.timeSec > 0
             ? ` · ${t('craft.seconds', { s: recipe.timeSec })}`
             : '';
-        this.label(x + PAD + 20, ry + 1, `${itemName(recipe.output)}${qty}${time}`, {
-          size: 8,
-          bold: true,
-          color: locked ? 'stone' : 'cream',
-        });
-        // Ingredientes: "tem/precisa nome", a vermelho se faltar.
+        if (sale) {
+          const have = haveInput(containers, sale.item, gameState.data.player);
+          this.label(
+            x + PAD + 20,
+            ry + 1,
+            `${itemName(sale.item)} ${String(have)}/${String(sale.qty)} (${String(recipe.qty)}× ${itemName(recipe.output)})`,
+            { size: 8, bold: true, color: locked ? 'stone' : have >= sale.qty ? 'cream' : 'red' },
+          );
+        } else
+          this.label(x + PAD + 20, ry + 1, `${itemName(recipe.output)}${qty}${time}`, {
+            size: 8,
+            bold: true,
+            color: locked ? 'stone' : 'cream',
+          });
+        // Ingredientes: "tem/precisa nome" (quanto se tem mesmo, ex.: 42/3 Moeda), a vermelho se
+        // faltar. Na venda já estão no título.
         let ix = x + PAD + 20;
-        for (const { item, qty: need } of recipe.inputs) {
+        for (const { item, qty: need } of sale ? [] : recipe.inputs) {
           const have = haveInput(containers, item, gameState.data.player);
-          const text = `${String(Math.min(have, need))}/${String(need)} ${itemName(item)}`;
+          const text = `${String(have)}/${String(need)} ${itemName(item)}`;
           const lbl = this.label(ix, ry + 12, text, {
             size: 7,
             color: locked ? 'stone' : have >= need ? 'lime' : 'red',
@@ -555,15 +569,10 @@ export class CraftingUI {
       for (const { item, qty } of cost) {
         const have = countItem(containers, item);
         ok &&= have >= qty;
-        const lbl = this.label(
-          ix,
-          ry + 12,
-          `${String(Math.min(have, qty))}/${String(qty)} ${itemName(item)}`,
-          {
-            size: 7,
-            color: have >= qty ? 'lime' : 'red',
-          },
-        );
+        const lbl = this.label(ix, ry + 12, `${String(have)}/${String(qty)} ${itemName(item)}`, {
+          size: 7,
+          color: have >= qty ? 'lime' : 'red',
+        });
         ix += lbl.text.width + 8;
       }
       this.button(

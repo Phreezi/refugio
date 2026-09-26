@@ -132,7 +132,7 @@ const VOID_TEXTURE = 'void_cliffs';
 /** Mundo contínuo (Etapa E): desenham-se as zonas a menos disto (tiles) da zona atual. */
 const NEIGHBOR_MARGIN_TILES = 40;
 /** …e só se apagam quando ficam a mais disto (evita criar e apagar a andar junto a uma borda). */
-const NEIGHBOR_DROP_TILES = 64;
+const NEIGHBOR_DROP_TILES = 48;
 
 /** Tudo o que se desenhou de uma zona (a atual ou uma vizinha), para a apagar ou a seguir. */
 interface ZoneView {
