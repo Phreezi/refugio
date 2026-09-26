@@ -300,7 +300,98 @@ const painters: Record<BaseTile, Painter> = {
     img.fill(ox, 0, 1, SIZE, color('ink'));
     img.fill(ox + SIZE - 1, 0, 1, SIZE, color('ink'));
   },
+  mound: (img, ox) => {
+    // Monte de terra coberto de erva (luz em cima à esquerda); em fila parece uma sebe irregular.
+    outlined(img, ox, 'forest_dark', (t) => {
+      t.ellipse(8, 9, 8, 6.5, color('grass'));
+      t.ellipse(6.5, 7, 5, 3.5, color('leaf'));
+      t.ellipse(9.5, 12.5, 6.5, 2.2, color('forest'));
+      for (const [x, y] of [
+        [4, 5],
+        [7, 4],
+        [11, 6],
+        [3, 9],
+      ] as const)
+        t.set(x, y, color('lime'));
+      t.set(10, 9, color('forest'));
+      t.set(12, 11, color('forest'));
+    });
+  },
+  rocks: (img, ox) => {
+    // Pedregulhos amontoados, cada um com 3 tons.
+    outlined(img, ox, 'ink', (t) => {
+      for (const [cx, cy, rx, ry] of [
+        [5, 10, 4.5, 3.5],
+        [11, 8, 4, 3.5],
+        [9, 13, 3.5, 2],
+      ] as const) {
+        t.ellipse(cx, cy, rx, ry, color('stone'));
+        t.ellipse(cx - 1, cy - 1, rx - 1.5, ry - 1.5, color('stone_light'));
+        t.ellipse(cx + 1, cy + ry - 1, rx - 1.5, 1, color('stone_dark'));
+      }
+      t.set(4, 7, color('leaf')); // musgo
+      t.set(10, 5, color('leaf'));
+    });
+  },
+  log: (img, ox) => {
+    // Tronco caído na horizontal (continua para os lados), com veios e musgo.
+    outlined(img, ox, 'ink', (t) => {
+      t.fill(0, 5, SIZE, 7, color('bark'));
+      t.fill(0, 5, SIZE, 1, color('wood_light'));
+      t.fill(0, 6, SIZE, 1, color('wood'));
+      t.fill(0, 11, SIZE, 1, color('bark_dark'));
+      for (const x of [2, 7, 12]) t.fill(x, 8, 3, 1, color('bark_dark'));
+      t.fill(9, 6, 2, 2, color('bark_dark')); // nó
+      t.fill(3, 4, 3, 1, color('leaf'));
+      t.set(4, 3, color('grass'));
+    });
+  },
+  waterfall: (img, ox) => {
+    // Cascata: rebordo de pedra, água a cair em riscas e espuma em baixo.
+    img.fill(ox, 0, SIZE, SIZE, color('water'));
+    for (let x = 0; x < SIZE; x++) {
+      const shade = x % 4 === 0 ? 'ice' : x % 4 === 2 ? 'sky' : 'water';
+      for (let y = 2 + (x % 3); y < 13; y += 3) img.set(ox + x, y, color(shade));
+    }
+    img.fill(ox, 0, SIZE, 2, color('stone_dark'));
+    img.fill(ox, 0, SIZE, 1, color('stone'));
+    img.fill(ox, 13, SIZE, 3, color('ice'));
+    for (const x of [1, 5, 8, 12, 14]) img.set(ox + x, 12, color('cream'));
+    for (const x of [3, 10]) img.set(ox + x, 15, color('sky'));
+  },
+  cliff: (img, ox) => {
+    // Penhasco: rocha escura com camadas, fendas e arestas claras (como as montanhas à volta).
+    img.fill(ox, 0, SIZE, SIZE, color('stone_dark'));
+    for (const y of [4, 10]) img.fill(ox, y, SIZE, 1, color('shadow'));
+    for (const [x, y, w] of [
+      [1, 1, 5],
+      [8, 2, 6],
+      [3, 6, 7],
+      [11, 7, 4],
+      [0, 12, 6],
+      [8, 13, 7],
+    ] as const) {
+      img.fill(ox + x, y, w, 1, color('stone'));
+      img.fill(ox + x, y + 1, w, 1, color('stone_dark'));
+    }
+    for (const [x, y] of [
+      [6, 5],
+      [7, 6],
+      [13, 11],
+      [12, 12],
+    ] as const)
+      img.set(ox + x, y, color('ink'));
+    img.set(ox + 2, 7, color('forest'));
+  },
 };
+
+/** Pinta num tile à parte e contorna-o (tiles com fundo transparente, por cima do chão). */
+function outlined(img: Bitmap, ox: number, edge: string, paint: (tile: Bitmap) => void): void {
+  const tile = new Bitmap(SIZE, SIZE);
+  paint(tile);
+  tile.outline(color(edge));
+  img.blit(tile, ox, 0);
+}
 
 const image = new Bitmap(SIZE * BASE_TILES.length, SIZE);
 for (const [i, tile] of BASE_TILES.entries()) painters[tile](image, i * SIZE);

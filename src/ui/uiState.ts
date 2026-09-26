@@ -11,6 +11,8 @@ export const REOPEN_GUARD_MS = 300;
 export const uiState = {
   /** Botão de ação (toque) ou clique no mundo premido. */
   actionHeld: false,
+  /** A ação fica ignorada até se largar a tecla/botão (Espaço que fechou uma conversa não fala outra vez). */
+  actionLocked: false,
   /** Painel aberto (mochila/baú/crafting): o jogador não anda nem faz ações. */
   modalOpen: false,
   /** Mensagem a mostrar quando o HUD abrir (ex.: resumo do tempo offline). */
