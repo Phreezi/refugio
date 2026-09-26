@@ -13,6 +13,7 @@ import { BASE_ZONE_ID, CHARACTER_LOOKS, gameState, type CharacterLook } from '..
 import { simulation } from '../core/Simulation';
 import { getWorldView } from '../display/view';
 import { WeaponFx } from '../display/weaponFx';
+import { questKillTargets, questTarget, type WorldPoint } from '../world/questGuide';
 import { onWorldZoomChange, stepWorldZoom, worldZoomFor } from '../display/worldZoom';
 import { installShortcutGuard } from '../input/browserShortcuts';
 import { keyboardDirection } from '../input/joystick';
@@ -71,6 +72,11 @@ const SHOT_COLORS: Readonly<Record<string, PaletteColor>> = {
 const MARKER_TEXTURE = 'target_marker';
 /** Duração da animação de golpe (2 frames). */
 const ATTACK_MS = 240;
+/** Seta da missão: à volta do boneco, e só com o destino a mais de `QUEST_ARROW_MIN_PX`. */
+const QUEST_FX_DEPTH = 1_000_000 + 6; // por cima do véu da noite
+const QUEST_ARROW_RADIUS = 22;
+const QUEST_ARROW_MIN_PX = 40;
+const QUEST_TARGET_REFRESH_MS = 1000;
 /** Escurecer/clarear ao dormir. */
 const SLEEP_FADE_MS = 400;
 const FLOAT_TEXT_MS = 900;
@@ -173,6 +179,9 @@ type MoveKeys = Record<'up' | 'down' | 'left' | 'right' | 'action' | 'sneak', Ph
 export class ZoneScene extends Phaser.Scene {
   private zoneId: string = BASE_ZONE_ID;
   private enemyViews = new Map<number, EnemyView>();
+  /** Seta da missão ativa e marcas por cima dos inimigos a derrotar. */
+  private questFx: Phaser.GameObjects.Graphics | null = null;
+  private questTargetCache: { key: string; at: number; point: WorldPoint | null } | null = null;
   /** Contentores com loot, pelo id do objeto (ficam escuros quando vazios). */
   private containerSprites = new Map<number, Phaser.GameObjects.Image>();
   private bagSprites: Phaser.GameObjects.Image[] = [];
@@ -253,6 +262,7 @@ export class ZoneScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setDepth(ysort(y));
     this.weaponFx = new WeaponFx(this);
+    this.questFx = this.add.graphics().setDepth(QUEST_FX_DEPTH);
 
     const camera = this.cameras.main;
     // Fora do mapa (ecrãs maiores do que ele, ou zoom afastado) vê-se "noite".
@@ -331,6 +341,8 @@ export class ZoneScene extends Phaser.Scene {
       coop.onLost = null;
       this.player = null;
       this.weaponFx = null;
+      this.questFx = null;
+      this.questTargetCache = null;
       this.other = null;
       this.nameTags = {};
       this.keys = null;
@@ -369,6 +381,7 @@ export class ZoneScene extends Phaser.Scene {
     this.renderPlayer();
     this.renderOther();
     this.renderEnemies();
+    this.renderQuestGuide();
     this.renderShots();
     this.renderHomestead();
     this.renderLighting();
@@ -844,6 +857,76 @@ export class ZoneScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Missão ativa (pedido do jogador): uma seta dourada à volta do boneco aponta para onde ir
+   * (NPC a quem entregar, zona, inimigos a derrotar) e cada inimigo a derrotar tem uma marca
+   * por cima.
+   */
+  private renderQuestGuide(): void {
+    const fx = this.questFx;
+    const player = this.player;
+    if (!fx || !player) return;
+    // Desenha-se em coordenadas do mundo: o deslocamento ao mudar de zona não conta.
+    fx.clear().setPosition(0, 0);
+    const quests = simulation.quests;
+    const quest = quests.active()[0];
+    if (!quest || uiState.modalOpen) return;
+    const progress = quests.progress(quest.id);
+    const kills = questKillTargets(quest, progress);
+    // Marcas por cima dos inimigos da missão (os desta zona e os das vizinhas desenhadas).
+    const found: { nearest: { x: number; y: number; d: number } | null } = { nearest: null };
+    const mark = (enemyId: string, uid: number): void => {
+      if (!kills.has(enemyId)) return;
+      const view = this.enemyViews.get(uid);
+      if (!view) return;
+      const x = Math.round(view.sprite.x);
+      const top = Math.round(view.sprite.y - view.sprite.displayHeight - 4);
+      fx.fillStyle(paletteNumber('ink'), 1).fillTriangle(x - 4, top - 5, x + 4, top - 5, x, top + 1);
+      fx.fillStyle(paletteNumber('gold'), 1).fillTriangle(x - 3, top - 4, x + 3, top - 4, x, top);
+      const d = Math.hypot(view.sprite.x - player.x, view.sprite.y - player.y);
+      if (!found.nearest || d < found.nearest.d) found.nearest = { x: view.sprite.x, y: view.sprite.y, d };
+    };
+    for (const enemy of simulation.combat.list) mark(enemy.id, enemy.uid);
+    for (const n of simulation.combat.neighborEnemies())
+      for (const enemy of n.enemies) mark(enemy.id, enemy.uid);
+    // Para onde aponta: o inimigo da missão mais perto que se vê; senão, o sítio da missão.
+    const origin = content.world.rect(this.zoneId);
+    if (!origin) return;
+    const tile = content.zoneMap(this.zoneId).tileSize;
+    let target: { x: number; y: number } | null = found.nearest;
+    if (!target) {
+      const now = this.time.now;
+      const ready = quests.ready(quest.id);
+      const key = `${quest.id}:${String(ready)}:${progress.map((p) => p[0]).join(',')}`;
+      const cache = this.questTargetCache;
+      if (cache?.key !== key || now - cache.at > QUEST_TARGET_REFRESH_MS) {
+        const from = { x: origin.x * tile + player.x, y: origin.y * tile + player.y };
+        this.questTargetCache = { key, at: now, point: questTarget(quest, progress, ready, from) };
+      }
+      const point = this.questTargetCache?.point;
+      if (point) target = { x: point.x - origin.x * tile, y: point.y - origin.y * tile };
+    }
+    if (!target) return;
+    const dx = target.x - player.x;
+    const dy = target.y - player.y;
+    const d = Math.hypot(dx, dy);
+    if (d < QUEST_ARROW_MIN_PX) return;
+    const ux = dx / d;
+    const uy = dy / d;
+    const cx = player.x + ux * QUEST_ARROW_RADIUS;
+    const cy = player.y - 14 + uy * QUEST_ARROW_RADIUS;
+    const tri = (size: number): [number, number, number, number, number, number] => [
+      cx + ux * size,
+      cy + uy * size,
+      cx - ux * size * 0.6 - uy * size * 0.7,
+      cy - uy * size * 0.6 + ux * size * 0.7,
+      cx - ux * size * 0.6 + uy * size * 0.7,
+      cy - uy * size * 0.6 - ux * size * 0.7,
+    ];
+    fx.fillStyle(paletteNumber('ink'), 0.9).fillTriangle(...tri(7));
+    fx.fillStyle(paletteNumber('gold'), 1).fillTriangle(...tri(5));
+  }
+
   private renderEnemies(): void {
     // No convidado, os inimigos chegam do anfitrião 10×/s: interpola-se entre frames.
     const alpha = coop.isGuest ? coop.enemyAlpha(performance.now()) : simulation.alpha;
@@ -892,6 +975,9 @@ export class ZoneScene extends Phaser.Scene {
         } else if (view.sprite.tintMode === Phaser.TintModes.FILL && enemy.stun === 0) {
           view.sprite.clearTint();
         }
+        // Versões mais fortes (alfa, titã…): o mesmo desenho, tingido.
+        if (def.tint && view.sprite.tintMode !== Phaser.TintModes.FILL)
+          view.sprite.setTint(paletteNumber(def.tint as PaletteColor));
         const hurt = enemy.hp < enemy.maxHp;
         const top = y - view.sprite.height - 4;
         view.barBack

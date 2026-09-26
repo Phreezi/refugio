@@ -15,13 +15,18 @@
   "bloated": [["zombie_bloated", 1, 1]],
   "boars": [
     ["boar", 1, 2],
-    ["bear", 0, 1]
+    ["bear", 0, 1],
+    ["bear_grizzly", 0, 1]
   ],
-  "wolves": [["wolf", 2, 3]],
+  "wolves": [
+    ["wolf", 2, 3],
+    ["wolf_dire", 0, 1]
+  ],
   "t2_mixed": [
     ["zombie_walker", 1, 2],
     ["zombie_runner", 1, 1],
-    ["zombie_crawler", 0, 2]
+    ["zombie_crawler", 0, 2],
+    ["zombie_alpha", 0, 1]
   ],
   "horde": [
     ["zombie_walker", 6, 6],
@@ -33,20 +38,23 @@
     ["zombie_walker", 1, 2],
     ["zombie_runner", 1, 2],
     ["zombie_spitter", 0, 1],
-    ["zombie_armored", 0, 1]
+    ["zombie_armored", 0, 1],
+    ["zombie_ravager", 0, 1]
   ],
   "warden": [["boss_warden", 1, 1]],
   "t4_mixed": [
     ["zombie_walker", 2, 3],
     ["zombie_runner", 1, 2],
     ["zombie_armored", 1, 1],
-    ["zombie_spitter", 0, 1]
+    ["zombie_spitter", 0, 1],
+    ["zombie_juggernaut", 0, 1]
   ],
   "squad": [
     ["zombie_runner", 2, 3],
     ["zombie_tank", 1, 1],
     ["zombie_armored", 1, 2],
-    ["zombie_spitter", 1, 1]
+    ["zombie_spitter", 1, 1],
+    ["zombie_abomination", 0, 1]
   ],
   "screamers": [
     ["zombie_screamer", 1, 2],

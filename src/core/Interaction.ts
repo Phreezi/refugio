@@ -46,6 +46,8 @@ export interface ZoneContext {
    * fora dela) e o mesmo ponto nas coordenadas dela. Omisso = a zona não está no mundo contínuo.
    */
   neighborAt?: (x: number, y: number) => { zoneId: string; x: number; y: number } | null;
+  /** Mundo contínuo: canto superior esquerdo da zona no mundo (px), para passar coisas entre zonas. */
+  worldOrigin?: { x: number; y: number };
 }
 
 /**

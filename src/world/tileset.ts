@@ -34,6 +34,9 @@ export const BASE_TILES = [
   'log',
   'waterfall',
   'cliff',
+  // Degrau (estilo Pokémon): só se passa a descer (para sul). Entrada de caverna (chão escuro).
+  'ledge',
+  'cave_mouth',
 ] as const;
 
 export type BaseTile = (typeof BASE_TILES)[number];
@@ -42,6 +45,9 @@ export type BaseTile = (typeof BASE_TILES)[number];
 export function baseTileIndex(tile: BaseTile): number {
   return BASE_TILES.indexOf(tile);
 }
+
+/** Tiles da camada `collision` que só bloqueiam a subir (degraus: salta-se para baixo). */
+export const BASE_LEDGE_TILES: readonly BaseTile[] = ['ledge'];
 
 /** Tiles do chão que contam como fundação (o chão da casa em ruínas, CLAUDE.md §7.7). */
 export const BASE_FLOOR_TILES: readonly BaseTile[] = ['floor_wood', 'floor_concrete'];

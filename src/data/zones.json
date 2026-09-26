@@ -427,5 +427,65 @@
       "durationDays": 2,
       "offsetDays": 1
     }
+  },
+  "zone_cave_pine": {
+    "name": "zone.cave_pine",
+    "map": "maps/cave_pine.json",
+    "danger": 1,
+    "worldMapPos": [34, 24],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 2,
+    "unlockLevel": 1,
+    "nightEnemyMultiplier": 1,
+    "darkness": 0.6,
+    "hidden": true
+  },
+  "zone_cave_lake": {
+    "name": "zone.cave_lake",
+    "map": "maps/cave_lake.json",
+    "danger": 1,
+    "worldMapPos": [40, 40],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 2,
+    "unlockLevel": 3,
+    "nightEnemyMultiplier": 1,
+    "darkness": 0.6,
+    "hidden": true
+  },
+  "zone_cave_deep": {
+    "name": "zone.cave_deep",
+    "map": "maps/cave_deep.json",
+    "danger": 2,
+    "worldMapPos": [52, 28],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 2,
+    "unlockLevel": 10,
+    "nightEnemyMultiplier": 1,
+    "darkness": 0.6,
+    "hidden": true
+  },
+  "zone_cave_industrial": {
+    "name": "zone.cave_industrial",
+    "map": "maps/cave_industrial.json",
+    "danger": 3,
+    "worldMapPos": [64, 22],
+    "travelCost": {
+      "hunger": 0,
+      "thirst": 0
+    },
+    "respawnDays": 2,
+    "unlockLevel": 14,
+    "nightEnemyMultiplier": 1,
+    "darkness": 0.6,
+    "hidden": true
   }
 }

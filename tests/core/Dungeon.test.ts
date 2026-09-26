@@ -12,7 +12,13 @@ import { countItem } from '../../src/systems/inventory/inventory';
 import { rollLoot } from '../../src/systems/loot/loot';
 import { discountedCost, eventActive, eventTicksLeft } from '../../src/systems/travel/events';
 import { CollisionWorld } from '../../src/systems/movement/CollisionWorld';
-import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../../src/world/tileset';
+import {
+  BASE_FLOOR_TILES,
+  BASE_LEDGE_TILES,
+  BASE_TILES,
+  BASE_TILESET_NAME,
+  baseTileIndex,
+} from '../../src/world/tileset';
 import { parseZoneMap, type ZoneMap } from '../../src/world/zoneMap';
 import { loadContent } from '../helpers/content';
 
@@ -30,6 +36,7 @@ function realMap(zoneId: string): ZoneMap {
       propIds: Object.keys(content.props),
       stationIds: Object.keys(content.stations),
       floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
+      ledgeTiles: { [BASE_TILESET_NAME]: BASE_LEDGE_TILES.map(baseTileIndex) },
       lootTableIds: Object.keys(content.lootTables),
     },
     zone.map,
@@ -123,6 +130,7 @@ describe('Bunker (Fase 10)', () => {
     const boss = sim.combat.list.find((e) => e.id === 'boss_warden');
     if (!boss) throw new Error('sem chefe');
     boss.hp = 1;
+    sim.combat.roll = () => 0.99; // não falha
     sim.combat.attack(boss.uid);
     expect(events).toContain('boss:boss_warden');
     // O cartão fica no corpo: abre-se e apanha-se.

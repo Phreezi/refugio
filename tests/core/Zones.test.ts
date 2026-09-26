@@ -15,7 +15,13 @@ import { countItem } from '../../src/systems/inventory/inventory';
 import { rollLoot } from '../../src/systems/loot/loot';
 import { CollisionWorld } from '../../src/systems/movement/CollisionWorld';
 import { arrivalPoint, canTravel } from '../../src/systems/travel/travel';
-import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../../src/world/tileset';
+import {
+  BASE_FLOOR_TILES,
+  BASE_LEDGE_TILES,
+  BASE_TILES,
+  BASE_TILESET_NAME,
+  baseTileIndex,
+} from '../../src/world/tileset';
 import { parseZoneMap, type ZoneMap } from '../../src/world/zoneMap';
 import { buildWorldLayout, worldLinks } from '../../src/world/worldLayout';
 import { loadContent } from '../helpers/content';
@@ -36,6 +42,7 @@ function realMap(zoneId: string): ZoneMap {
       propIds: Object.keys(content.props),
       stationIds: Object.keys(content.stations),
       floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
+      ledgeTiles: { [BASE_TILESET_NAME]: BASE_LEDGE_TILES.map(baseTileIndex) },
       lootTableIds: Object.keys(content.lootTables),
     },
     zone.map,

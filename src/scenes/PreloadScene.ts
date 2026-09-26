@@ -34,7 +34,13 @@ import { getView, setupFixedCamera } from '../display/view';
 import { t } from '../i18n';
 import { Label } from '../ui/text';
 import { content } from '../world/content';
-import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../world/tileset';
+import {
+  BASE_FLOOR_TILES,
+  BASE_LEDGE_TILES,
+  BASE_TILES,
+  BASE_TILESET_NAME,
+  baseTileIndex,
+} from '../world/tileset';
 import { parseZoneMap } from '../world/zoneMap';
 import { showFatalError } from '../ui/fatalError';
 import { SceneKey } from './keys';
@@ -175,6 +181,7 @@ export class PreloadScene extends Phaser.Scene {
           propIds: Object.keys(props),
           stationIds: Object.keys(stations),
           floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
+          ledgeTiles: { [BASE_TILESET_NAME]: BASE_LEDGE_TILES.map(baseTileIndex) },
           zoneIds: Object.keys(zones),
           enemyGroupIds: Object.keys(groups),
           lootTableIds: Object.keys(lootTables),

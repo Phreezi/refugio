@@ -19,12 +19,14 @@ export function buildZoneContext(zoneId: string): ZoneContext {
   );
   // Mundo contínuo (Etapa E): fora do mapa estão os tiles das zonas vizinhas.
   const links = worldLinks(content.world, zoneId, map.tileSize, (id) => content.zoneMap(id));
+  const rect = content.world.rect(zoneId);
   if (links) collision.outside = links.outside;
   return {
     zoneId,
     map,
     collision,
     ...(links ? { neighborAt: links.neighborAt } : {}),
+    ...(rect ? { worldOrigin: { x: rect.x * map.tileSize, y: rect.y * map.tileSize } } : {}),
     items: content.items,
     resources: content.resources,
     props: content.props,

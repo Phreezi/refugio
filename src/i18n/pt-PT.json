@@ -672,5 +672,15 @@
   "hud.stamina": "Energia",
   "sleep.slept": "Dormiste até às 6h30. Energia e vida cheias.",
   "sleep.passed_out": "Adormeceste de cansaço onde estavas… acordaste às 11h, sem energia.",
-  "sleep.not_sleepy": "Ainda não tens sono: dorme-se a partir das {h}h."
+  "sleep.not_sleepy": "Ainda não tens sono: dorme-se a partir das {h}h.",
+  "enemy.zombie_alpha": "Arrastado alfa",
+  "enemy.wolf_dire": "Lobo terrível",
+  "enemy.zombie_ravager": "Devastador",
+  "enemy.bear_grizzly": "Urso-pardo",
+  "enemy.zombie_juggernaut": "Titã",
+  "enemy.zombie_abomination": "Abominação",
+  "zone.cave_pine": "Gruta do Pinhal",
+  "zone.cave_lake": "Gruta do Lago",
+  "zone.cave_deep": "Gruta da Floresta",
+  "zone.cave_industrial": "Minas Abandonadas"
 }

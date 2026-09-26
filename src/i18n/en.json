@@ -672,5 +672,15 @@
   "hud.stamina": "Energy",
   "sleep.slept": "You slept until 6:30. Energy and health restored.",
   "sleep.passed_out": "You collapsed from exhaustion… woke up at 11:00 with no energy.",
-  "sleep.not_sleepy": "You're not sleepy yet: bedtime is from {h}:00."
+  "sleep.not_sleepy": "You're not sleepy yet: bedtime is from {h}:00.",
+  "enemy.zombie_alpha": "Alpha shambler",
+  "enemy.wolf_dire": "Dire wolf",
+  "enemy.zombie_ravager": "Ravager",
+  "enemy.bear_grizzly": "Grizzly",
+  "enemy.zombie_juggernaut": "Juggernaut",
+  "enemy.zombie_abomination": "Abomination",
+  "zone.cave_pine": "Pinewood Cave",
+  "zone.cave_lake": "Lake Cave",
+  "zone.cave_deep": "Forest Cave",
+  "zone.cave_industrial": "Abandoned Mines"
 }

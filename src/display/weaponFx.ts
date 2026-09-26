@@ -70,7 +70,7 @@ export class WeaponFx {
     const px = Math.round(x + pose.dx);
     const py = Math.round(y + pose.dy);
     const d = depth + (pose.behind ? -0.5 : 0.5);
-    const fx = this.fx.clear().setVisible(true).setDepth(d);
+    const fx = this.fx.clear().setPosition(0, 0).setVisible(true).setDepth(d);
 
     if (swing.kind === 'punch') {
       // Punho: 3×3 px de pele com contorno, e duas riscas de impacto no fim do soco.

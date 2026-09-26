@@ -25,7 +25,13 @@ import {
   type StationDefs,
   type ResourceDefs,
 } from '../src/data/types.ts';
-import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../src/world/tileset.ts';
+import {
+  BASE_FLOOR_TILES,
+  BASE_LEDGE_TILES,
+  BASE_TILES,
+  BASE_TILESET_NAME,
+  baseTileIndex,
+} from '../src/world/tileset.ts';
 import { ZoneMapError, parseZoneMap, type ZoneMap } from '../src/world/zoneMap.ts';
 import { buildWorldLayout } from '../src/world/worldLayout.ts';
 import { QuestDataError, parseNpcs, parseQuests, parseWaystoneCosts } from '../src/systems/quests/quests.ts';
@@ -265,7 +271,14 @@ function checkEnemies(): string[] {
   if (Array.isArray(groups)) return groups.map((p) => `enemies: ${p}`);
   const problems: string[] = [];
   if (!(HORDE_GROUP in groups)) problems.push(`enemyGroups.json: falta o grupo "${HORDE_GROUP}" (hordas)`);
-  const ids = Object.keys(readJson('src/data/enemies.json') as object).filter((id) => id !== '$comment');
+  const enemies = readJson('src/data/enemies.json') as Record<string, { tint?: unknown }>;
+  const ids = Object.keys(enemies).filter((id) => id !== '$comment');
+  const palette = readJson('src/assets/palette.json') as Record<string, unknown>;
+  for (const id of ids) {
+    const tint = enemies[id]?.tint;
+    if (tint !== undefined && (typeof tint !== 'string' || !(tint in palette)))
+      problems.push(`enemies.json: "${id}" tint ${JSON.stringify(tint)} não é uma cor da paleta`);
+  }
   for (const lang of ['pt-PT', 'en']) {
     const dict = readJson(`src/i18n/${lang}.json`);
     if (!isStringRecord(dict)) continue;
@@ -407,6 +420,7 @@ function checkMaps(): string[] {
           propIds: Object.keys(props),
           stationIds: Object.keys(stations),
           floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
+          ledgeTiles: { [BASE_TILESET_NAME]: BASE_LEDGE_TILES.map(baseTileIndex) },
           zoneIds: Object.keys(zones),
           enemyGroupIds: Object.keys(groups),
           lootTableIds: loadLootIds() ?? [],

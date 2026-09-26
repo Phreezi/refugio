@@ -1125,6 +1125,8 @@ export interface EnemyDef {
   armorPct?: number;
   /** Chefe (fim do bunker): derrotado, só volta ao fim de `respawnDays` da zona; barra no HUD. */
   boss?: boolean;
+  /** Cor da paleta a tingir o sprite (versões mais fortes de um inimigo, ex.: "alfa"). */
+  tint?: string;
 }
 
 export type EnemyDefs = Readonly<Record<string, EnemyDef>>;
@@ -1150,6 +1152,7 @@ const ENEMY_KEYS = new Set([
   'boss',
   'spit',
   'armorPct',
+  'tint',
 ]);
 
 function isNonNegativeInt(value: unknown): value is number {
@@ -1261,6 +1264,10 @@ export function parseEnemies(
     if (raw.armorPct !== undefined) {
       if (isNonNegativeInt(raw.armorPct) && raw.armorPct <= 80) defs[id].armorPct = raw.armorPct;
       else problems.push(`"${id}": armorPct tem de ser um inteiro de 0 a 80`);
+    }
+    if (raw.tint !== undefined) {
+      if (typeof raw.tint === 'string' && /^[a-z_]+$/.test(raw.tint)) defs[id].tint = raw.tint;
+      else problems.push(`"${id}": tint tem de ser o nome de uma cor da paleta`);
     }
     if (raw.windupSec !== undefined) {
       if (positive(raw.windupSec) && raw.windupSec <= 5) defs[id].windupSec = raw.windupSec;

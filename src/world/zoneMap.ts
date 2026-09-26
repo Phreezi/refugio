@@ -51,6 +51,8 @@ export interface ZoneMap {
   solid: readonly boolean[];
   /** Um booleano por tile: chão construído no mapa (conta como fundação, §7.7). */
   floor: readonly boolean[];
+  /** Degraus (tiles de colisão que só bloqueiam a subir: salta-se para baixo). Omisso = nenhum. */
+  ledge?: readonly boolean[];
   playerSpawn: Point;
   exits: readonly ExitPoint[];
   resources: readonly ResourcePlacement[];
@@ -79,6 +81,8 @@ export interface ZoneMapRules {
   stationIds: Iterable<string>;
   /** Tiles da camada `ground` que contam como fundação: tileset → ids locais. */
   floorTiles?: Readonly<Record<string, readonly number[]>>;
+  /** Tiles (ids locais, por tileset) da camada `collision` que só bloqueiam a subir (degraus). */
+  ledgeTiles?: Readonly<Record<string, readonly number[]>>;
   /** Zonas válidas em `exit:<zona>` (omisso = não se verifica). */
   zoneIds?: Iterable<string>;
   /** Tabelas válidas em `container:<tabela>` (omisso = não se verifica). */
@@ -215,13 +219,15 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
 
   let solid: boolean[] = new Array<boolean>(size).fill(false);
   let floor: boolean[] = new Array<boolean>(size).fill(false);
-  const isFloor = (gid: number): boolean =>
-    ranges.some(
-      (r) =>
-        gid >= r.first &&
-        gid < r.first + r.count &&
-        (rules.floorTiles?.[r.name] ?? []).includes(gid - r.first),
-    );
+  let ledge: boolean[] = new Array<boolean>(size).fill(false);
+  const isIn =
+    (tiles: Readonly<Record<string, readonly number[]>> | undefined) =>
+    (gid: number): boolean =>
+      ranges.some(
+        (r) => gid >= r.first && gid < r.first + r.count && (tiles?.[r.name] ?? []).includes(gid - r.first),
+      );
+  const isFloor = isIn(rules.floorTiles);
+  const isLedge = isIn(rules.ledgeTiles);
   for (const name of TILE_LAYERS) {
     const found = layers.filter((l) => l.name === name);
     if (found.length !== 1 || found[0]?.type !== 'tilelayer') {
@@ -229,7 +235,10 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
       continue;
     }
     const gids = parseTileLayer(found[0], size, ranges, problems);
-    if (name === 'collision' && gids.length === size) solid = gids.map((gid) => gid !== 0);
+    if (name === 'collision' && gids.length === size) {
+      solid = gids.map((gid) => gid !== 0);
+      ledge = gids.map(isLedge);
+    }
     if (name === 'ground' && gids.length === size) floor = gids.map(isFloor);
   }
   for (const layer of layers) {
@@ -333,6 +342,7 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
     tileSize: rules.tileSize,
     solid,
     floor,
+    ...(ledge.some(Boolean) ? { ledge } : {}),
     playerSpawn: spawn,
     exits,
     resources,
