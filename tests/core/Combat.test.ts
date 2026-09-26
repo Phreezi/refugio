@@ -728,6 +728,28 @@ describe('Populações das zonas (mundo contínuo)', () => {
     run(1);
     expect(sim.combat.list.map((e) => e.id)).toEqual(['zombie_walker']);
   });
+
+  it('um só mapa: o inimigo da vizinha que entra na zona do jogador passa a ser desta (ataca-se)', () => {
+    const here = map([]);
+    const { sim, run } = setup(here);
+    const home = { ...context(ZONE, here), worldOrigin: { x: 0, y: 0 } };
+    sim.setZone(home);
+    // A Quinta está por cima (20 tiles = 320 px); o arrastado dela está junto à borda de baixo.
+    const farm = {
+      ...context('zone_farm', map([{ id: 'walker', x: 160, y: 300 }])),
+      worldOrigin: { x: 0, y: -320 },
+    };
+    sim.combat.keepZones([farm]);
+    const walker = sim.combat.neighborEnemies()[0]?.enemies[0];
+    if (!walker) throw new Error('sem arrastado');
+    walker.y = 330; // já passou a borda: está na zona do jogador (y = 10 aqui)
+    walker.px = walker.x;
+    walker.py = walker.y;
+    run(0.1);
+    expect(sim.combat.list.map((e) => e.uid)).toContain(walker.uid);
+    expect(walker.y).toBeLessThan(40);
+    expect(sim.combat.neighborEnemies()[0]?.enemies ?? []).not.toContain(walker);
+  });
 });
 
 describe('Voltar a casa (botão "Casa")', () => {

@@ -38,7 +38,8 @@ function sweepAxis(box: Rect, delta: number, axis: 'x' | 'y', world: CollisionWo
     h: box.h + (axis === 'y' ? Math.abs(delta) : 0),
   };
   let allowed = delta;
-  for (const solid of world.solidsIn(sweep)) {
+  // Degraus (estilo Pokémon): a descer passa-se por cima deles (salto); a subir bloqueiam.
+  for (const solid of world.solidsIn(sweep, axis === 'y' && delta > 0)) {
     // Sólidos em que já estamos metidos são ignorados, para nunca ficar preso.
     if (overlaps(solid, box)) continue;
     if (axis === 'x') {

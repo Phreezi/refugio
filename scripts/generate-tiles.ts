@@ -383,6 +383,32 @@ const painters: Record<BaseTile, Painter> = {
       img.set(ox + x, y, color('ink'));
     img.set(ox + 2, 7, color('forest'));
   },
+  ledge: (img, ox) => {
+    // Degrau (salta-se para baixo): relva em cima, rebordo de terra com sombra em baixo.
+    img.fill(ox, 0, SIZE, SIZE, color('grass'));
+    for (const [x, y] of [
+      [2, 2],
+      [9, 3],
+      [13, 1],
+    ] as const)
+      img.set(ox + x, y, color('leaf'));
+    img.fill(ox, 7, SIZE, 1, color('forest'));
+    img.fill(ox, 8, SIZE, 4, color('wood'));
+    img.fill(ox, 8, SIZE, 1, color('wood_light'));
+    for (const x of [1, 6, 11]) img.fill(ox + x, 10, 3, 1, color('bark'));
+    img.fill(ox, 12, SIZE, 1, color('bark_dark'));
+    img.fill(ox, 13, SIZE, 3, color('forest_dark'));
+  },
+  cave_mouth: (img, ox) => {
+    // Entrada de caverna: boca escura em rocha, com o chão a entrar.
+    img.fill(ox, 0, SIZE, SIZE, color('stone_dark'));
+    img.fill(ox + 2, 2, SIZE - 4, SIZE - 2, color('shadow'));
+    img.fill(ox + 3, 4, SIZE - 6, SIZE - 4, color('ink'));
+    img.fill(ox + 1, 0, SIZE - 2, 2, color('stone'));
+    img.set(ox + 2, 2, color('stone'));
+    img.set(ox + SIZE - 3, 2, color('stone'));
+    img.fill(ox + 4, SIZE - 2, SIZE - 8, 2, color('shadow'));
+  },
 };
 
 /** Pinta num tile à parte e contorna-o (tiles com fundo transparente, por cima do chão). */

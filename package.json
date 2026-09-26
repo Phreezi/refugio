@@ -1,7 +1,7 @@
 {
   "name": "refugio",
   "private": true,
-  "version": "0.0.54",
+  "version": "0.0.55",
   "description": "Refúgio — jogo de sobrevivência top-down em pixel art (HTML5)",
   "type": "module",
   "engines": {
@@ -33,6 +33,8 @@
     "map:events": "node scripts/generate-events.ts",
     "map:routes": "node scripts/generate-routes.ts",
     "map:extend": "node scripts/extend-zones.ts",
+    "map:caves": "node scripts/generate-caves.ts",
+    "map:ledges": "node scripts/add-ledges.ts",
     "map:naturalize": "node scripts/naturalize-barriers.ts"
   },
   "dependencies": {

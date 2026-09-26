@@ -138,6 +138,10 @@ export interface CombatContent {
 /** Altura (px) da área do corpo de um inimigo, acima dos pés (para lhe acertar). */
 const BODY_HEIGHT = 14;
 const HOURS_MS = 3_600_000;
+/** Ao passar a borda, os inimigos a esta distância (px) vêm com o jogador para a zona nova. */
+const FOLLOW_CROSS_PX = 200;
+/** Estados em que um inimigo está a lutar com o jogador (segue-o de zona para zona). */
+const CHASING: ReadonlySet<Enemy['state']> = new Set(['chase', 'windup', 'recover', 'charge']);
 
 /**
  * Combate (CLAUDE.md §7.8–§7.12): os inimigos da zona (nascem nos pontos `enemy_spawn` ao
@@ -161,6 +165,10 @@ export class Combat {
   /** Populações das zonas perto (a atual e as vizinhas desenhadas), pelo id da zona. */
   private populations = new Map<string, ZonePopulation>();
   private nextUidBlock = 1;
+  /** A zona da população atual (para saber de onde se veio ao passar a borda). */
+  private lastZoneId: string | null = null;
+  /** Onde cada inimigo nasceu (zona e ponto): mesmo que passe para outra zona, volta lá a nascer. */
+  private readonly originOf = new WeakMap<Enemy, { zoneId: string; home: { x: number; y: number } }>();
   /** Co-op (convidado): os inimigos vêm do anfitrião (não nascem aqui). */
   remote = false;
   /** Co-op: multiplicador de vida e dano dos inimigos (`coopEnemyMultiplier`; sozinho, 1). */
@@ -286,9 +294,74 @@ export class Combat {
       bags.splice(0, bags.length, ...alive);
       this.state.markDirty();
     }
+    const previous = this.pool;
+    const previousZone = seamless ? this.populations.get(this.lastZoneId ?? '')?.zone : undefined;
     const population = this.population(zone);
     population.zone = zone;
     this.pool = population.pool;
+    this.lastZoneId = zone.zoneId;
+    // Mundo contínuo (pedido do jogador: "um só mapa gigante"): quem vinha atrás do jogador
+    // (ou estava mesmo ao lado) passa com ele para a zona nova e continua a poder ser atacado.
+    if (previousZone && previous !== this.pool) {
+      const player = this.state.data.player;
+      const follow = previous.enemies.filter((enemy) => {
+        const off = this.offsetBetween(previousZone, zone);
+        if (!off) return false;
+        const near = Math.hypot(enemy.x + off.x - player.x, enemy.y + off.y - player.y) <= FOLLOW_CROSS_PX;
+        return enemy.horde || enemy.alert > 0 || CHASING.has(enemy.state) || near;
+      });
+      for (const enemy of follow) this.moveEnemy(enemy, previous, previousZone, this.pool, zone);
+    }
+  }
+
+  /** Deslocamento (px) de coordenadas da zona `from` para as da zona `to` (null fora do mundo). */
+  private offsetBetween(from: ZoneContext, to: ZoneContext): { x: number; y: number } | null {
+    if (!from.worldOrigin || !to.worldOrigin) return null;
+    return { x: from.worldOrigin.x - to.worldOrigin.x, y: from.worldOrigin.y - to.worldOrigin.y };
+  }
+
+  /** Passa um inimigo de uma população para outra (as posições mudam de coordenadas). */
+  private moveEnemy(
+    enemy: Enemy,
+    fromPool: EnemyPool,
+    from: ZoneContext,
+    toPool: EnemyPool,
+    to: ZoneContext,
+  ): void {
+    const off = this.offsetBetween(from, to);
+    const index = fromPool.enemies.indexOf(enemy);
+    if (!off || index < 0) return;
+    fromPool.enemies.splice(index, 1);
+    enemy.x += off.x;
+    enemy.y += off.y;
+    enemy.px += off.x;
+    enemy.py += off.y;
+    enemy.home = { x: enemy.home.x + off.x, y: enemy.home.y + off.y };
+    if (enemy.goal) enemy.goal = { x: enemy.goal.x + off.x, y: enemy.goal.y + off.y };
+    toPool.enemies.push(enemy);
+  }
+
+  /**
+   * Mundo contínuo: os inimigos das zonas vizinhas que entram na zona do jogador passam a ser
+   * desta zona (veem-no, atacam-no e podem ser atacados). Nunca saem para as vizinhas: seguem
+   * o jogador até desistirem e voltarem para casa.
+   */
+  private adoptWanderers(): void {
+    const zone = this.zone;
+    if (!zone?.worldOrigin || this.remote || this.linkedTo) return;
+    const w = zone.map.width * zone.map.tileSize;
+    const h = zone.map.height * zone.map.tileSize;
+    for (const [id, population] of this.populations) {
+      if (id === zone.zoneId) continue;
+      const off = this.offsetBetween(population.zone, zone);
+      if (!off) continue;
+      const inside = population.pool.enemies.filter((enemy) => {
+        const x = enemy.x + off.x;
+        const y = enemy.y + off.y;
+        return x >= 0 && y >= 0 && x < w && y < h;
+      });
+      for (const enemy of inside) this.moveEnemy(enemy, population.pool, population.zone, this.pool, zone);
+    }
   }
 
   /**
@@ -343,6 +416,7 @@ export class Combat {
             y: Math.round(spawn.y + (nextRandom(rng) - 0.5) * 24),
           };
           const enemy = createEnemy(population.pool.nextUid++, member.enemy, def, at, this.difficulty);
+          this.originOf.set(enemy, { zoneId: zone.zoneId, home: { ...enemy.home } });
           if (group.night) population.night.add(enemy);
           population.pool.enemies.push(enemy);
         }
@@ -393,6 +467,7 @@ export class Combat {
         const def = enemies[r.id];
         if (seen || !def) return seen;
         const enemy = createEnemy(population.pool.nextUid++, r.id, def, r.home, this.difficulty);
+        this.originOf.set(enemy, { zoneId, home: { ...r.home } });
         if (r.night) population.night.add(enemy);
         population.pool.enemies.push(enemy);
         return false;
@@ -931,6 +1006,7 @@ export class Combat {
     const zone = this.zone;
     this.sneaking = sneaking;
     this.flyProjectiles();
+    this.adoptWanderers();
     this.tickPopulations();
     if (!zone || this.enemies.length === 0) return;
     const { enemies } = this.content();
@@ -1343,11 +1419,13 @@ export class Combat {
     const def = this.content().enemies[enemy.id];
     this.enemies = this.enemies.filter((e) => e !== enemy);
     // Volta ao sítio onde nasceu daqui a pouco (os chefes e as hordas não).
-    const population = zone ? this.owner.populations.get(zone.zoneId) : undefined;
+    // Volta a nascer na zona de onde veio (mesmo que tenha morrido noutra).
+    const origin = this.owner.originOf.get(enemy);
+    const population = this.owner.populations.get(origin?.zoneId ?? zone?.zoneId ?? '');
     if (population && def && !def.boss && !enemy.horde)
       population.respawns.push({
         id: enemy.id,
-        home: { ...enemy.home },
+        home: { ...(origin?.home ?? enemy.home) },
         at: this.state.data.world.tick + secondsToTicks(BALANCE.enemyRespawnSec),
         night: population.night.has(enemy),
       });

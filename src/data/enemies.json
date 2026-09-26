@@ -355,5 +355,154 @@
       ["electronics", 3, 5],
       ["coin", 200, 300]
     ]
+  },
+  "zombie_alpha": {
+    "sprite": "zombie_walker",
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 140,
+    "damage": 14,
+    "speed": 48,
+    "detectRadius": 90,
+    "leashRadius": 180,
+    "attackRange": 10,
+    "attackSec": 1.6,
+    "drops": [
+      ["cloth", 1, 3],
+      ["scrap_metal", 1, 2],
+      ["coin", 8, 16]
+    ],
+    "xp": 45,
+    "tint": "orange"
+  },
+  "wolf_dire": {
+    "sprite": "wolf",
+    "footprint": {
+      "width": 12,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 160,
+    "damage": 18,
+    "speed": 108,
+    "detectRadius": 80,
+    "leashRadius": 170,
+    "attackRange": 10,
+    "attackSec": 1.3,
+    "drops": [
+      ["leather", 2, 3],
+      ["raw_meat", 2, 3],
+      ["coin", 10, 18]
+    ],
+    "xp": 70,
+    "bleedPct": 35,
+    "tint": "stone_dark"
+  },
+  "zombie_ravager": {
+    "sprite": "zombie_runner",
+    "footprint": {
+      "width": 10,
+      "height": 6
+    },
+    "behavior": "hostile",
+    "hp": 220,
+    "damage": 22,
+    "speed": 95,
+    "detectRadius": 64,
+    "leashRadius": 160,
+    "attackRange": 10,
+    "attackSec": 1.4,
+    "drops": [
+      ["scrap_metal", 2, 4],
+      ["electronics", 0, 2],
+      ["coin", 18, 30]
+    ],
+    "xp": 110,
+    "bleedPct": 40,
+    "tint": "red"
+  },
+  "bear_grizzly": {
+    "sprite": "bear",
+    "footprint": {
+      "width": 18,
+      "height": 8
+    },
+    "behavior": "hostile",
+    "hp": 480,
+    "damage": 32,
+    "speed": 75,
+    "detectRadius": 80,
+    "leashRadius": 200,
+    "attackRange": 14,
+    "attackSec": 1.8,
+    "windupSec": 0.7,
+    "bleedPct": 35,
+    "charge": {
+      "range": 80,
+      "speed": 140,
+      "sec": 0.8
+    },
+    "xp": 180,
+    "drops": [
+      ["leather", 4, 6],
+      ["raw_meat", 4, 6],
+      ["coin", 25, 40]
+    ],
+    "tint": "bark_dark"
+  },
+  "zombie_juggernaut": {
+    "sprite": "zombie_tank",
+    "footprint": {
+      "width": 14,
+      "height": 7
+    },
+    "behavior": "hostile",
+    "hp": 900,
+    "damage": 40,
+    "speed": 32,
+    "detectRadius": 80,
+    "leashRadius": 220,
+    "attackRange": 14,
+    "attackSec": 2.2,
+    "windupSec": 1.1,
+    "bleedPct": 30,
+    "drops": [
+      ["iron_ingot", 1, 3],
+      ["scrap_metal", 4, 8],
+      ["chemicals", 1, 2],
+      ["coin", 50, 90]
+    ],
+    "xp": 320,
+    "armorPct": 50,
+    "tint": "stone_dark"
+  },
+  "zombie_abomination": {
+    "sprite": "zombie_tank",
+    "footprint": {
+      "width": 14,
+      "height": 7
+    },
+    "behavior": "hostile",
+    "hp": 1800,
+    "damage": 60,
+    "speed": 36,
+    "detectRadius": 80,
+    "leashRadius": 220,
+    "attackRange": 14,
+    "attackSec": 2.2,
+    "windupSec": 1.2,
+    "bleedPct": 50,
+    "drops": [
+      ["iron_ingot", 2, 4],
+      ["electronics", 2, 4],
+      ["gunpowder", 2, 5],
+      ["coin", 100, 180]
+    ],
+    "xp": 650,
+    "armorPct": 60,
+    "tint": "plum"
   }
 }

@@ -280,6 +280,8 @@ npm run map:t4     # gera maps/military.json, city.json (idem)
 npm run map:events # gera maps/plane_crash.json, train.json, camp.json (idem)
 npm run map:routes # gera maps/route_1..10.json (Caminhos do mundo contínuo; idem)
 npm run map:extend # alarga as zonas 48 tiles para leste (área de PvE + poste ao fundo; só uma vez)
+npm run map:caves  # gera maps/cave_*.json e a boca de cada caverna na zona de entrada (`-- --force` refaz as cavernas)
+npm run map:ledges # degraus nos Caminhos + tileset embebido de todos os mapas (só uma vez)
 npm run map:naturalize # divisórias naturais nos Caminhos e nas bordas das zonas (só uma vez; `-- --force` refaz)
 ```
 
@@ -453,6 +455,9 @@ Os nós de recurso reaparecem (ver zonas).
 - Armadura reduz dano em percentagem (máx. 60%; soma das peças equipadas; cada golpe recebido gasta 1 de durabilidade a cada peça). Um golpe que acerta tira sempre pelo menos 1.
 - Os inimigos não se gravam: nascem nos pontos `enemy_spawn:<grupo>` ao entrar na zona (os grupos estão em `enemyGroups.json`).
 - **Populações por zona** (`Combat.populations`, blocos de uids de 100000 por zona): as zonas vizinhas desenhadas (mundo contínuo) já têm os seus inimigos, animais e NPCs a passear antes de se lá chegar, e ao passar a borda continuam os mesmos (nada aparece/desaparece). Quem morre volta ao ponto de onde nasceu ao fim de `enemyRespawnSec` (90 s de jogo), só com o jogador a mais de `enemyRespawnMinPx` (dá para "farmar"); chefes e hordas não. Viajar, recarregar ou morrer recomeça as populações.
+- **Um só mapa para o combate** (mundo contínuo): um inimigo de uma zona vizinha que entra na zona do jogador passa a ser desta (vê-o, ataca-o e pode ser atacado — `Combat.adoptWanderers`); ao passar a borda, os que o perseguem (ou estão a menos de `FOLLOW_CROSS_PX`) passam com ele. Quando morrem, voltam a nascer na zona de onde vieram.
+- **Monstros mais fortes** (tingidos, `tint` em `enemies.json`): arrastado alfa, lobo terrível, devastador, urso-pardo, titã (900 de vida, blindado 50%) e abominação (1800, blindado 60%) — aparecem às vezes nos grupos das zonas T2–T4.
+- **Missão ativa**: uma seta dourada à volta do boneco aponta para onde ir (o NPC a quem entregar, a zona, o NPC com quem falar ou os inimigos a derrotar — o que se vê mais perto, senão a zona onde nascem; `world/questGuide.ts`) e os inimigos a derrotar têm uma marca dourada por cima.
 - **Animações das armas** (`display/weaponPose.ts` puro + `display/weaponFx.ts`): golpe em arco com o ícone da arma/ferramenta e um rasto; soco com o punho, alternando as mãos; arco/besta apontados ao alvo (`player:action.aim`), com a corda puxada e a flecha, e clarão na pistola.
 
 ### 7.9 Inimigos
@@ -584,6 +589,8 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - **Desenho do mundo**: a Casa a sudoeste; a leste dela sobe para norte uma estrada de **Caminhos** (`zone_route_1…10`, 20 tiles de largura, `hidden` no mapa-mundo, `npm run map:routes`), e cada zona encosta-se a leste do seu Caminho, **por ordem de dificuldade**: Pinhal, Quinta, Lago, Estrada, Aldeia, Floresta Profunda, Industrial, Hospital, Base Militar, Cidade. Cada Caminho tem barreiras de lado a lado com uma só passagem, alternada à esquerda e à direita (obriga a andar em ziguezague), inimigos do nível da zona ao lado, relva alta, árvores e pedras.
 - **Zonas maiores**: cada zona foi alargada 48 tiles para leste (`npm run map:extend`): a antiga borda leste é um muro com 3 portões e a área nova tem mais recursos, contentores e inimigos; o poste (com o técnico) fica ao fundo — é preciso atravessar a zona a pé antes de o poder usar.
 - **Dificuldade por ordem**: cada Caminho pede o nível da zona ao lado (`unlockLevel`); sem ele, a borda trava ("precisas de nível N para passar"). Zonas com `requiresItem` também travam na borda.
+- **Degraus** (tile `ledge`, estilo Pokémon): só bloqueiam quem sobe — a descer salta-se (`CollisionWorld`, `ledgeTiles`). `npm run map:ledges` pôs 1–2 em cada Caminho (atalhos a descer; a subir dá-se a volta), confirmando que o Caminho se atravessa nos dois sentidos.
+- **Cavernas** (`zone_cave_pine`, `_lake`, `_deep`, `_industrial`; escondidas no mapa-mundo, escuras): mapas próprios com túneis e salas (minério, pedras, contentores, inimigos do nível da zona). A boca (tile `cave_mouth`, 2 tiles, rocha à volta) numa zona do mundo é uma saída `exit:<caverna>`; lá dentro, as escadas levam de volta à boca.
 - As masmorras e as zonas-evento ficam fora do mundo contínuo (mapa-mundo e postes). O `validate-data` confirma que os blocos não se sobrepõem e que cada abertura de um Caminho dá para chão livre.
 
 ### 8.2 Lista de zonas
@@ -1225,4 +1232,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. **Dificuldade** (def
 | 2026-09-26 | Populações persistentes por zona com respawn de 90 s; base sem a saída de baixo; tamanho da interface Grande/Médio/Pequeno; Espaço 2× apanha tudo; botão "Casa" (5 s parado); comida cura um pouco; número de flechas no slot do arco; animações das armas | Pedidos do jogador. Sem mudar o save: as populações e a contagem do "Casa" só vivem em memória |
 | 2026-09-26 | v0.0.53: versão = número do PR; painel preso ao esvaziar uma pilha corrigido; opções do Auto; toque duplo baú ↔ mochila; loot no chão 6 h de jogo; Espaço aceita/entrega missões; tocar num ingrediente faz-o ou diz onde se arranja; câmara sempre centrada; painel do fabrico fixo no topo | Pedidos do jogador |
 | 2026-09-26 | v0.0.54: dia de jogo 5× mais longo (100 min); energia (correr e atacar gastam; sobe com o nível até +500%); cama e sono (20h–6h30; acordado às 2h adormece e acorda às 11h com 10%); barra proteica. Save v24: `player.stamina`; o relógio passa a ×5 e os prazos deslocam-se para o dia, a hora e o que falta ficarem iguais | Pedido do jogador |
+| 2026-09-26 | v0.0.55: combate como um só mapa (inimigos passam de zona com o jogador); seta e marcas da missão; monstros mais fortes; degraus só para baixo; 4 cavernas | Pedidos do jogador |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

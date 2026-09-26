@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import props from '../../src/data/props.json';
 import resources from '../../src/data/resources.json';
 import stations from '../../src/data/stations.json';
-import { BASE_FLOOR_TILES, BASE_TILES, BASE_TILESET_NAME, baseTileIndex } from '../../src/world/tileset';
+import {
+  BASE_FLOOR_TILES,
+  BASE_LEDGE_TILES,
+  BASE_TILES,
+  BASE_TILESET_NAME,
+  baseTileIndex,
+} from '../../src/world/tileset';
 import { parseZoneMap, ZoneMapError, type ZoneMapRules } from '../../src/world/zoneMap';
 
 const RULES: ZoneMapRules = {
@@ -13,6 +19,7 @@ const RULES: ZoneMapRules = {
   propIds: Object.keys(props).filter((id) => id !== '$comment'),
   stationIds: Object.keys(stations).filter((id) => id !== '$comment'),
   floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
+  ledgeTiles: { [BASE_TILESET_NAME]: BASE_LEDGE_TILES.map(baseTileIndex) },
 };
 
 /** Mapa 3×2 mínimo válido; `patch` altera partes para testar erros. */

@@ -12,6 +12,8 @@ export class CollisionWorld {
   readonly heightTiles: number;
   readonly tileSize: number;
   private readonly solid: readonly boolean[];
+  /** Degraus: tiles sólidos que não bloqueiam quem desce (salta-se para baixo, não se sobe). */
+  private readonly ledge: readonly boolean[] | undefined;
   private readonly obstacles: readonly Rect[];
   /** Obstáculos com chave (ex.: id do objeto de um recurso), que se podem desligar. */
   private readonly keyed = new Map<number, Rect>();
@@ -28,6 +30,7 @@ export class CollisionWorld {
     tileSize: number,
     solid: readonly boolean[],
     obstacles: readonly Rect[] = [],
+    ledge?: readonly boolean[],
   ) {
     if (solid.length !== widthTiles * heightTiles) {
       throw new Error('CollisionWorld: o tamanho de "solid" não corresponde ao mapa');
@@ -36,6 +39,7 @@ export class CollisionWorld {
     this.heightTiles = heightTiles;
     this.tileSize = tileSize;
     this.solid = solid;
+    this.ledge = ledge;
     this.obstacles = obstacles;
   }
 
@@ -66,7 +70,7 @@ export class CollisionWorld {
       const footprint = lootTables[placement.id]?.footprint;
       if (footprint) obstacles.push(footprintRect(placement, footprint));
     }
-    const world = new CollisionWorld(map.width, map.height, map.tileSize, map.solid, obstacles);
+    const world = new CollisionWorld(map.width, map.height, map.tileSize, map.solid, obstacles, map.ledge);
     for (const [key, rect] of keyed) world.addKeyed(key, rect);
     return world;
   }
@@ -101,8 +105,17 @@ export class CollisionWorld {
     return this.solid[ty * this.widthTiles + tx] === true;
   }
 
-  /** Retângulos sólidos que se sobrepõem a `area`. */
-  solidsIn(area: Rect): Rect[] {
+  /** É um degrau (só bloqueia a subir)? */
+  isLedgeTile(tx: number, ty: number): boolean {
+    if (!this.ledge || tx < 0 || ty < 0 || tx >= this.widthTiles || ty >= this.heightTiles) return false;
+    return this.ledge[ty * this.widthTiles + tx] === true;
+  }
+
+  /**
+   * Retângulos sólidos que se sobrepõem a `area`.
+   * @param descending a andar para baixo (sul): os degraus não contam (salta-se).
+   */
+  solidsIn(area: Rect, descending = false): Rect[] {
     const size = this.tileSize;
     const found: Rect[] = [];
     const tx0 = Math.floor(area.x / size);
@@ -111,7 +124,8 @@ export class CollisionWorld {
     const ty1 = Math.ceil((area.y + area.h) / size) - 1;
     for (let ty = ty0; ty <= ty1; ty++) {
       for (let tx = tx0; tx <= tx1; tx++) {
-        if (this.isSolidTile(tx, ty)) found.push({ x: tx * size, y: ty * size, w: size, h: size });
+        if (this.isSolidTile(tx, ty) && !(descending && this.isLedgeTile(tx, ty)))
+          found.push({ x: tx * size, y: ty * size, w: size, h: size });
       }
     }
     for (const obstacle of this.obstacles) {
