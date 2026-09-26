@@ -57,6 +57,8 @@ export interface Projectile {
   recover: boolean;
   /** % de partir (ao acertar; metade ao cair no chão). */
   breakPct: number;
+  /** Cuspidela de um inimigo: acerta nos jogadores (não nos inimigos) e não fica no chão. */
+  hostile?: boolean;
 }
 
 /**
@@ -88,6 +90,12 @@ function createPool(nextUid = 1, nextShot = 1): EnemyPool {
 
 /** Altura dos tiros acima dos pés (px). */
 const SHOT_HEIGHT = 8;
+
+/** Dano depois da blindagem do inimigo (`armorPct`); um golpe que acerta tira sempre 1. */
+function armored(def: EnemyDef | undefined, damage: number): number {
+  const armor = def?.armorPct ?? 0;
+  return armor > 0 ? Math.max(1, Math.round((damage * (100 - armor)) / 100)) : damage;
+}
 
 /** Junta `qty` de `item` à aljava (sem limite de stack). */
 function addToQuiver(quiver: [string, number][], item: string, qty: number): void {
@@ -125,8 +133,8 @@ export class Combat {
   private invulnerableUntil = 0;
   /** Peças da base: as hordas partem-nas e as armadilhas ferem os inimigos. */
   building: Building | null = null;
-  /** Multiplicador de vida e dano dos inimigos que nascem (co-op: `coopEnemyMultiplier`). */
-  difficulty = 1;
+  /** Co-op: multiplicador de vida e dano dos inimigos (`coopEnemyMultiplier`; sozinho, 1). */
+  private coopMultiplier = 1;
   /** O jogador anda agachado (atualizado a cada tick; os inimigos veem-no de mais perto). */
   sneaking = false;
   /** Co-op: o jogador está no mapa-mundo ou em pausa (os inimigos ignoram-no). */
@@ -193,7 +201,22 @@ export class Combat {
    * (mantendo a fração de vida que tinham).
    */
   setDifficulty(multiplier: number): void {
-    this.difficulty = multiplier;
+    this.coopMultiplier = multiplier;
+    this.refreshDifficulty();
+  }
+
+  /**
+   * Multiplicador de vida e dano dos inimigos que nascem: o do co-op × o da dificuldade
+   * escolhida (`settings.difficulty`, §12).
+   */
+  get difficulty(): number {
+    const setting = BALANCE.difficulty[this.state.data.settings.difficulty];
+    return this.coopMultiplier * (setting.enemyPct / 100);
+  }
+
+  /** A dificuldade mudou: os inimigos que já estão na zona ajustam-se (mantendo a fração de vida). */
+  refreshDifficulty(): void {
+    const multiplier = this.difficulty;
     for (const enemy of this.enemies) {
       if (enemy.power === multiplier) continue;
       const ratio = multiplier / enemy.power;
@@ -418,6 +441,10 @@ export class Combat {
             owner.dropGround(shot.x - shot.dx * 6, shot.y - shot.dy * 6 + SHOT_HEIGHT, shot.ammo);
           return false;
         }
+        if (shot.hostile) {
+          if (this.spitHits(shot)) return false;
+          continue;
+        }
         const hit = this.enemies.find((e) => {
           if (e.dying > 0 || e.uid === shot.ignore) return false;
           const b = this.bodyArea(e);
@@ -425,16 +452,17 @@ export class Combat {
         });
         if (hit) {
           const def = enemies[hit.id];
+          const dealt = armored(def, shot.damage);
           const died = hitEnemy(
             hit,
-            shot.damage,
+            dealt,
             owner.state.data.player,
             BALANCE.enemyKnockbackPx / 2,
             secondsToTicks(BALANCE.enemyHitStunSec),
           );
           owner.bus.emit('enemy:hit', {
             uid: hit.uid,
-            damage: shot.damage,
+            damage: dealt,
             x: hit.x,
             y: hit.y - BODY_HEIGHT,
           });
@@ -809,6 +837,7 @@ export class Combat {
       const damage = Math.round(def.damage * enemy.power);
       if (result === 'attack') target.damagePlayer(damage, enemy, def.bleedPct ?? 0);
       else if (result === 'scream' && def.scream) this.scream(enemy, def.scream);
+      else if (result === 'spit' && def.spit) this.spit(enemy, def.spit, target);
       else if (result === 'siege' && enemy.siege !== null) {
         const amount = Math.round((damage * BALANCE.hordeStructureDamagePct) / 100);
         this.building?.damageStructure(enemy.siege, amount);
@@ -841,6 +870,48 @@ export class Combat {
         enemy.state = 'chase';
     }
     this.bus.emit('enemy:scream', { uid: from.uid, x: from.x, y: from.y, radius: scream.radius });
+  }
+
+  /** O cuspidor cospe na direção do jogador (um projétil lento: dá para sair da frente). */
+  private spit(from: Enemy, spit: NonNullable<EnemyDef['spit']>, target: Combat): void {
+    const p = target.state.data.player;
+    const start = { x: from.x, y: from.y - SHOT_HEIGHT };
+    const dir = normalize({ x: p.x - start.x, y: p.y - SHOT_HEIGHT - start.y });
+    this.projectiles.push({
+      id: this.pool.nextShot++,
+      ammo: 'spit',
+      x: start.x,
+      y: start.y,
+      px: start.x,
+      py: start.y,
+      dx: dir.x,
+      dy: dir.y,
+      step: spit.speed / TICKS_PER_SECOND,
+      left: spit.range + 24,
+      damage: Math.round(spit.damage * from.power),
+      owner: this,
+      ignore: from.uid,
+      recover: false,
+      breakPct: 100,
+      hostile: true,
+    });
+    this.bus.emit('enemy:spit', { uid: from.uid, x: from.x, y: from.y });
+  }
+
+  /** Cuspidela a passar: acerta no primeiro jogador (desta zona) em que toque. */
+  private spitHits(shot: Projectile): boolean {
+    const zoneId = this.zone?.zoneId;
+    if (!zoneId) return false;
+    for (const target of [this, ...this.others]) {
+      if (!target.targetable(zoneId)) continue;
+      const p = target.state.data.player;
+      const w = PLAYER_FOOTPRINT.width + 2;
+      if (shot.x >= p.x - w / 2 && shot.x <= p.x + w / 2 && shot.y >= p.y - 20 && shot.y <= p.y) {
+        target.damagePlayer(shot.damage, { x: shot.x - shot.dx * 8, y: shot.y - shot.dy * 8 + SHOT_HEIGHT });
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Peça construída sólida entre o inimigo e o jogador (o que a horda tem de partir). */
@@ -914,7 +985,10 @@ export class Combat {
       this.bus.emit('enemy:missed', { x: enemy.x, y: enemy.y - BODY_HEIGHT });
       return true;
     }
-    const damage = Math.round(this.weapon().damage * (1 + talentOf(player, 'meleeDamagePct') / 100));
+    const damage = armored(
+      def,
+      Math.round(this.weapon().damage * (1 + talentOf(player, 'meleeDamagePct') / 100)),
+    );
     const equipment = player.equipment;
     const weaponBefore = equipment[0];
     const broken =

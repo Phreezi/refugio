@@ -125,6 +125,9 @@ export class UIScene extends Phaser.Scene {
   /** Missão em curso (§7.18): título e o que falta, por baixo das barras. */
   private questLabel: Label | null = null;
   private dialog: DialogUI | null = null;
+  private noticeBg: Phaser.GameObjects.Rectangle | null = null;
+  /** Auto e Ação à vista (escondem-se com painéis abertos e no modo construção). */
+  private playButtonsVisible = true;
   private worldMap: MapUI | null = null;
   private seedHintShown = false;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
@@ -239,6 +242,12 @@ export class UIScene extends Phaser.Scene {
       { size: 9, color: 'wheat', bold: true, stroke: true, align: 'center', wrap: width - 32 },
       [0.5, 0.5],
     ).setDepth(90);
+    // Fundo escuro por trás do aviso: lê-se mesmo por cima de um painel aberto.
+    this.noticeBg = this.add
+      .rectangle(0, 0, 2, 2, paletteNumber('ink'), 0.75)
+      .setOrigin(0)
+      .setDepth(89)
+      .setVisible(false);
     // Tocar no aviso faz o que ele propõe (ex.: fazer o machado que falta).
     this.notice.text.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
       this.runNoticeAction();
@@ -335,6 +344,7 @@ export class UIScene extends Phaser.Scene {
       this.hurtEdges = null;
       this.xpFill = null;
       this.actionButton = [];
+      this.playButtonsVisible = true;
       this.buildButton = null;
       this.autoButton = null;
       this.weaponView = null;
@@ -343,6 +353,7 @@ export class UIScene extends Phaser.Scene {
       this.bars = [];
       this.clock = null;
       this.notice = null;
+      this.noticeBg = null;
     });
   }
 
@@ -373,8 +384,15 @@ export class UIScene extends Phaser.Scene {
     const pad = (n: number): string => String(n).padStart(2, '0');
     this.clock?.setText(t('hud.clock', { day: clock.day, time: `${pad(clock.hour)}:${pad(clock.minute)}` }));
     this.hordeLabel?.setText(this.hordeStatus());
+    // Com um painel aberto (loja, mochila, conversa…), os botões de jogo não ficam por cima dele.
+    const playButtons = !uiState.modalOpen && !buildMode.active;
+    if (playButtons !== this.playButtonsVisible) {
+      this.playButtonsVisible = playButtons;
+      this.autoButton?.setVisible(playButtons);
+      for (const obj of this.actionButton) obj.setVisible(playButtons);
+    }
     if (this.sprintButton) {
-      const visible = !uiState.modalOpen && !buildMode.active;
+      const visible = playButtons;
       const running = moveInput.run;
       if (visible !== this.sprintVisible) {
         this.sprintVisible = visible;
@@ -389,6 +407,8 @@ export class UIScene extends Phaser.Scene {
     this.beginnerLabel?.setVisible(simulation.combat.beginner && !uiState.modalOpen);
     this.renderQuest();
     this.renderBossBar();
+    this.layoutTopLeft(player.bleed > 0);
+    this.renderNoticeBg();
     this.renderHint();
     this.renderWeapon();
   }
@@ -745,6 +765,42 @@ export class UIScene extends Phaser.Scene {
       color: 'wheat',
       stroke: true,
     });
+  }
+
+  private renderNoticeBg(): void {
+    const bg = this.noticeBg;
+    const text = this.notice?.text;
+    if (!bg || !text) return;
+    const visible = text.visible && text.text !== '';
+    bg.setVisible(visible);
+    if (!visible) return;
+    bg.setPosition(Math.round(text.x) - 4, Math.round(text.y) - 2);
+    bg.setSize(Math.ceil(text.width) + 8, Math.ceil(text.height) + 4);
+  }
+
+  /**
+   * Textos do canto (por baixo das barras): "a sangrar", principiante e missão, uns por baixo dos
+   * outros conforme os que se veem; ao alto, a dica do tutorial vai logo a seguir (nada se sobrepõe).
+   */
+  private layoutTopLeft(bleeding: boolean): void {
+    let y = HUD_MARGIN + STATS.length * BAR_SPACING + 7;
+    const rows: [Label | null, boolean][] = [
+      [this.bleedLabel, bleeding],
+      [this.beginnerLabel, this.beginnerLabel?.text.visible === true],
+      [this.questLabel, this.questLabel?.text.visible === true],
+    ];
+    for (const [label, shown] of rows) {
+      if (!label || !shown) continue;
+      label.setPosition(HUD_MARGIN, y);
+      y += Math.ceil(label.text.height) + 2;
+    }
+    const hint = this.hint;
+    if (!hint || getView().width >= NARROW_HUD_WIDTH) return;
+    const hintY = Math.max(HINT_Y_NARROW, y + 2);
+    if (hint.y === hintY) return;
+    hint.y = hintY;
+    hint.label.setPosition(hint.x, hintY);
+    hint.step = ''; // refaz o × na posição nova
   }
 
   /** Registo da missão em curso (a primeira ativa): título e objetivos com progresso. */

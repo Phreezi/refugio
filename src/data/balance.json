@@ -82,6 +82,12 @@
   "bleedSec": 30,
   "bleedEverySec": 2,
   "coopEnemyMultiplier": 1.5,
+  "difficulty": {
+    "relaxed": { "enemyPct": 70, "xpPct": 100 },
+    "normal": { "enemyPct": 100, "xpPct": 100 },
+    "hard": { "enemyPct": 140, "xpPct": 125 },
+    "nightmare": { "enemyPct": 200, "xpPct": 160 }
+  },
   "gatherPowerEveryLevels": 10,
   "gatherExtraPctPerLevel": 2,
   "sprintMultiplier": 1.6,

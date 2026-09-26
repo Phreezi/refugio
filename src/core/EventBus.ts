@@ -35,6 +35,7 @@ export interface GameEvents {
   'enemy:exploded': { x: number; y: number; radius: number };
   /** Um gritador gritou (os inimigos à volta ficam alertados). */
   'enemy:scream': { uid: number; x: number; y: number; radius: number };
+  'enemy:spit': { uid: number; x: number; y: number };
   /** O jogador começou a sangrar (uma ligadura estanca). */
   'player:bleeding': Record<string, never>;
   /** Mochilas no chão de uma zona mudaram. */

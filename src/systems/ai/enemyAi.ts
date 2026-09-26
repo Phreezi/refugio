@@ -38,6 +38,8 @@ export interface Enemy {
   knock: Vec2;
   /** O aviso em curso é para uma carga (javali) e não para um golpe. */
   charging: boolean;
+  /** O aviso em curso é para cuspir (à distância), não para morder. */
+  spitting: boolean;
   /** Direção da carga. */
   dir: Vec2;
   /** Derrotado, a rebentar (inchado): ticks até explodir (0 = vivo). */
@@ -97,6 +99,7 @@ export function createEnemy(uid: number, id: string, def: EnemyDef, at: Vec2, po
     stun: 0,
     knock: { x: 0, y: 0 },
     charging: false,
+    spitting: false,
     dir: { x: 0, y: 0 },
     dying: 0,
     horde: false,
@@ -134,7 +137,11 @@ function startIdle(enemy: Enemy, ctx: AiContext): void {
  * @returns 'attack' quando um ataque acaba o aviso com o jogador ao alcance, 'siege' quando acaba
  * o aviso contra a peça `enemy.siege` (quem chama aplica o dano).
  */
-export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack' | 'siege' | 'scream' | null {
+export function stepEnemy(
+  enemy: Enemy,
+  def: EnemyDef,
+  ctx: AiContext,
+): 'attack' | 'siege' | 'scream' | 'spit' | null {
   enemy.px = enemy.x;
   enemy.py = enemy.y;
   if (enemy.dying > 0) return null; // a rebentar: quem trata é o Combat
@@ -183,6 +190,11 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
       }
       enemy.state = 'recover';
       enemy.timer = Math.round(def.attackSec * ctx.ticksPerSec);
+      if (enemy.spitting) {
+        // Cuspidela: sai no fim do aviso, na direção de onde o jogador está (dá para desviar).
+        enemy.spitting = false;
+        return 'spit';
+      }
       if (enemy.siege !== null) return 'siege';
       return toPlayer <= def.attackRange + ATTACK_SLACK_PX ? 'attack' : null;
     case 'charge': {
@@ -221,7 +233,7 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
         startIdle(enemy, ctx);
       }
       return null;
-    case 'chase':
+    case 'chase': {
       if ((!hunting && distance(enemy, enemy.home) > def.leashRadius) || playerFarFromHome) {
         enemy.state = 'return';
         return null;
@@ -237,10 +249,33 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
         enemy.cooldown = Math.round(scream.everySec * ctx.ticksPerSec);
         return 'scream';
       }
+      // Cuspidor: de longe (fora do alcance da dentada), avisa e cospe um projétil.
+      const spit = def.spit;
+      if (spit && enemy.cooldown === 0 && toPlayer > def.attackRange + 4 && toPlayer <= spit.range) {
+        enemy.state = 'windup';
+        enemy.siege = null;
+        enemy.charging = false;
+        enemy.spitting = true;
+        enemy.cooldown = Math.round(spit.everySec * ctx.ticksPerSec);
+        enemy.timer = windupTicks;
+        return null;
+      }
+      if (spit && spit.keepAway > 0) {
+        // Mantém-se longe: recua se o jogador se aproxima, senão chega-se até `keepAway`.
+        if (toPlayer < spit.keepAway * 0.6) {
+          const away = normalize({ x: enemy.x - ctx.player.x, y: enemy.y - ctx.player.y });
+          walk(enemy, def, { x: enemy.x + away.x * 16, y: enemy.y + away.y * 16 }, def.speed, ctx);
+          if (toPlayer > def.attackRange || def.damage <= 0) return null;
+        } else if (toPlayer > spit.keepAway) {
+          walk(enemy, def, ctx.player, def.speed, ctx, spit.keepAway);
+          return null;
+        } else return null;
+      }
       if (toPlayer <= def.attackRange && def.damage > 0) {
         enemy.state = 'windup';
         enemy.siege = null;
         enemy.charging = false;
+        enemy.spitting = false;
         enemy.timer = windupTicks;
         return null;
       }
@@ -249,12 +284,14 @@ export function stepEnemy(enemy: Enemy, def: EnemyDef, ctx: AiContext): 'attack'
         enemy.state = 'windup';
         enemy.siege = null;
         enemy.charging = true;
+        enemy.spitting = false;
         enemy.timer = windupTicks * 2;
         return null;
       }
       walk(enemy, def, ctx.player, def.speed, ctx, def.attackRange - 2);
       if (enemy.horde) besiege(enemy, def, ctx, toPlayer);
       return null;
+    }
     default:
       if (sees && !playerFarFromHome) {
         enemy.state = 'chase';
@@ -279,6 +316,7 @@ function besiege(enemy: Enemy, def: EnemyDef, ctx: AiContext, before: number): v
   enemy.siege = uid;
   enemy.state = 'windup';
   enemy.charging = false;
+  enemy.spitting = false;
   enemy.timer = def.windupSec ? Math.round(def.windupSec * ctx.ticksPerSec) : ctx.windupTicks;
 }
 

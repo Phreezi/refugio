@@ -1,4 +1,4 @@
-import type { GameStateData } from '../core/GameState';
+import { DIFFICULTIES, type Difficulty, type GameStateData } from '../core/GameState';
 import { MIGRATIONS, migrate, type Migration } from './migrations';
 import { SKILLS } from '../data/types';
 import { TALENT_EFFECTS } from '../systems/progression/talents';
@@ -6,7 +6,7 @@ import { TALENT_EFFECTS } from '../systems/progression/talents';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 22;
+export const SAVE_VERSION = 23;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -281,7 +281,12 @@ export function validateState(input: unknown): GameStateData {
     problems.push('base.damage inválido');
   }
   const settings = isObject(input) ? input.settings : undefined;
-  if (!isObject(settings) || typeof settings.hordes !== 'boolean') problems.push('settings inválido');
+  if (
+    !isObject(settings) ||
+    typeof settings.hordes !== 'boolean' ||
+    !DIFFICULTIES.includes(settings.difficulty as Difficulty)
+  )
+    problems.push('settings inválido');
   const horde = isObject(input) ? input.horde : undefined;
   if (!isObject(horde) || !stat(horde.at) || !stat(horde.count) || typeof horde.active !== 'boolean')
     problems.push('horde inválido');

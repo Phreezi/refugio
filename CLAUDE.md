@@ -340,6 +340,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 - Regeneração: +1 vida a cada 5 s se fome e sede > 50%.
 - Nível do jogador (XP por recolher, craftar, matar, construir, abrir contentores, pescar) → desbloqueia receitas, peças de construção e zonas (`unlockLevel` em recipes/structures/zones). Jogo **sem fim**: nível máximo `maxLevel` 999. XP para passar do nível n: `xpCurve.base × growth^(n−1)` até `softCapLevel` (25; 50, 63, 78…; ~1300 XP até ao nível 10) e daí em diante +`lateGrowthPct`% (8%) por nível (há sempre um nível seguinte ao alcance). As perícias (§7.8/§7.15) vão até ao nível 50 com a mesma ideia (`skillCurve`). Valores: `xp` em resources/enemies/recipes (omisso: `xpGather`; receitas pelo tempo) e `xpBuild`, `xpLoot`, `xpFish` em `balance.json`.
 - **Notas** (itens `type: "note"`, campo `teaches`) encontradas em contentores ensinam uma receita antes do nível ("Ler" na mochila); ficam em `unlocks.recipes`.
+- HUD: por baixo das barras, "a sangrar", principiante e a missão empilham-se conforme os que se veem; ao alto, a dica do tutorial vai logo a seguir. Com um painel aberto (loja, mochila, conversa…) os botões Auto/Ação/Correr escondem-se; os avisos têm fundo escuro.
 - Ao subir de nível aparece "Subiste de nível!" no topo, com o que ficou desbloqueado (não pausa o jogo). O HUD mostra o nível e uma barra de XP.
 - Movimento 8 direções. Velocidade base 80 px/s; mais lento com inventário > 90% cheio (opcional).
 
@@ -454,7 +455,13 @@ Os nós de recurso reaparecem (ver zonas).
 | wolf | Lobo | 45 | 8 | 100 px/s | Animal, T2 florestas |
 | boar | Javali | 70 | 10 | carga | Aviso 2× mais longo, depois carga em linha reta (150 px/s, 0,7 s); dá carne e couro |
 | deer | Veado | 30 | 0 | foge | Presa pacífica |
-| boss_* | Chefes de bunker | — | — | — | Fase 10 |
+| zombie_crawler | Rastejante | 18 | 4 | 70 px/s | Pequeno e rápido; aparece com corredores (T2+) |
+| zombie_spitter | Cuspidor | 40 | 4 (+9 à distância) | 45 px/s | T3+; fica a ~70 px e cospe (`spit`: aviso normal, projétil lento verde a 90 px/s que pára nas paredes — dá para desviar) |
+| zombie_armored | Blindado | 90 | 12 | 38 px/s | T3+; `armorPct` 45: cada golpe/tiro tira menos (mínimo 1) |
+| bear | Urso | 180 | 18 | 70 px/s | Floresta Profunda (com os javalis); carga e sangrar |
+| boss_* | Chefes | — | — | — | Guarda do Bunker (Fase 10); **Colosso** no fundo da Cidade (1600 de vida, blindado 25%, carga e cuspidela; missão do sargento `q_colossus`) |
+
+Grupos com `mín` 0 (em `enemyGroups.json`) às vezes não trazem esse inimigo.
 
 IA: estados `idle → wander → chase → attack → return`. Perdem o interesse fora de um raio (leash) para não perseguirem pelo mapa todo.
 
@@ -1044,7 +1051,7 @@ Os dois jogadores são **completos e autónomos**, como sozinhos: cada um com a 
 }
 ```
 
-Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Relaxado"** (multiplicadores 0,5× em decaimento e dano recebido) e **"Normal"**; ainda assim ambos mais fáceis que o LDoE.
+Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. **Dificuldade** (definições do jogo, save v23 `settings.difficulty`): Relaxado / Normal / Difícil / Pesadelo — `balance.difficulty.<nível>.enemyPct` multiplica a vida e o dano dos inimigos (× o do co-op; os que já estão na zona ajustam-se) e `xpPct` a XP de cada inimigo derrotado.
 
 ---
 
@@ -1187,4 +1194,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. Criar um modo **"Rel
 | 2026-09-25 | Mundo contínuo à Pokémon: zonas como blocos com coordenadas no mundo, ligadas por Caminhos com obstáculos; passa-se a andar pelas bordas (sem fade) e só se desenham as zonas perto | Pedido do jogador: "o mapa tornar-se contínuo… load parcial… caminhos específicos… dificuldade por ordem". Os mapas e o save não mudam: a zona continua a ser a unidade da lógica e do save; recomeçar a cena na vizinha (com a mesma vista) evita reescrever o jogo todo |
 | 2026-09-25 | Save v22: missões com NPCs, postes que o técnico repara a troco de itens/moedas, teletransporte pago (moedas ou pergaminho), comerciante perto de casa, zonas alargadas com o poste ao fundo | Pedido do jogador: jogo mais imersivo, desbloquear cada teletransporte deve custar algo "relativamente complexo" e ter mais PvE antes dele |
 | 2026-09-25 | Travessia sem recomeçar a cena; montanhas em vez de preto; mapa (M); zoom só um nível; vedações ligadas em todas as direções | Pedidos do jogador (iPhone): o jogo parava ao mudar de zona, via-se preto e demasiado mundo, e as vedações verticais/cantos estavam mal |
+| 2026-09-26 | Monstros novos (rastejante, cuspidor com projéteis, blindado, urso, Colosso) e dificuldade Relaxado/Normal/Difícil/Pesadelo (save v23); textos do HUD empilhados e botões escondidos com painéis abertos | Pedidos do jogador: "novos monstros, maiores dificuldades"; no telemóvel o Auto ficava por cima da loja do Zé e os textos do canto sobrepunham-se |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

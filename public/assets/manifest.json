@@ -1799,6 +1799,61 @@
         "letter": "P"
       },
       "file": "sprites/icons/travel_scroll.png"
+    },
+    "zombie_crawler": {
+      "type": "image",
+      "file": "sprites/zombie_crawler.png",
+      "placeholder": {
+        "width": 20,
+        "height": 14,
+        "color": "lime",
+        "border": "ink",
+        "letter": "R"
+      }
+    },
+    "zombie_spitter": {
+      "type": "image",
+      "file": "sprites/zombie_spitter.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "lime",
+        "border": "ink",
+        "letter": "C"
+      }
+    },
+    "zombie_armored": {
+      "type": "image",
+      "file": "sprites/zombie_armored.png",
+      "placeholder": {
+        "width": 16,
+        "height": 32,
+        "color": "stone",
+        "border": "ink",
+        "letter": "A"
+      }
+    },
+    "bear": {
+      "type": "image",
+      "file": "sprites/bear.png",
+      "placeholder": {
+        "width": 32,
+        "height": 24,
+        "color": "bark",
+        "border": "ink",
+        "letter": "U"
+      }
+    },
+    "boss_colossus": {
+      "type": "image",
+      "file": "sprites/boss_colossus.png",
+      "placeholder": {
+        "width": 32,
+        "height": 40,
+        "color": "grass",
+        "border": "ink",
+        "letter": "C"
+      }
     }
   }
 }

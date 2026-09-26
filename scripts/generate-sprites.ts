@@ -2899,6 +2899,145 @@ const RANGED_ICONS: Sprite[] = [
   })),
 ];
 
+/** Monstros novos (mais dificuldade): rastejante, cuspidor, blindado, urso e o Colosso da cidade. */
+const MONSTERS: Sprite[] = [
+  {
+    file: 'zombie_crawler',
+    width: 20,
+    height: 14,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 10, 12.5, 8, 1.2);
+      // Corpo deitado, a arrastar-se pelos braços.
+      img.ellipse(11, 8, 6, 3, c('plum'));
+      img.fill(7, 8, 9, 2, c('night'));
+      img.fill(15, 6, 3, 3, c('stone'));
+      // Braços à frente, mãos no chão.
+      img.fill(1, 9, 5, 2, c('lime'));
+      img.fill(0, 11, 2, 1, c('grass'));
+      img.fill(4, 11, 2, 1, c('grass'));
+      // Cabeça levantada, olhos vermelhos.
+      img.ellipse(6, 6, 3.5, 3, c('lime'));
+      img.fill(3, 7, 6, 1, c('grass'));
+      img.set(5, 5, c('red'));
+      img.set(7, 5, c('red'));
+      img.fill(4, 3, 4, 1, c('bark_dark'));
+    },
+  },
+  {
+    file: 'zombie_spitter',
+    width: 16,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      zombie(img, 'lime', 'grass', 'teal', 'forest_dark', 'night');
+      // Bochechas inchadas e baba verde.
+      img.fill(3, 8, 2, 3, c('leaf'));
+      img.fill(11, 8, 2, 3, c('grass'));
+      img.fill(6, 10, 4, 2, c('forest_dark'));
+      img.fill(7, 12, 2, 2, c('lime'));
+      img.set(7, 14, c('leaf'));
+      // Pústulas no peito.
+      img.set(6, 16, c('lime'));
+      img.set(9, 18, c('lime'));
+    },
+  },
+  {
+    file: 'zombie_armored',
+    width: 16,
+    height: 32,
+    outline: 'ink',
+    paint: (img) => {
+      zombie(img, 'stone_light', 'stone', 'night', 'ink', 'shadow');
+      // Colete de proteção com placas.
+      img.fill(4, 13, 9, 8, c('stone_dark'));
+      img.fill(4, 13, 9, 1, c('stone'));
+      img.fill(5, 15, 3, 3, c('stone'));
+      img.fill(9, 15, 3, 3, c('stone'));
+      img.fill(12, 13, 1, 8, c('shadow'));
+      // Capacete com viseira.
+      img.fill(3, 2, 10, 5, c('stone_dark'));
+      img.fill(3, 2, 10, 1, c('stone'));
+      img.fill(4, 6, 8, 2, c('sky'));
+      img.fill(4, 6, 8, 1, c('ice'));
+      // Ombreiras.
+      img.fill(1, 13, 3, 3, c('stone'));
+      img.fill(13, 13, 3, 3, c('stone_dark'));
+    },
+  },
+  {
+    file: 'bear',
+    width: 32,
+    height: 24,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 16, 22.5, 13, 1.5);
+      // Corpo grande e peludo (luz em cima à esquerda).
+      img.ellipse(15, 13, 11, 6.5, c('bark'));
+      img.ellipse(13, 10, 8, 3.5, c('wood'));
+      img.ellipse(16, 17, 9, 2, c('bark_dark'));
+      for (const x of [6, 10, 19, 23]) {
+        img.fill(x, 17, 3, 5, c('bark_dark'));
+        img.fill(x, 21, 3, 1, c('ink'));
+      }
+      // Cabeça com focinho claro, a olhar para a direita.
+      img.ellipse(26, 9, 5, 4.5, c('bark'));
+      img.ellipse(25, 8, 3, 2, c('wood'));
+      img.fill(28, 10, 4, 3, c('wood_light'));
+      img.set(31, 10, c('ink'));
+      img.set(26, 8, c('ink'));
+      img.fill(22, 4, 3, 2, c('bark'));
+      img.fill(27, 4, 3, 2, c('bark'));
+      img.set(23, 5, c('wood_light'));
+      img.set(28, 5, c('wood_light'));
+    },
+  },
+  {
+    file: 'boss_colossus',
+    width: 32,
+    height: 40,
+    outline: 'ink',
+    paint: (img) => {
+      shadow(img, 16, 38, 13, 2);
+      // Pernas enormes.
+      img.fill(7, 28, 7, 9, c('night'));
+      img.fill(18, 28, 7, 9, c('ink'));
+      img.fill(7, 36, 7, 1, c('ink'));
+      img.fill(18, 36, 7, 1, c('ink'));
+      // Tronco inchado, pele verde doente com placas de metal presas.
+      img.ellipse(16, 20, 12, 10, c('grass'));
+      img.ellipse(13, 17, 8, 6, c('leaf'));
+      img.ellipse(18, 25, 9, 3, c('forest'));
+      img.fill(9, 16, 6, 5, c('stone_dark'));
+      img.fill(9, 16, 6, 1, c('stone'));
+      img.fill(19, 20, 5, 4, c('stone_dark'));
+      img.fill(19, 20, 5, 1, c('stone'));
+      // Pústulas a brilhar (cospe ácido).
+      const pustules: [number, number][] = [
+        [6, 20],
+        [24, 16],
+        [15, 25],
+        [22, 26],
+      ];
+      for (const [x, y] of pustules) img.fill(x, y, 2, 2, c('lime'));
+      // Braços como troncos.
+      img.fill(0, 14, 5, 13, c('grass'));
+      img.fill(27, 14, 5, 13, c('forest'));
+      img.fill(0, 25, 5, 4, c('leaf'));
+      img.fill(27, 25, 5, 4, c('grass'));
+      // Cabeça pequena, afundada, com mandíbula aberta.
+      img.fill(12, 3, 8, 8, c('leaf'));
+      img.fill(12, 9, 8, 2, c('grass'));
+      img.fill(13, 5, 2, 2, c('ink'));
+      img.fill(17, 5, 2, 2, c('ink'));
+      img.set(14, 5, c('gold'));
+      img.set(18, 5, c('gold'));
+      img.fill(14, 9, 4, 3, c('ink'));
+      img.fill(15, 10, 2, 2, c('lime'));
+    },
+  },
+];
+
 const outDir = new URL('public/assets/sprites/', ROOT);
 const iconDir = new URL('icons/', outDir);
 mkdirSync(iconDir, { recursive: true });
@@ -2915,6 +3054,7 @@ for (const [dir, list] of [
   [outDir, PHASE10B],
   [outDir, PHASE10C],
   [outDir, PHASE10E],
+  [outDir, MONSTERS],
   [iconDir, ICONS],
   [iconDir, WEAPON_ICONS],
   [iconDir, FOOD_ICONS],
@@ -2937,7 +3077,7 @@ for (const [dir, list] of [
   }
 }
 console.log(
-  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length + PHASE10E.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length + PHASE10D_ICONS.length + PHASE10E_ICONS.length + RANGED_ICONS.length)} ícones`,
+  `sprites/: ${String(SPRITES.length + STRUCTURES.length + CREATURES.length + ZONE_OBJECTS.length + PHASE8.length + PHASE8B.length + PHASE9.length + PHASE10A.length + PHASE10B.length + PHASE10C.length + PHASE10E.length + MONSTERS.length)} sprites + ${String(ICONS.length + WEAPON_ICONS.length + FOOD_ICONS.length + NOTE_ICONS.length + IRON_ICONS.length + PHASE9_ICONS.length + PHASE10A_ICONS.length + PHASE10B_ICONS.length + PHASE10C_ICONS.length + PHASE10D_ICONS.length + PHASE10E_ICONS.length + RANGED_ICONS.length)} ícones`,
 );
 
 // Prancha de pré-visualização ampliada (para rever a arte sem abrir o jogo).

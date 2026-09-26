@@ -2,10 +2,11 @@ import type Phaser from 'phaser';
 import { paletteNumber } from '../assets/palette';
 import { TICKS_PER_SECOND } from '../core/Clock';
 import { eventBus } from '../core/EventBus';
-import { gameState } from '../core/GameState';
+import { DIFFICULTIES, gameState } from '../core/GameState';
+import { simulation } from '../core/Simulation';
 import { getView } from '../display/view';
 import { coop } from '../net/coop';
-import { getLanguage, LANGUAGES, setLanguage, t, type MessageKey } from '../i18n';
+import { getLanguage, LANGUAGES, setLanguage, t, tKey, type MessageKey } from '../i18n';
 import { BALANCE } from '../data/balance';
 import { WEAPON_SKILLS } from '../data/types';
 import { missPct, skillLevel } from '../systems/combat/skills';
@@ -113,7 +114,10 @@ export class PauseUI {
           ? 8 + this.skillRows().length
           : this.view === 'coop'
             ? 5
-            : 8;
+            : // Definições: 6 linhas + hordas e dificuldade (as do jogo) + "Voltar".
+              gameState.hasGame && !coop.isGuest
+              ? 9
+              : 7;
     const h = Math.min(height - 8, 34 + lines * ROW + 10);
     const x = Math.round((width - W) / 2);
     const y = Math.max(4, Math.round((height - h) / 2));
@@ -318,6 +322,13 @@ export class PauseUI {
       this.setting(x, next(), t('pause.hordes'), onOff(data.settings.hordes), () => {
         data.settings.hordes = !data.settings.hordes;
         if (data.settings.hordes && !data.horde.active) data.horde.at = 0; // marca-se a partir de agora
+        gameState.markDirty();
+      });
+      // Dificuldade (§12): Relaxado → Normal → Difícil → Pesadelo; os inimigos ajustam-se logo.
+      this.setting(x, next(), t('pause.difficulty'), tKey(`difficulty.${data.settings.difficulty}`), () => {
+        const i = DIFFICULTIES.indexOf(data.settings.difficulty);
+        data.settings.difficulty = DIFFICULTIES[(i + 1) % DIFFICULTIES.length] ?? 'normal';
+        simulation.refreshDifficulty();
         gameState.markDirty();
       });
     }

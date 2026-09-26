@@ -300,6 +300,12 @@ export class Simulation {
     for (const secondary of this.secondaries) secondary.combat.setDifficulty(multiplier);
   }
 
+  /** Mudou a dificuldade (definições): os inimigos da zona ajustam-se. */
+  refreshDifficulty(): void {
+    this.combat.refreshDifficulty();
+    for (const secondary of this.secondaries) secondary.combat.refreshDifficulty();
+  }
+
   /** Co-op: o jogador está no mapa-mundo ou em pausa (não age e os inimigos ignoram-no). */
   set away(away: boolean) {
     this.combat.away = away;
