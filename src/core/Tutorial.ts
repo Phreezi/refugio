@@ -44,6 +44,8 @@ export class Tutorial {
       if (tutorial.done.includes(step)) continue;
       // Comer só aparece quando a fome começa a descer.
       if (step === 'eat' && player.hunger > BALANCE.statMax * 0.7) continue;
+      // Construir só se faz em casa: fora dela passa-se à dica seguinte.
+      if (step === 'build' && player.zoneId !== BASE_ZONE_ID) continue;
       return step;
     }
     return null;

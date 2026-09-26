@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import { PALETTE, type PaletteColor } from '../assets/palette';
-import { textResolution } from '../display/view';
+import { textResolution, worldTextResolution } from '../display/view';
+import { SceneKey } from '../scenes/keys';
 
 /** Fonte da interface: pixel (Jersey 10, OFL; ver display/fonts.ts), com reservas. */
 export const UI_FONT = '"Jersey 10", "Trebuchet MS", "Segoe UI", system-ui, sans-serif';
@@ -15,13 +16,18 @@ const FONT_PIXEL_PER_PX = 3 / 56;
 const FONT_SCALE = 0.08;
 
 /** Um píxel da letra, em píxeis do ecrã (inteiro: senão as letras ficam irregulares). */
-function fontPixel(size: number): number {
-  return Math.max(1, Math.round(size * textResolution() * FONT_SCALE));
+function fontPixel(size: number, resolution = textResolution()): number {
+  return Math.max(1, Math.round(size * resolution * FONT_SCALE));
 }
 
 /** Tamanho (px de jogo) com que se desenha o texto de tamanho `size`, na grelha da fonte. */
-export function pixelFontSize(size: number): number {
-  return fontPixel(size) / FONT_PIXEL_PER_PX / textResolution();
+export function pixelFontSize(size: number, resolution = textResolution()): number {
+  return fontPixel(size, resolution) / FONT_PIXEL_PER_PX / resolution;
+}
+
+/** O texto do mundo (ZoneScene) segue o zoom do mundo; o resto, o da interface. */
+function resolutionOf(scene: Phaser.Scene): number {
+  return scene.sys.settings.key === SceneKey.Zone ? worldTextResolution() : textResolution();
 }
 
 let measureContext: CanvasRenderingContext2D | null = null;
@@ -74,6 +80,7 @@ export class Label {
   private color: PaletteColor;
   private readonly size: number;
   private readonly fit: number | undefined;
+  private readonly resolution: number;
 
   constructor(
     scene: Phaser.Scene,
@@ -88,22 +95,24 @@ export class Label {
     this.color = style.color ?? 'cream';
     this.size = style.size;
     this.fit = style.fit;
+    const resolution = resolutionOf(scene);
+    this.resolution = resolution;
     this.text = scene.add
       .text(0, 0, noLigatures(content), {
         fontFamily: UI_FONT,
-        fontSize: `${String(pixelFontSize(style.size))}px`,
+        fontSize: `${String(pixelFontSize(style.size, resolution))}px`,
         // A fonte pixel só tem um peso: o "negrito" falso esborrataria os píxeis.
         fontStyle: '',
         color: PALETTE[this.color],
         align: style.align ?? 'left',
-        resolution: textResolution(),
+        resolution,
         // Legível por cima do mundo: sombra de 1 píxel da letra, em baixo e à direita (um
         // contorno engrossava as letras de 1 píxel e fechava-lhes os buracos).
         ...(style.stroke
           ? {
               shadow: {
-                offsetX: fontPixel(style.size),
-                offsetY: fontPixel(style.size),
+                offsetX: fontPixel(style.size, resolution),
+                offsetY: fontPixel(style.size, resolution),
                 color: PALETTE.ink,
                 blur: 0,
                 fill: true,
@@ -163,8 +172,8 @@ export class Label {
   /** Com `fit`: letra no tamanho pedido ou, se não couber, píxel a píxel mais pequena. */
   private shrinkToFit(): void {
     if (this.fit === undefined) return;
-    const resolution = textResolution();
-    let pixel = fontPixel(this.size);
+    const resolution = this.resolution;
+    let pixel = fontPixel(this.size, resolution);
     const apply = (): void => {
       const size = `${String(pixel / FONT_PIXEL_PER_PX / resolution)}px`;
       if (this.text.style.fontSize !== size) this.text.setFontSize(size);

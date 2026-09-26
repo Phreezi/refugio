@@ -2,6 +2,7 @@
 // por isso ficam no browser (localStorage) e valem já no menu inicial. As hordas, que mudam o
 // jogo, ficam no save (`settings.hordes`).
 
+import type { UiSize } from '../display/view';
 import { DEFAULT_LANGUAGE, isLanguage, type Language } from '../i18n';
 
 export interface Preferences {
@@ -18,7 +19,11 @@ export interface Preferences {
   musicVolume: number;
   /** Ataque automático ligado (botão "Auto" do HUD). */
   autoAttack: boolean;
+  /** Tamanho da interface (menus, HUD): grande (o do mundo), médio ou pequeno. */
+  uiSize: UiSize;
 }
+
+export const UI_SIZES: readonly UiSize[] = ['large', 'medium', 'small'];
 
 const STORAGE_KEY = 'refugio.prefs';
 
@@ -30,6 +35,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   volume: 0.6,
   musicVolume: 0.4,
   autoAttack: false,
+  uiSize: 'large',
 };
 
 /** Níveis de volume das definições (tocar muda para o seguinte). */
@@ -50,6 +56,9 @@ export function parsePreferences(text: string | null): Preferences {
   if (typeof r.language === 'string' && isLanguage(r.language)) prefs.language = r.language;
   for (const key of ['damageNumbers', 'vibration', 'colorblind', 'autoAttack'] as const) {
     if (typeof r[key] === 'boolean') prefs[key] = r[key];
+  }
+  if (typeof r.uiSize === 'string' && (UI_SIZES as readonly string[]).includes(r.uiSize)) {
+    prefs.uiSize = r.uiSize as UiSize;
   }
   for (const key of ['volume', 'musicVolume'] as const) {
     const value = r[key];

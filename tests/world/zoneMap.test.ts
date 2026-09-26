@@ -127,14 +127,15 @@ describe('parseZoneMap', () => {
     ]);
   });
 
-  it('exige pelo menos 2 saídas e o spawn fora das colisões', () => {
+  it('exige pelo menos 1 saída e o spawn fora das colisões', () => {
     const problems = problemsOf(
       tinyMap((m) => {
         const layers = m.layers as { name: string; objects?: { name: string; x: number }[] }[];
         const objects = layers.find((l) => l.name === 'objects')?.objects ?? [];
         const spawn = objects.find((o) => o.name === 'player_spawn');
         if (spawn) spawn.x = 40; // tile (2, 0), que é sólido
-        objects.splice(1, 1);
+        for (let i = objects.length - 1; i >= 0; i--)
+          if (objects[i]?.name.startsWith('exit')) objects.splice(i, 1);
       }),
     );
     expect(problems).toEqual([expect.stringContaining('saídas'), expect.stringContaining('colisão')]);

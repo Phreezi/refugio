@@ -5,6 +5,7 @@ import { skillOf, type ItemDef } from '../data/types';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
 import { missPct, skillLevel } from '../systems/combat/skills';
 import { COIN } from '../systems/inventory/inventory';
+import { healOf } from '../core/PlayerActions';
 
 /**
  * O que um item faz, em linhas curtas (tocar no desenho ou no nome, no fabrico e na mochila):
@@ -48,7 +49,8 @@ export function describeItem(id: string, def: ItemDef | undefined, enchant = 0):
   if (def.armor !== undefined) add('info.armor', { n: def.armor + enchant * BALANCE.enchantArmor });
   if (def.slots !== undefined) add('info.slots', { n: def.slots });
   const effects = def.effects;
-  if (effects?.hp) add('info.hp', { n: effects.hp });
+  const heal = effects ? healOf(effects) : 0;
+  if (heal) add('info.hp', { n: heal });
   if (effects?.hunger) add('info.hunger', { n: effects.hunger });
   if (effects?.thirst) add('info.thirst', { n: effects.thirst });
   if (def.stopsBleeding) add('info.bleed');

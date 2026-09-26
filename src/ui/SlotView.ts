@@ -1,3 +1,4 @@
+import { BALANCE } from '../data/balance';
 import type Phaser from 'phaser';
 import { paletteNumber, type PaletteColor } from '../assets/palette';
 import type { SlotRef } from '../core/PlayerActions';
@@ -44,6 +45,8 @@ export class SlotView {
   private readonly qty: Label;
   /** "+N" das armas e roupa encantadas. */
   private readonly enchant: Label;
+  /** Munição de uma arma à distância (canto superior direito; ver `setAmmo`). */
+  private readonly ammo: Label;
   private readonly wearBg: Phaser.GameObjects.Rectangle;
   private readonly wear: Phaser.GameObjects.Rectangle;
   private readonly key: Label | null;
@@ -110,6 +113,21 @@ export class SlotView {
       { size: 6 + 2 * (scale - 1), bold: true, color: 'gold', stroke: true },
       [0, 1],
     );
+    this.ammo = new Label(
+      scene,
+      x + size - 1,
+      y + 1,
+      '',
+      { size: 6 + 3 * (scale - 1), bold: true, stroke: true },
+      [1, 0],
+    );
+  }
+
+  /** Arma à distância: quantas munições tem (null = não mostra; a vermelho se acabaram). */
+  setAmmo(qty: number | null): this {
+    this.ammo.setText(qty === null ? '' : String(Math.min(qty, BALANCE.quiverDisplayMax)));
+    if (qty !== null) this.ammo.setColor(qty > 0 ? 'cream' : 'red');
+    return this;
   }
 
   /** Fundo de outra cor (o slot da arma ao lado da hotbar). */
@@ -158,6 +176,7 @@ export class SlotView {
     for (const pip of this.pips) pip.setDepth(depth + 1);
     this.qty.setDepth(depth + 1);
     this.enchant.setDepth(depth + 1);
+    this.ammo.setDepth(depth + 2);
     this.key?.setDepth(depth + 1);
     return this;
   }
@@ -166,6 +185,7 @@ export class SlotView {
     for (const obj of [this.frame, this.bg, this.icon, this.wearBg, this.wear, ...this.pips]) obj.destroy();
     this.qty.destroy();
     this.enchant.destroy();
+    this.ammo.destroy();
     this.key?.destroy();
   }
 }

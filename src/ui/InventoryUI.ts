@@ -49,8 +49,9 @@ const EQUIP_SHOWN = [
   { index: EQUIP_SLOTS.indexOf('body'), label: 'inv.slot.body_short' },
   { index: EQUIP_SLOTS.indexOf('backpack'), label: 'inv.slot.backpack_short' },
 ] as const;
-/** Linhas da coluna do equipamento: os slots mostrados e a aljava. */
-const EQUIP_ROWS = EQUIP_SHOWN.length + 1;
+/** Linhas da coluna do equipamento. */
+const EQUIP_ROWS = EQUIP_SHOWN.length;
+const WEAPON_INDEX = EQUIP_SLOTS.indexOf('weapon');
 /** Com uma mochila grande, a grelha pode alargar até estas colunas para caber no ecrã. */
 const INVENTORY_MAX_COLS = 10;
 
@@ -194,6 +195,19 @@ export class InventoryUI {
     this.refresh();
   }
 
+  /**
+   * "Apanhar tudo" do contentor/pilha aberto (botão, ou Espaço outra vez: abrir e apanhar).
+   * @returns false se não houver nada aberto de onde apanhar (baús não contam).
+   */
+  takeAll(): boolean {
+    const other = this.other;
+    if (!this.isOpen || !other || other.startsWith('chest:')) return false;
+    if (!this.actions.takeAll(other)) this.scene.events.emit('ui:message', t('msg.inventory_full'));
+    this.selected = null;
+    this.rebuildSoon();
+    return true;
+  }
+
   /** Usa o item da hotbar `index` (teclas 1–4). */
   useHotbar(index: number): void {
     this.actions.use({ container: 'hotbar', index });
@@ -304,6 +318,13 @@ export class InventoryUI {
       const selected =
         this.selected?.container === view.ref.container && this.selected.index === view.ref.index;
       view.update(slot, items, selected);
+    }
+    // Aljava (§7.8): a munição da arma à distância vê-se como um número no canto do slot da
+    // arma, no painel (a hotbar já a mostra por cima do slot da arma).
+    const ranged = items[gameState.data.player.equipment[WEAPON_INDEX]?.[0] ?? '']?.ranged;
+    const ammo = ranged ? simulation.combat.ammoCount() : null;
+    for (const view of this.panelSlots) {
+      if (view.ref.container === 'equipment' && view.ref.index === WEAPON_INDEX) view.setAmmo(ammo);
     }
   }
 
@@ -429,49 +450,6 @@ export class InventoryUI {
         ).setDepth(DEPTH.slots),
       );
     });
-    // Aljava (por baixo do equipamento): a munição em uso; tocar passa à seguinte.
-    const ammo = simulation.combat.activeAmmo();
-    const ammoDef = ammo ? content.items[ammo.item] : undefined;
-    if (ammo && ammoDef) {
-      const ax = gx + bag.w - size;
-      const ay = gy + TITLE_H + EQUIP_SHOWN.length * (size + SLOT_GAP);
-      add(
-        new Button(
-          scene,
-          ax + size / 2,
-          ay + size / 2,
-          '',
-          { width: size, height: size, style: 'secondary' },
-          () => {
-            this.scene.time.delayedCall(0, () => {
-              simulation.combat.cycleAmmo();
-              if (this.isOpen) this.buildPanel();
-            });
-          },
-        ),
-      ).setDepth(DEPTH.slots);
-      add(
-        scene.add
-          .image(ax + size / 2, ay + size / 2 - 2, ammoDef.icon)
-          .setScale(scale)
-          .setDepth(DEPTH.slots + 1),
-      );
-      add(
-        new Label(
-          scene,
-          ax + size - 1,
-          ay + size - 1,
-          String(Math.min(ammo.qty, BALANCE.quiverDisplayMax)),
-          {
-            size: 7,
-            bold: true,
-            color: 'cream',
-            stroke: true,
-          },
-          [1, 1],
-        ),
-      ).setDepth(DEPTH.slots + 1);
-    }
     const other = this.other;
     if (chest && other) {
       const cx = sideBySide ? gx + bag.w + PAD : gx;
@@ -686,9 +664,7 @@ export class InventoryUI {
           t('inv.take_all'),
           { ...small, width: bw, style: 'primary' },
           () => {
-            if (!this.actions.takeAll(other)) scene.events.emit('ui:message', t('msg.inventory_full'));
-            this.selected = null;
-            this.rebuildSoon();
+            this.takeAll();
           },
         ),
       ).setDepth(DEPTH.slots);

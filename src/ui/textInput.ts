@@ -38,8 +38,8 @@ export function createTextInput(canvas: HTMLCanvasElement, options: TextInputOpt
   if (options.uppercase) input.autocapitalize = 'characters';
   const place = (): void => {
     const rect = canvas.getBoundingClientRect();
-    const view = getView();
-    const scale = rect.width / view.width;
+    // Píxeis CSS por píxel de jogo da interface (o canvas pode ter uns píxeis a mais à direita).
+    const scale = canvas.width > 0 ? (rect.width / canvas.width) * getView().zoom : 1;
     Object.assign(input.style, {
       position: 'fixed',
       left: `${String(rect.left + options.x * scale)}px`,

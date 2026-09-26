@@ -22,7 +22,7 @@ import { Progression, type ProgressionContent } from './Progression';
 import { Crafting, type CraftingContent } from './Crafting';
 import { Interaction, type ZoneContext } from './Interaction';
 import { PlayerActions } from './PlayerActions';
-import { secondsToTicks } from './Clock';
+import { secondsToTicks, TICKS_PER_SECOND } from './Clock';
 import { content } from '../world/content';
 import { arrivalPoint, canTravel, type TravelCost } from '../systems/travel/travel';
 import type { ZoneMap } from '../world/zoneMap';
@@ -94,6 +94,9 @@ export class Simulation {
   private world: CollisionWorld | null = null;
   private respawnPoint: Vec2 | null = null;
   private intent: Vec2 = ZERO;
+  /** Voltar a casa: ticks que faltam (0 = parado) e a vida quando começou (dano cancela). */
+  private recallLeft = 0;
+  private recallHp = 0;
   private sneaking = false;
   private previous: Vec2 = ZERO;
   /** Mundo contínuo: não repetir o aviso "precisas de nível" a cada tick na borda. */
@@ -209,7 +212,7 @@ export class Simulation {
   }
 
   /** Zona onde o jogador está: colisões, recursos, baús… (null = fora de uma cena de jogo). */
-  setZone(zone: ZoneContext | null): void {
+  setZone(zone: ZoneContext | null, seamless = false): void {
     // O convidado ligado a esta zona fica com ela (e com os inimigos que lá estão).
     for (const secondary of this.secondaries) secondary.unlink();
     this.linked = false;
@@ -219,7 +222,8 @@ export class Simulation {
     this.leavingTo = null;
     this.fishing.cancel();
     this.building.setZone(zone);
-    this.combat.setZone(zone);
+    this.combat.remote = this.remote !== null;
+    this.combat.setZone(zone, seamless);
     // Co-op (convidado): os inimigos são os do anfitrião (chegam pela rede).
     if (this.remote) this.combat.setRemote([]);
     this.horde.setZone(zone);
@@ -422,6 +426,47 @@ export class Simulation {
     return true;
   }
 
+  /**
+   * Botão "Casa": ao fim de `recallSec` segundos parado (sem andar nem levar dano), volta-se à
+   * base de qualquer lado, sem custo. @returns 'home' se já está na base.
+   */
+  startRecall(): 'started' | 'home' {
+    const player = this.state.data.player;
+    if (player.zoneId === BASE_ZONE_ID) return 'home';
+    this.recallLeft = Math.max(1, Math.round(BALANCE.recallSec * TICKS_PER_SECOND));
+    this.recallHp = player.hp;
+    return 'started';
+  }
+
+  /** Interrompe a contagem do "Casa" (se houver). */
+  cancelRecall(): void {
+    if (this.recallLeft === 0) return;
+    this.recallLeft = 0;
+    this.bus.emit('home:recall_cancelled', {});
+  }
+
+  /** Contagem do "Casa": fração feita [0, 1] e segundos que faltam; null se parada. */
+  get recall(): { progress: number; secondsLeft: number } | null {
+    if (this.recallLeft === 0) return null;
+    const total = Math.max(1, Math.round(BALANCE.recallSec * TICKS_PER_SECOND));
+    return {
+      progress: 1 - this.recallLeft / total,
+      secondsLeft: Math.ceil(this.recallLeft / TICKS_PER_SECOND),
+    };
+  }
+
+  private tickRecall(): void {
+    if (this.recallLeft === 0) return;
+    const player = this.state.data.player;
+    if (this.intent.x !== 0 || this.intent.y !== 0 || player.hp < this.recallHp || player.hp <= 0) {
+      this.cancelRecall();
+      return;
+    }
+    this.recallHp = player.hp; // a regeneração não conta
+    this.recallLeft -= 1;
+    if (this.recallLeft === 0) this.bus.emit('home:recall', { zoneId: player.zoneId });
+  }
+
   /** Moedas do teletransporte para uma zona (para casa é grátis). */
   teleportPrice(to: string): number {
     if (to === BASE_ZONE_ID) return 0;
@@ -483,6 +528,7 @@ export class Simulation {
     this.actionHeld = false;
     this.actionQueued = false;
     this.nextActionTick = 0;
+    this.recallLeft = 0;
     if (this.state.hasGame) {
       const { x, y } = this.state.data.player;
       this.previous = { x, y };
@@ -495,6 +541,7 @@ export class Simulation {
     // estações (o anfitrião manda o estado certo de vez em quando).
     if (this.remote) {
       world.tick += 1;
+      this.tickRecall();
       this.movePlayer();
       this.checkExits();
       this.crafting.advance(1);
@@ -504,6 +551,7 @@ export class Simulation {
     if (this.primary) return;
     world.tick += 1;
     this.state.markDirty(); // o tempo de jogo avançou
+    this.tickRecall();
     this.movePlayer();
     if (this.moved) this.tutorial.playerMoved();
     this.combat.collectGround();
