@@ -1,5 +1,6 @@
 import type { QuestDef } from '../systems/quests/quests';
 import { content } from './content';
+import { TILE_PX } from './wilds';
 
 // Seta da missão (pedido do jogador): para onde ir na missão ativa, em coordenadas do MUNDO
 // contínuo (px). Pronta a entregar → o NPC que a recebe; senão, o primeiro objetivo por fazer:
@@ -13,9 +14,15 @@ export interface WorldPoint {
 
 /** Onde está o NPC (px do mundo), na primeira zona do mundo contínuo que o tenha. */
 export function npcWorldPoint(npc: string): WorldPoint | null {
+  // NPCs das aldeias geradas: sabe-se onde estão sem gerar o mapa.
+  const home = content.npcHome(npc);
+  if (home) {
+    const rect = content.world.rect(home.zoneId);
+    return rect ? { x: rect.x * TILE_PX + home.x, y: rect.y * TILE_PX + home.y } : null;
+  }
   for (const [zoneId] of Object.entries(content.zones)) {
     const rect = content.world.rect(zoneId);
-    if (!rect) continue;
+    if (!rect || content.isWild(zoneId)) continue;
     const map = content.zoneMap(zoneId);
     const placement = map.npcs?.find((p) => p.id === npc);
     if (placement) return { x: rect.x * map.tileSize + placement.x, y: rect.y * map.tileSize + placement.y };
@@ -27,7 +34,7 @@ export function npcWorldPoint(npc: string): WorldPoint | null {
 export function zoneWorldPoint(zoneId: string): WorldPoint | null {
   const rect = content.world.rect(zoneId);
   if (!rect) return null;
-  const tile = content.zoneMap(zoneId).tileSize;
+  const tile = TILE_PX;
   return { x: (rect.x + rect.w / 2) * tile, y: (rect.y + rect.h / 2) * tile };
 }
 
@@ -36,8 +43,9 @@ export function enemySpawnPoints(enemy: string): WorldPoint[] {
   const points: WorldPoint[] = [];
   for (const zoneId of Object.keys(content.zones)) {
     const rect = content.world.rect(zoneId);
-    if (!rect) continue;
-    const map = content.zoneMap(zoneId);
+    // As zonas selvagens só contam se já estiverem geradas (as que se veem à volta).
+    const map = rect ? content.loadedZoneMap(zoneId) : undefined;
+    if (!rect || !map) continue;
     for (const spawn of map.enemySpawns) {
       const group = content.enemyGroups[spawn.id];
       if (!group?.members.some((m) => m.enemy === enemy)) continue;

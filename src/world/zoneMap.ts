@@ -91,6 +91,8 @@ export interface ZoneMapRules {
   enemyGroupIds?: Iterable<string>;
   /** NPCs válidos em `npc:<id>` (omisso = não se verifica). */
   npcIds?: Iterable<string>;
+  /** Saídas mínimas (omisso = `MIN_EXITS`; as zonas selvagens do mundo não têm saídas). */
+  minExits?: number;
 }
 
 export class ZoneMapError extends Error {
@@ -327,8 +329,9 @@ export function parseZoneMap(input: unknown, rules: ZoneMapRules, where: string)
 
   if (spawns.length !== 1)
     problems.push(`tem de haver exatamente um player_spawn (há ${String(spawns.length)})`);
-  if (exits.length < MIN_EXITS) {
-    problems.push(`tem de haver pelo menos ${String(MIN_EXITS)} saídas "exit" (há ${String(exits.length)})`);
+  const minExits = rules.minExits ?? MIN_EXITS;
+  if (exits.length < minExits) {
+    problems.push(`tem de haver pelo menos ${String(minExits)} saídas "exit" (há ${String(exits.length)})`);
   }
   const spawn = spawns[0] ?? { x: 0, y: 0 };
   const spawnTile = Math.floor(spawn.y / rules.tileSize) * width + Math.floor(spawn.x / rules.tileSize);

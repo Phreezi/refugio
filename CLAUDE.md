@@ -137,7 +137,7 @@ refugio/
 │   │   └── placeholders.ts   # texturas placeholder geradas por código
 │   ├── audio/                # sfx.ts: efeitos sonoros sintetizados (Web Audio), ligados aos eventos
 │   ├── display/              # escala inteira + vista (view.ts) + zoom do jogador (worldZoom.ts)
-│   ├── world/                # mapas: tileset.ts, zoneMap.ts (validação Tiled, puro), content.ts, zoneContext.ts
+│   ├── world/                # mapas: tileset.ts, zoneMap.ts (validação Tiled, puro), content.ts, zoneContext.ts, wilds.ts (mundo selvagem: plano + gerador, puro), wildContent.ts (aldeias, missões e textos gerados)
 │   ├── debug/                # overlay F3 (DOM)
 │   ├── scenes/
 │   │   ├── keys.ts           # chaves das cenas
@@ -206,6 +206,7 @@ refugio/
 │   │   ├── enemies.json      # inimigos/animais (vida, dano, velocidade, deteção, leash, drops)
 │   │   ├── enemyGroups.json  # grupos dos pontos enemy_spawn:<grupo>
 │   │   ├── zones.json        # zonas (nome, mapa, perigo)
+│   │   ├── wilds.json        # plano do mundo selvagem (gerado por `npm run map:wilds`; uma zona por linha)
 │   │   ├── lootTables.json   # contentores com loot (sprite, footprint, tiragens, entradas, pity)
 │   │   ├── talents.json      # árvore de talentos (ramo, efeito, pontos, requisitos; §7.15)
 │   │   └── balance.json
@@ -283,6 +284,7 @@ npm run map:extend # alarga as zonas 48 tiles para leste (área de PvE + poste a
 npm run map:caves  # gera maps/cave_*.json e a boca de cada caverna na zona de entrada (`-- --force` refaz as cavernas)
 npm run map:ledges # degraus nos Caminhos + tileset embebido de todos os mapas (só uma vez)
 npm run map:naturalize # divisórias naturais nos Caminhos e nas bordas das zonas (só uma vez; `-- --force` refaz)
+npm run map:wilds  # plano do mundo selvagem (src/data/wilds.json) + passagens nas zonas à mão (`-- --force` refaz o plano)
 ```
 
 Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?debug` na URL mostra-o ao arrancar; `?lang=en` força inglês.
@@ -591,6 +593,8 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - **Dificuldade por ordem**: cada Caminho pede o nível da zona ao lado (`unlockLevel`); sem ele, a borda trava ("precisas de nível N para passar"). Zonas com `requiresItem` também travam na borda.
 - **Degraus** (tile `ledge`, estilo Pokémon): só bloqueiam quem sobe — a descer salta-se (`CollisionWorld`, `ledgeTiles`). `npm run map:ledges` pôs 1–2 em cada Caminho (atalhos a descer; a subir dá-se a volta), confirmando que o Caminho se atravessa nos dois sentidos.
 - **Cavernas** (`zone_cave_pine`, `_lake`, `_deep`, `_industrial`; escondidas no mapa-mundo, escuras): mapas próprios com túneis e salas (minério, pedras, contentores, inimigos do nível da zona). A boca (tile `cave_mouth`, 2 tiles, rocha à volta) numa zona do mundo é uma saída `exit:<caverna>`; lá dentro, as escadas levam de volta à boca.
+- **Mundo selvagem** (plano D, `src/world/wilds.ts`): à volta das zonas à mão há um continente de forma irregular (elipse com ruído, ~20× a área das zonas à mão) com ~290 zonas geradas por código (`zone_w_<n>`, `hidden`, de 12 a 96 tiles de lado). O **plano** (posição, bioma — prado, bosque, colinas, pântano —, nível, seed, nome do sítio e passagens) é feito uma vez por `npm run map:wilds` e fica em `src/data/wilds.json`; o **mapa** de cada zona gera-se quando é preciso (`content.zoneMap`, determinista; os 32 mais recentes ficam em memória) e passa pela cache do Phaser só para o desenhar — o download não cresce. Bordas naturais irregulares (1–3 tiles), passagens de 3 tiles (uma árvore que liga tudo + algumas extra: um labirinto largo), caminhos de terra sinuosos até à praça, lagos, montes de rochas, recursos e contentores pelo bioma e pelo perigo, inimigos pelo perigo. O **nível** (`unlockLevel`) cresce com a distância à Casa (`levelAt`; perto de casa nível 1, nas pontas ~35), por isso a borda trava como nos Caminhos. As passagens para as zonas à mão foram abertas nos mapas pelo script (só onde o interior está perto e se chega lá a partir do ponto de partida).
+- **Aldeias** (~1 em 9 zonas grandes, afastadas umas das outras): casas, poço, um ancião com missões e um comerciante (a loja do mercador). Cada ancião dá 3 missões (derrotar inimigos do perigo da zona, trazer o material do bioma, levar notícias ao ancião da aldeia seguinte), numa cadeia da aldeia mais perto de casa para a mais longe. Os nomes (zonas, aldeias, NPCs) e os textos das missões são gerados nas duas línguas (`defineTexts` em `src/i18n`). O mapa (M) desliza nos dois eixos, tem zoom (−/+ ou roda) e mostra os biomas, as aldeias (laranja) e os "!" dos anciões sem gerar os mapas.
 - As masmorras e as zonas-evento ficam fora do mundo contínuo (mapa-mundo e postes). O `validate-data` confirma que os blocos não se sobrepõem e que cada abertura de um Caminho dá para chão livre.
 
 ### 8.2 Lista de zonas
@@ -1233,4 +1237,5 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. **Dificuldade** (def
 | 2026-09-26 | v0.0.53: versão = número do PR; painel preso ao esvaziar uma pilha corrigido; opções do Auto; toque duplo baú ↔ mochila; loot no chão 6 h de jogo; Espaço aceita/entrega missões; tocar num ingrediente faz-o ou diz onde se arranja; câmara sempre centrada; painel do fabrico fixo no topo | Pedidos do jogador |
 | 2026-09-26 | v0.0.54: dia de jogo 5× mais longo (100 min); energia (correr e atacar gastam; sobe com o nível até +500%); cama e sono (20h–6h30; acordado às 2h adormece e acorda às 11h com 10%); barra proteica. Save v24: `player.stamina`; o relógio passa a ×5 e os prazos deslocam-se para o dia, a hora e o que falta ficarem iguais | Pedido do jogador |
 | 2026-09-26 | v0.0.55: combate como um só mapa (inimigos passam de zona com o jogador); seta e marcas da missão; monstros mais fortes; degraus só para baixo; 4 cavernas | Pedidos do jogador |
+| 2026-10-03 | v0.0.56: mundo 20× maior com zonas geradas (plano em `wilds.json`, mapas gerados em runtime com seed), continente irregular, caminhos sinuosos, aldeias com missões em cadeia, mapa com zoom e arrasto nos dois eixos | Pedido do jogador: "mapa 20× maior", caminhos orgânicos e "não ser um retângulo". Gerar em runtime mantém o jogo pequeno para descarregar (YouTube Playables) e o save não muda (as zonas novas guardam-se como as outras) |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

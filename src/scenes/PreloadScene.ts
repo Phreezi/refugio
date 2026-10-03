@@ -16,6 +16,7 @@ import resourcesJson from '../data/resources.json';
 import npcsJson from '../data/npcs.json';
 import questsJson from '../data/quests.json';
 import waystonesJson from '../data/waystones.json';
+import wildsJson from '../data/wilds.json';
 import { parseNpcs, parseQuests, parseWaystoneCosts } from '../systems/quests/quests';
 import {
   parseEnemies,
@@ -41,7 +42,9 @@ import {
   BASE_TILESET_NAME,
   baseTileIndex,
 } from '../world/tileset';
-import { parseZoneMap } from '../world/zoneMap';
+import { parseZoneMap, type ZoneMapRules } from '../world/zoneMap';
+import { installWilds } from '../world/wildContent';
+import { parseWildPlan } from '../world/wilds';
 import { showFatalError } from '../ui/fatalError';
 import { SceneKey } from './keys';
 
@@ -167,29 +170,27 @@ export class PreloadScene extends Phaser.Scene {
       }),
       parseWaystoneCosts(waystonesJson, Object.keys(items), Object.keys(zones)),
     );
+    const rules: ZoneMapRules = {
+      tileSize: TILE_SIZE,
+      tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
+      resourceIds: Object.keys(resources),
+      propIds: Object.keys(props),
+      stationIds: Object.keys(stations),
+      floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
+      ledgeTiles: { [BASE_TILESET_NAME]: BASE_LEDGE_TILES.map(baseTileIndex) },
+      zoneIds: Object.keys(zones),
+      enemyGroupIds: Object.keys(groups),
+      lootTableIds: Object.keys(lootTables),
+      npcIds: Object.keys(npcs),
+    };
     for (const [zoneId, zone] of Object.entries(zones)) {
       const cached: unknown = this.cache.tilemap.get(zoneMapKey(zoneId));
       const data =
         typeof cached === 'object' && cached !== null && 'data' in cached ? cached.data : undefined;
       if (data === undefined) throw new Error(`Não foi possível carregar ${zone.map}.`);
-      const map = parseZoneMap(
-        data,
-        {
-          tileSize: TILE_SIZE,
-          tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
-          resourceIds: Object.keys(resources),
-          propIds: Object.keys(props),
-          stationIds: Object.keys(stations),
-          floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
-          ledgeTiles: { [BASE_TILESET_NAME]: BASE_LEDGE_TILES.map(baseTileIndex) },
-          zoneIds: Object.keys(zones),
-          enemyGroupIds: Object.keys(groups),
-          lootTableIds: Object.keys(lootTables),
-          npcIds: Object.keys(npcs),
-        },
-        zone.map,
-      );
-      content.setZoneMap(zoneId, map);
+      content.setZoneMap(zoneId, parseZoneMap(data, rules, zone.map));
     }
+    // Mundo selvagem (plano D): os mapas geram-se quando são precisos.
+    installWilds(parseWildPlan(wildsJson), rules);
   }
 }
