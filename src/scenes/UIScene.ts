@@ -24,6 +24,7 @@ import { LevelUpUI } from '../ui/LevelUpUI';
 import { PauseUI } from '../ui/PauseUI';
 import { DialogUI, goalText } from '../ui/DialogUI';
 import { MapUI } from '../ui/MapUI';
+import { Minimap, MINIMAP_SIZE } from '../ui/Minimap';
 import { SkillsUI, skillEffectText } from '../ui/SkillsUI';
 import { preferences, setPreference } from '../ui/preferences';
 import { autosave } from '../save';
@@ -58,11 +59,15 @@ const ACTION_RADIUS = 20;
 
 /** Barras do HUD (px de jogo; pares, porque as Shapes não são arredondadas). */
 const HUD_MARGIN = 6;
+/** Altura da hotbar com a margem de baixo, e o espaço entre ela e a dica do tutorial. */
+const HOTBAR_SPACE = 28;
+const HINT_GAP = 24;
+/** Largura da coluna de botões da direita (Correr, Auto, Ação) com a margem. */
+const RIGHT_COLUMN = 54;
+/** Topo do minimapa (por baixo dos botões Mapa/Casa). */
+const MINIMAP_TOP = HUD_MARGIN + 21 + 19 + 12;
 /** Coluna mínima das barras (passa para a direita se os rótulos forem mais largos). */
 const BAR_X = 34;
-/** Abaixo desta largura (ecrã ao alto), a dica do tutorial vai para baixo das barras. */
-const NARROW_HUD_WIDTH = 420;
-const HINT_Y_NARROW = 60;
 const BAR_WIDTH = 60;
 const BAR_HEIGHT = 6;
 const BAR_SPACING = 11;
@@ -130,8 +135,15 @@ export class UIScene extends Phaser.Scene {
   /** Bordas do ecrã avermelhadas ao levar dano (em vez de abanar a câmara). */
   private hurtEdges: Phaser.GameObjects.Container | null = null;
   /** Dica do tutorial (em cima, ao centro) e o × que a desliga. */
-  private hint: { label: Label; close: Button | null; step: string | null; x: number; y: number } | null =
-    null;
+  private hint: {
+    label: Label;
+    close: Button | null;
+    step: string | null;
+    x: number;
+    y: number;
+    /** Fundo da dica (o texto cresce para cima). */
+    bottom: number;
+  } | null = null;
   /** "A sangrar" (por baixo da barra de XP), a piscar. */
   private bleedLabel: Label | null = null;
   /** Proteção de principiante (armas sem desgaste até ao dia 4). */
@@ -144,6 +156,7 @@ export class UIScene extends Phaser.Scene {
   /** Auto e Ação à vista (escondem-se com painéis abertos e no modo construção). */
   private playButtonsVisible = true;
   private worldMap: MapUI | null = null;
+  private minimap: Minimap | null = null;
   private seedHintShown = false;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
   private hordeLabel: Label | null = null;
@@ -202,14 +215,17 @@ export class UIScene extends Phaser.Scene {
       [1, 0],
     );
     const bossX = Math.round(width / 2);
-    const cx = Math.round(width / 2);
-    // Num ecrã estreito (ao alto) a dica não cabe entre as barras e o relógio: vai por baixo.
-    const hintY = width < NARROW_HUD_WIDTH ? HINT_Y_NARROW : HUD_MARGIN + 24;
+    // A dica fica entre a borda esquerda e a coluna da direita (Correr/Auto/Ação).
+    const hintRight = width - RIGHT_COLUMN;
+    const hintX = Math.round((4 + hintRight) / 2);
+    // A dica fica ao meio, logo acima da hotbar (o topo é das barras, dos botões e do minimapa).
+    const hintY = height - HOTBAR_SPACE - HINT_GAP;
     this.hint = {
       y: hintY,
+      bottom: hintY,
       label: new Label(
         this,
-        cx,
+        hintX,
         hintY,
         '',
         {
@@ -218,13 +234,13 @@ export class UIScene extends Phaser.Scene {
           color: 'wheat',
           stroke: true,
           align: 'center',
-          wrap: Math.min(260, width - 60),
+          wrap: Math.min(260, hintRight - 4 - 34),
         },
         [0.5, 0],
       ).setDepth(40),
       close: null,
       step: null,
-      x: cx,
+      x: hintX,
     };
     this.bossBar = {
       label: new Label(
@@ -245,7 +261,7 @@ export class UIScene extends Phaser.Scene {
     this.coopLabel = new Label(
       this,
       width - HUD_MARGIN,
-      HUD_MARGIN + 48,
+      MINIMAP_TOP + MINIMAP_SIZE + 6,
       '',
       { size: 7, color: 'wheat', bold: true, stroke: true },
       [1, 0],
@@ -301,6 +317,11 @@ export class UIScene extends Phaser.Scene {
     };
     this.createButtons();
     this.createSpeedButton();
+    // Minimapa por baixo dos botões do canto (tocar abre o mapa).
+    this.minimap = new Minimap(this, () => {
+      this.toggleMap();
+    });
+    this.minimap.setPosition(width - HUD_MARGIN - MINIMAP_SIZE - 2, MINIMAP_TOP);
     this.createJoystick();
     this.createKeys();
     const offEvents = this.listenForMessages();
@@ -341,6 +362,7 @@ export class UIScene extends Phaser.Scene {
       this.dialog = null;
       this.worldMap?.destroy();
       this.worldMap = null;
+      this.minimap = null;
       this.questLabel = null;
       this.recallUi = null;
       this.autoOptions = [];
@@ -389,6 +411,8 @@ export class UIScene extends Phaser.Scene {
 
   override update(time: number): void {
     if (!gameState.hasGame) return;
+    this.minimap?.setVisible(!uiState.modalOpen && !buildMode.active);
+    this.minimap?.update(time);
     this.updateRecall();
     this.crafting?.update();
     this.build?.update();
@@ -489,6 +513,8 @@ export class UIScene extends Phaser.Scene {
     if (!step) return;
     const touch = window.matchMedia('(pointer: coarse)').matches;
     hint.label.setText(tKey(`tut.${step}.${touch ? 'touch' : 'keys'}`));
+    hint.y = Math.round(hint.bottom - hint.label.text.height);
+    hint.label.setPosition(hint.x, hint.y);
     // O × (desligar as dicas) fica à direita do texto.
     hint.close = new Button(
       this,
@@ -868,7 +894,7 @@ export class UIScene extends Phaser.Scene {
 
   /**
    * Textos do canto (por baixo das barras): "a sangrar", principiante e missão, uns por baixo dos
-   * outros conforme os que se veem; ao alto, a dica do tutorial vai logo a seguir (nada se sobrepõe).
+   * outros conforme os que se veem (com um fundo escuro por trás).
    */
   private layoutTopLeft(bleeding: boolean): void {
     let y = HUD_MARGIN + STATS.length * BAR_SPACING + 7;
@@ -888,13 +914,6 @@ export class UIScene extends Phaser.Scene {
       ?.setPosition(HUD_MARGIN - 3, HUD_MARGIN - 3)
       .setSize(right - HUD_MARGIN + 6, y - HUD_MARGIN + 1)
       .setVisible(!uiState.modalOpen);
-    const hint = this.hint;
-    if (!hint || getView().width >= NARROW_HUD_WIDTH) return;
-    const hintY = Math.max(HINT_Y_NARROW, y + 2);
-    if (hint.y === hintY) return;
-    hint.y = hintY;
-    hint.label.setPosition(hint.x, hintY);
-    hint.step = ''; // refaz o × na posição nova
   }
 
   /** Registo da missão em curso (a primeira ativa): título e objetivos com progresso. */
