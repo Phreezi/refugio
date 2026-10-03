@@ -1,7 +1,17 @@
 import type { ZoneDef } from '../data/types';
 import { defineTexts, LANGUAGES, textIn, type Language } from '../i18n';
 import type { NpcDef, QuestDef } from '../systems/quests/quests';
-import { BASE_TILES, BASE_TILESET_FILE, BASE_TILESET_NAME, baseTileIndex, type BaseTile } from './tileset';
+import {
+  BASE_TILES,
+  BASE_TILESET_FILE,
+  BASE_TILESET_NAME,
+  baseTileIndex,
+  URBAN_TILES_COLUMNS,
+  URBAN_TILES_COUNT,
+  URBAN_TILESET_FILE,
+  URBAN_TILESET_NAME,
+  type BaseTile,
+} from './tileset';
 import { content } from './content';
 import type { ZoneMapRules } from './zoneMap';
 import {
@@ -26,8 +36,15 @@ const BIOME_NAME: Readonly<Record<Language, Readonly<Record<Biome, string>>>> = 
     forest: 'Bosque de {name}',
     hills: 'Colinas de {name}',
     marsh: 'Pântano de {name}',
+    urban: 'Subúrbio de {name}',
   },
-  en: { meadow: '{name} Meadow', forest: '{name} Woods', hills: '{name} Hills', marsh: '{name} Marsh' },
+  en: {
+    meadow: '{name} Meadow',
+    forest: '{name} Woods',
+    hills: '{name} Hills',
+    marsh: '{name} Marsh',
+    urban: '{name} Suburb',
+  },
 };
 const VILLAGE_NAME: Readonly<Record<Language, string>> = {
   'pt-PT': 'Aldeia de {name}',
@@ -119,6 +136,7 @@ const VILLAGE_NEEDS: Readonly<Record<Biome, readonly [string, number]>> = {
   meadow: ['fiber', 15],
   hills: ['stone', 25],
   marsh: ['clay', 10],
+  urban: ['scrap_metal', 10],
 };
 
 const fill = (template: string, params: Readonly<Record<string, string | number>>): string =>
@@ -242,7 +260,17 @@ export function installWilds(plan: WildPlan, rules: ZoneMapRules): void {
   });
   defineTexts(texts);
   const gid = (tile: string): number => baseTileIndex(tile as BaseTile) + 1;
-  const tileset = { name: BASE_TILESET_NAME, image: `../${BASE_TILESET_FILE}`, count: BASE_TILES.length };
+  const tileset = {
+    name: BASE_TILESET_NAME,
+    image: `../${BASE_TILESET_FILE}`,
+    count: BASE_TILES.length,
+    urban: {
+      name: URBAN_TILESET_NAME,
+      image: `../${URBAN_TILESET_FILE}`,
+      count: URBAN_TILES_COUNT,
+      columns: URBAN_TILES_COLUMNS,
+    },
+  };
   content.addWilds({
     zones,
     plan: plan.zones,

@@ -41,6 +41,8 @@ import {
   BASE_TILES,
   BASE_TILESET_NAME,
   baseTileIndex,
+  URBAN_TILESET_NAME,
+  URBAN_TILES_COUNT,
 } from '../world/tileset';
 import { parseZoneMap, type ZoneMapRules } from '../world/zoneMap';
 import { installWilds } from '../world/wildContent';
@@ -172,7 +174,7 @@ export class PreloadScene extends Phaser.Scene {
     );
     const rules: ZoneMapRules = {
       tileSize: TILE_SIZE,
-      tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
+      tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length, [URBAN_TILESET_NAME]: URBAN_TILES_COUNT },
       resourceIds: Object.keys(resources),
       propIds: Object.keys(props),
       stationIds: Object.keys(stations),

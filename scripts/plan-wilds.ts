@@ -3,15 +3,41 @@
 // das zonas à mão que dão para o mundo selvagem (só onde o interior está perto e se chega lá a
 // partir do ponto de partida da zona); as passagens que não se podem abrir saem do plano, e as
 // zonas selvagens a que não se chega de casa ficam de fora (montanhas).
-// Uso: `npm run map:wilds` (não substitui o plano sem `-- --force`).
+// Uso: `npm run map:wilds` (não substitui o plano sem `-- --force`); `-- --update-biomes` só volta
+// a escolher os subúrbios no plano que já existe (sem mudar a geometria nem os mapas).
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { BASE_LEDGE_TILES, baseTileIndex } from '../src/world/tileset.ts';
-import { planWilds, type Opening, type Rect, type Side, type WildPlan } from '../src/world/wilds.ts';
+import {
+  assignUrban,
+  parseWildPlan,
+  planWilds,
+  type Opening,
+  type Rect,
+  type Side,
+  type WildPlan,
+} from '../src/world/wilds.ts';
 
 const SEED = 20261003;
 const MAX_DEPTH = 10;
 const OUT = new URL('../src/data/wilds.json', import.meta.url);
+
+// Uma zona por linha: o ficheiro fica legível nos diffs.
+function writePlan(plan: WildPlan): void {
+  const line = (v: unknown): string => JSON.stringify(v);
+  writeFileSync(
+    OUT,
+    `{\n  "version": 1,\n  "zones": [\n${plan.zones.map((z) => `    ${line(z)}`).join(',\n')}\n  ],\n  "hand": [\n${plan.hand.map((h) => `    ${line(h)}`).join(',\n')}\n  ]\n}\n`,
+  );
+}
+
+if (process.argv.includes('--update-biomes')) {
+  const plan = parseWildPlan(JSON.parse(readFileSync(OUT, 'utf8')));
+  assignUrban(plan.zones);
+  writePlan(plan);
+  console.log(`wilds.json: ${String(plan.zones.filter((z) => z.biome === 'urban').length)} subúrbios`);
+  process.exit(0);
+}
 
 if (existsSync(OUT) && !process.argv.includes('--force')) {
   console.error('src/data/wilds.json já existe. Usar --force para refazer o plano.');
@@ -208,12 +234,7 @@ for (const zoneId of carved) {
   const map = maps.get(zoneId);
   if (file && map) writeFileSync(mapUrl(file), JSON.stringify(map));
 }
-// Uma zona por linha: o ficheiro fica legível nos diffs.
-const line = (v: unknown): string => JSON.stringify(v);
-writeFileSync(
-  OUT,
-  `{\n  "version": 1,\n  "zones": [\n${out.zones.map((z) => `    ${line(z)}`).join(',\n')}\n  ],\n  "hand": [\n${out.hand.map((h) => `    ${line(h)}`).join(',\n')}\n  ]\n}\n`,
-);
+writePlan(out);
 const area = out.zones.reduce((sum, z) => sum + z.w * z.h, 0);
 const handArea = hand.reduce((sum, r) => sum + r.w * r.h, 0);
 console.log(

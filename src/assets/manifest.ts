@@ -11,7 +11,7 @@ export const MANIFEST_VERSION = 1;
 export const CHARACTER_SHEET_LAYOUT = { frameWidth: 16, frameHeight: 32, columns: 10, rows: 4 } as const;
 
 /** Limite de tamanho de um placeholder, em píxeis de jogo. */
-export const MAX_PLACEHOLDER_SIZE = 256;
+export const MAX_PLACEHOLDER_SIZE = 512;
 
 export interface PlaceholderSpec {
   width: number;
