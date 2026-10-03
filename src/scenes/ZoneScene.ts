@@ -1305,7 +1305,15 @@ export class ZoneScene extends Phaser.Scene {
    */
   private createZoneView(zoneId: string): ZoneView | null {
     const { x: ox, y: oy } = this.offsetOf(zoneId);
-    const tilemap = this.make.tilemap({ key: zoneMapKey(zoneId) });
+    // Zonas selvagens: o mapa é gerado agora e só passa pela cache do Phaser o tempo de o ler.
+    const key = zoneMapKey(zoneId);
+    const wild = content.wildTiledJson(zoneId);
+    if (wild) {
+      this.cache.tilemap.remove(key);
+      this.cache.tilemap.add(key, { format: Phaser.Tilemaps.Formats.TILED_JSON, data: wild });
+    }
+    const tilemap = this.make.tilemap({ key });
+    if (wild) this.cache.tilemap.remove(key);
     const tileset = tilemap.addTilesetImage(BASE_TILESET_NAME, TILESET_TEXTURE);
     if (!tileset) {
       tilemap.destroy();

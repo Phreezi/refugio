@@ -19,11 +19,24 @@ export interface WorldTile {
   ty: number;
 }
 
+/** Lado (tiles) das células do índice espacial (`at` só vê os blocos da célula). */
+const BUCKET = 64;
+
 export class WorldLayout {
   private readonly rects: ReadonlyMap<string, ZoneRect>;
+  /** Índice espacial: célula → blocos que lhe tocam (o mundo tem centenas de zonas). */
+  private readonly buckets = new Map<string, ZoneRect[]>();
 
   constructor(rects: Iterable<ZoneRect>) {
     this.rects = new Map([...rects].map((r) => [r.zoneId, r]));
+    for (const r of this.rects.values())
+      for (let by = Math.floor(r.y / BUCKET); by <= Math.floor((r.y + r.h - 1) / BUCKET); by++)
+        for (let bx = Math.floor(r.x / BUCKET); bx <= Math.floor((r.x + r.w - 1) / BUCKET); bx++) {
+          const key = `${String(bx)},${String(by)}`;
+          const list = this.buckets.get(key);
+          if (list) list.push(r);
+          else this.buckets.set(key, [r]);
+        }
   }
 
   /** O bloco de uma zona (undefined = fora do mundo contínuo: masmorras, eventos). */
@@ -37,7 +50,8 @@ export class WorldLayout {
 
   /** A zona que tem o tile (x, y) do mundo, e o tile dentro dela. */
   at(x: number, y: number): WorldTile | undefined {
-    for (const zone of this.rects.values()) {
+    const bucket = this.buckets.get(`${String(Math.floor(x / BUCKET))},${String(Math.floor(y / BUCKET))}`);
+    for (const zone of bucket ?? []) {
       if (x >= zone.x && y >= zone.y && x < zone.x + zone.w && y < zone.y + zone.h)
         return { zone, tx: x - zone.x, ty: y - zone.y };
     }

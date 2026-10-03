@@ -10,9 +10,13 @@ import type {
   StructureDefs,
   ZoneDefs,
 } from '../data/types';
-import type { ZoneMap } from './zoneMap';
+import { parseZoneMap, type ZoneMap, type ZoneMapRules } from './zoneMap';
+import type { WildZone } from './wilds';
 import type { NpcDefs, QuestDef, WaystoneCost } from '../systems/quests/quests';
 import { buildWorldLayout, type WorldLayout } from './worldLayout';
+
+/** Mapas selvagens gerados guardados em memória (as zonas desenhadas à volta cabem todas). */
+const WILD_CACHE = 32;
 
 /**
  * Conteúdo já validado no arranque (PreloadScene), partilhado pelas cenas.
@@ -34,6 +38,14 @@ class Content {
   private npcDefs: NpcDefs | null = null;
   private questList: readonly QuestDef[] | null = null;
   private waystoneDefs: Readonly<Record<string, WaystoneCost>> | null = null;
+  /** Mundo selvagem (plano D): zonas geradas quando são precisas. */
+  private readonly wildZones = new Map<string, WildZone>();
+  /** Mapas gerados (os mais usados ficam; ordem de inserção = o menos usado primeiro). */
+  private readonly wildMaps = new Map<string, { json: Record<string, unknown>; map: ZoneMap }>();
+  private wildRules: ZoneMapRules | null = null;
+  private wildGenerate: ((zone: WildZone) => Record<string, unknown>) | null = null;
+  /** Onde estão os NPCs gerados (aldeias): zona e pés (px da zona). */
+  private readonly npcHomes = new Map<string, { zoneId: string; x: number; y: number }>();
 
   setQuests(
     npcs: NpcDefs,
@@ -144,6 +156,75 @@ class Content {
     return this.zoneDefs;
   }
 
+  /**
+   * Junta o mundo selvagem: as zonas (definições), os NPCs e as missões das aldeias, e como gerar
+   * o mapa de cada zona (validado com as mesmas regras dos desenhados à mão).
+   */
+  addWilds(wild: {
+    zones: ZoneDefs;
+    plan: readonly WildZone[];
+    npcs: NpcDefs;
+    quests: readonly QuestDef[];
+    npcHomes: ReadonlyMap<string, { zoneId: string; x: number; y: number }>;
+    rules: ZoneMapRules;
+    generate: (zone: WildZone) => Record<string, unknown>;
+  }): void {
+    this.zoneDefs = { ...this.zones, ...wild.zones };
+    this.npcDefs = { ...this.npcs, ...wild.npcs };
+    this.questList = [...this.quests, ...wild.quests];
+    for (const zone of wild.plan) this.wildZones.set(zone.id, zone);
+    for (const [npc, home] of wild.npcHomes) this.npcHomes.set(npc, home);
+    this.wildRules = wild.rules;
+    this.wildGenerate = wild.generate;
+    this.layout = null;
+  }
+
+  /** Zona gerada por código (mundo selvagem)? */
+  isWild(zoneId: string): boolean {
+    return this.wildZones.has(zoneId);
+  }
+
+  wild(zoneId: string): WildZone | undefined {
+    return this.wildZones.get(zoneId);
+  }
+
+  /** Onde está um NPC gerado (aldeia): zona e pés. */
+  npcHome(npc: string): { zoneId: string; x: number; y: number } | undefined {
+    return this.npcHomes.get(npc);
+  }
+
+  /** JSON do Tiled de uma zona selvagem (para o Phaser a desenhar); undefined nas outras. */
+  wildTiledJson(zoneId: string): Record<string, unknown> | undefined {
+    return this.wildZones.has(zoneId) ? this.wildEntry(zoneId).json : undefined;
+  }
+
+  /** O mapa da zona se já estiver carregado (as selvagens só depois de geradas). */
+  loadedZoneMap(zoneId: string): ZoneMap | undefined {
+    return this.zoneMaps.get(zoneId) ?? this.wildMaps.get(zoneId)?.map;
+  }
+
+  private wildEntry(zoneId: string): { json: Record<string, unknown>; map: ZoneMap } {
+    const cached = this.wildMaps.get(zoneId);
+    if (cached) {
+      // Passa para o fim (o mais recente).
+      this.wildMaps.delete(zoneId);
+      this.wildMaps.set(zoneId, cached);
+      return cached;
+    }
+    const zone = this.wildZones.get(zoneId);
+    if (!zone || !this.wildRules || !this.wildGenerate)
+      throw new Error(`Content: mapa da zona "${zoneId}" não carregado.`);
+    const json = this.wildGenerate(zone);
+    const entry = { json, map: parseZoneMap(json, this.wildRules, zoneId) };
+    this.wildMaps.set(zoneId, entry);
+    while (this.wildMaps.size > WILD_CACHE) {
+      const oldest = this.wildMaps.keys().next().value;
+      if (oldest === undefined) break;
+      this.wildMaps.delete(oldest);
+    }
+    return entry;
+  }
+
   setZoneMap(zoneId: string, map: ZoneMap): void {
     this.zoneMaps.set(zoneId, map);
     this.layout = null;
@@ -151,14 +232,17 @@ class Content {
 
   /** Mundo contínuo: as zonas com `world` (feito na primeira vez, com os mapas carregados). */
   get world(): WorldLayout {
-    this.layout ??= buildWorldLayout(this.zones, (zoneId) => this.zoneMap(zoneId));
+    this.layout ??= buildWorldLayout(this.zones, (zoneId) => {
+      const wild = this.wildZones.get(zoneId);
+      return wild ? { width: wild.w, height: wild.h } : this.zoneMap(zoneId);
+    });
     return this.layout;
   }
 
   zoneMap(zoneId: string): ZoneMap {
     const map = this.zoneMaps.get(zoneId);
-    if (!map) throw new Error(`Content: mapa da zona "${zoneId}" não carregado.`);
-    return map;
+    if (map) return map;
+    return this.wildEntry(zoneId).map;
   }
 }
 

@@ -29,11 +29,13 @@ import {
   BASE_FLOOR_TILES,
   BASE_LEDGE_TILES,
   BASE_TILES,
+  BASE_TILESET_FILE,
   BASE_TILESET_NAME,
   baseTileIndex,
 } from '../src/world/tileset.ts';
-import { ZoneMapError, parseZoneMap, type ZoneMap } from '../src/world/zoneMap.ts';
-import { buildWorldLayout } from '../src/world/worldLayout.ts';
+import { ZoneMapError, parseZoneMap, type ZoneMap, type ZoneMapRules } from '../src/world/zoneMap.ts';
+import { buildWorldLayout, WorldLayout } from '../src/world/worldLayout.ts';
+import { generateWild, parseWildPlan, villageNpcIds, type WildPlan } from '../src/world/wilds.ts';
 import { QuestDataError, parseNpcs, parseQuests, parseWaystoneCosts } from '../src/systems/quests/quests.ts';
 import { parseTalents } from '../src/systems/progression/talents.ts';
 
@@ -435,12 +437,98 @@ function checkMaps(): string[] {
     }
   }
   if (problems.length === 0) problems.push(...checkWorld(zones, parsed));
+  if (problems.length === 0)
+    problems.push(
+      ...checkWilds(zones, parsed, {
+        tileSize: TILE_SIZE,
+        tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
+        resourceIds: Object.keys(resources),
+        propIds: Object.keys(props),
+        stationIds: Object.keys(stations),
+        floorTiles: { [BASE_TILESET_NAME]: BASE_FLOOR_TILES.map(baseTileIndex) },
+        ledgeTiles: { [BASE_TILESET_NAME]: BASE_LEDGE_TILES.map(baseTileIndex) },
+        zoneIds: Object.keys(zones),
+        enemyGroupIds: Object.keys(groups),
+        lootTableIds: loadLootIds() ?? [],
+        npcIds: loadNpcIds() ?? [],
+        minExits: 0,
+      }),
+    );
   return problems;
 }
 
 /**
- * Mundo contínuo (Etapa E): os blocos não se sobrepõem, e cada abertura na borda de um Caminho
- * dá para um tile livre de outra zona (senão era um beco sem saída).
+ * Mundo selvagem (plano D): o plano é válido, cada zona gera um mapa válido, os blocos não se
+ * sobrepõem às zonas à mão e cada passagem dá para chão livre do outro lado.
+ */
+function checkWilds(zones: ZoneDefs, handMaps: ReadonlyMap<string, ZoneMap>, rules: ZoneMapRules): string[] {
+  let plan: WildPlan;
+  try {
+    plan = parseWildPlan(readJson('src/data/wilds.json'));
+  } catch (error) {
+    return [error instanceof Error ? error.message : String(error)];
+  }
+  const problems: string[] = [];
+  const maps = new Map(handMaps);
+  const npcIds = [
+    ...(rules.npcIds ?? []),
+    ...plan.zones.flatMap((z) => (z.village ? Object.values(villageNpcIds(z)) : [])),
+  ];
+  const gid = (tile: string): number => baseTileIndex(tile as (typeof BASE_TILES)[number]) + 1;
+  const tileset = { name: BASE_TILESET_NAME, image: `../${BASE_TILESET_FILE}`, count: BASE_TILES.length };
+  for (const zone of plan.zones) {
+    if (zones[zone.id]) problems.push(`wilds.json: ${zone.id} também está em zones.json`);
+    try {
+      maps.set(zone.id, parseZoneMap(generateWild(zone, gid, tileset), { ...rules, npcIds }, zone.id));
+    } catch (error) {
+      if (error instanceof ZoneMapError) problems.push(...error.problems.map((p) => `${zone.id}: ${p}`));
+      else problems.push(`${zone.id}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (problems.length > 0) return problems;
+  const rects = [
+    ...buildWorldLayout(zones, (zoneId) => {
+      const map = handMaps.get(zoneId);
+      if (!map) throw new Error(`sem mapa: ${zoneId}`);
+      return map;
+    }).all(),
+    ...plan.zones.map((z) => ({ zoneId: z.id, x: z.x, y: z.y, w: z.w, h: z.h })),
+  ];
+  const layout = new WorldLayout(rects);
+  problems.push(...layout.overlaps(), ...checkRouteOpenings(layout, maps));
+  const openings = [...plan.zones.flatMap((z) => z.open.map((open) => ({ zone: z.id, open }))), ...plan.hand];
+  for (const { zone, open } of openings) {
+    const rect = layout.rect(zone);
+    const map = maps.get(zone);
+    if (!rect || !map) {
+      problems.push(`wilds.json: passagem numa zona que não existe (${zone})`);
+      continue;
+    }
+    const [side, at, width] = open;
+    for (let k = 0; k < width; k++) {
+      const [tx, ty] =
+        side === 'n'
+          ? [at + k, 0]
+          : side === 's'
+            ? [at + k, map.height - 1]
+            : side === 'w'
+              ? [0, at + k]
+              : [map.width - 1, at + k];
+      const [ox, oy] =
+        side === 'n' ? [tx, -1] : side === 's' ? [tx, map.height] : side === 'w' ? [-1, ty] : [map.width, ty];
+      const hit = layout.resolve(zone, ox, oy);
+      const other = hit ? maps.get(hit.zone.zoneId) : undefined;
+      if (map.solid[ty * map.width + tx] || !hit || !other || other.solid[hit.ty * other.width + hit.tx]) {
+        problems.push(`${zone}: a passagem ${side}${String(at)} não dá para chão livre`);
+        break;
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * Mundo contínuo (Etapa E): os blocos não se sobrepõem.
  */
 function checkWorld(zones: ZoneDefs, maps: ReadonlyMap<string, ZoneMap>): string[] {
   const layout = buildWorldLayout(zones, (zoneId) => {
@@ -448,7 +536,12 @@ function checkWorld(zones: ZoneDefs, maps: ReadonlyMap<string, ZoneMap>): string
     if (!map) throw new Error(`sem mapa: ${zoneId}`);
     return map;
   });
-  const problems = layout.overlaps();
+  return layout.overlaps();
+}
+
+/** Cada abertura na borda de um Caminho dá para chão livre (no mundo todo, com o selvagem). */
+function checkRouteOpenings(layout: WorldLayout, maps: ReadonlyMap<string, ZoneMap>): string[] {
+  const problems: string[] = [];
   for (const rect of layout.all()) {
     if (!rect.zoneId.startsWith('zone_route_')) continue;
     const map = maps.get(rect.zoneId);

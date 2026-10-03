@@ -6,3 +6,5 @@ package-lock.json
 CLAUDE.md
 # Gerados pelo Tiled (ou por scripts/generate-base-map.ts); o formato é o do Tiled.
 public/assets/maps/
+# Gerado por scripts/plan-wilds.ts (uma zona por linha).
+src/data/wilds.json
