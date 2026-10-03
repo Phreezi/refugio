@@ -1,4 +1,5 @@
 import { consumeResume } from '../display/contextLoss';
+import { tInput } from '../ui/touch';
 import Phaser from 'phaser';
 import { PALETTE, paletteNumber } from '../assets/palette';
 import { clockAt } from '../core/Clock';
@@ -95,7 +96,7 @@ export class MainMenuScene extends Phaser.Scene {
       this,
       cx,
       height - 30,
-      data.message ? t(data.message) : t('menu.hint'),
+      data.message ? t(data.message) : tInput('menu.hint', 'menu.hint.keys'),
       { size: 8, color: 'stone_light', wrap: width - 16, align: 'center' },
       [0.5, 0],
     );

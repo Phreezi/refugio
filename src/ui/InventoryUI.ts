@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { tInput } from './touch';
 import { paletteNumber } from '../assets/palette';
 import { eventBus, type OtherContainerRef } from '../core/EventBus';
 import { gameState } from '../core/GameState';
@@ -652,9 +653,13 @@ export class InventoryUI {
         );
       }
     } else {
-      add(new Label(scene, x, y + 2, t('inv.hint'), { size: 7, color: 'stone_light', wrap: w })).setDepth(
-        DEPTH.slots,
-      );
+      add(
+        new Label(scene, x, y + 2, tInput('inv.hint', 'inv.hint.keys'), {
+          size: 7,
+          color: 'stone_light',
+          wrap: w,
+        }),
+      ).setDepth(DEPTH.slots);
     }
 
     const other = this.other;

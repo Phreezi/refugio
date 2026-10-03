@@ -230,7 +230,8 @@ export class CraftingUI {
     const type = this.station ? stationType(this.station) : HANDS;
     const w = Math.min(MAX_WIDTH, width - 8);
     const rows = this.tab === 'repair' ? this.repairables().length : this.recipes().length;
-    const queueH = this.hasQueue() ? 22 + 3 * 18 + 22 : 0;
+    // A fila só ocupa o que tem (os trabalhos e o "Recolher"): sobra espaço para as receitas.
+    const queueH = this.hasQueue() ? this.queueHeight() : 0;
     // Separadores: passam para outra linha se não couberem (ecrã ao alto).
     const tabs = this.layoutTabs(w - PAD * 2);
     const tabsH = (tabs.at(-1)?.row ?? 0) * (TAB_H + TAB_GAP) + TAB_H;
@@ -262,7 +263,19 @@ export class CraftingUI {
     this.button(x + w - 10, y + 9, CLOSE_ICON, 12, () => {
       this.close();
     });
-    if (this.tab !== 'repair') {
+    const trade = this.station !== null && content.stations[stationType(this.station)]?.trade === true;
+    if (trade || this.delivers())
+      this.label(
+        x + PAD + Math.ceil(measureTextWidth(title, 9)) + 8,
+        y + PAD + 1,
+        t('craft.coins_have', { n: gameState.data.player.coins }),
+        {
+          size: 8,
+          color: 'gold',
+        },
+      );
+    // Na loja não há "Posso fazer" (as trocas veem-se pela cor do preço).
+    if (this.tab !== 'repair' && !trade) {
       const filter = t('craft.filter');
       const fw = Math.max(52, evenCeil(measureTextWidth(filter, 8)) + 14);
       this.button(
@@ -313,6 +326,14 @@ export class CraftingUI {
       });
     }
     if (this.hasQueue()) this.buildQueue(x, y + h - queueH, w);
+  }
+
+  /** Altura da fila: título, uma linha por trabalho e o botão de recolher (se houver). */
+  private queueHeight(): number {
+    const key = this.station;
+    if (!key) return 0;
+    const station = stationState(gameState.data, key);
+    return 20 + station.queue.length * 18 + (outputCount(station) > 0 ? 24 : 0);
   }
 
   /** A estação tem fila (o comerciante não: as trocas são logo). */
@@ -405,7 +426,11 @@ export class CraftingUI {
         let ix = x + PAD + 20;
         for (const { item, qty: need } of sale ? [] : recipe.inputs) {
           const have = haveInput(containers, item, gameState.data.player);
-          const text = `${String(have)}/${String(need)} ${itemName(item)}`;
+          // Moedas: só o preço (o que se tem está no cabeçalho); o resto "tem/precisa".
+          const text =
+            item === COIN
+              ? `${String(need)} ${itemName(item)}`
+              : `${String(have)}/${String(need)} ${itemName(item)}`;
           const lbl = this.label(ix, ry + 12, text, {
             size: 7,
             color: locked ? 'stone' : have >= need ? 'lime' : 'red',
@@ -472,20 +497,16 @@ export class CraftingUI {
         .setOrigin(0)
         .setDepth(DEPTH.content),
     );
-    this.label(x + PAD, y + 4, t('craft.queue'), { size: 8, bold: true, color: 'wheat' });
     const max = content.stations[stationType(key)]?.queue ?? 1;
-    for (let i = 0; i < max; i++) {
+    this.label(x + PAD, y + 4, `${t('craft.queue')} ${String(station.queue.length)}/${String(max)}`, {
+      size: 8,
+      bold: true,
+      color: 'wheat',
+    });
+    for (let i = 0; i < station.queue.length; i++) {
       const jy = y + 20 + i * 18;
       const job = station.queue[i];
-      if (!job) {
-        this.add(
-          this.scene.add
-            .rectangle(x + PAD, jy + 7, 12, 2, paletteNumber('shadow'))
-            .setOrigin(0)
-            .setDepth(DEPTH.content),
-        );
-        continue;
-      }
+      if (!job) continue;
       const recipe = content.recipes.find((r) => r.id === job[0]);
       const def = recipe ? content.items[recipe.output] : undefined;
       if (def)
@@ -523,7 +544,7 @@ export class CraftingUI {
     if (ready > 0) {
       this.button(
         x + w / 2,
-        y + 20 + max * 18 + 6,
+        y + 20 + station.queue.length * 18 + 10,
         t('craft.collect', { qty: ready }),
         90,
         () => {
