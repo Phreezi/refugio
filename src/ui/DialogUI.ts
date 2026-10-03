@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { tInput } from './touch';
 import { paletteNumber, type PaletteColor } from '../assets/palette';
 import { eventBus } from '../core/EventBus';
 import { gameState } from '../core/GameState';
@@ -13,6 +14,9 @@ import { Label } from './text';
 import { splitSpeech } from './speech';
 import { tapMaterial } from './itemSources';
 import { panelTop, uiState } from './uiState';
+
+/** Espaço da hotbar em baixo (o painel da conversa fica por cima dela). */
+const HOTBAR_SPACE = 32;
 
 const DEPTH = { dim: 80, panel: 82, content: 84 } as const;
 const MAX_W = 280;
@@ -47,6 +51,8 @@ export class DialogUI {
 
   /** Fundo do painel (px de jogo), para os avisos aparecerem por baixo dele e não tapados. */
   bottom: number | null = null;
+  /** Topo do painel (px de jogo), para os avisos irem por cima dele. */
+  top: number | null = null;
 
   open(npc: string): void {
     if (!gameState.hasGame) return;
@@ -71,6 +77,7 @@ export class DialogUI {
     if (this.npc !== null) uiState.modalOpen = false;
     this.npc = null;
     this.bottom = null;
+    this.top = null;
   }
 
   destroy(): void {
@@ -178,7 +185,8 @@ export class DialogUI {
       if (state === 'offer') {
         const accept = (): void => {
           quests.accept(quest.id);
-          this.rebuildSoon();
+          // Aceite: a conversa fecha (o aviso e a seta da missão dizem o que fazer a seguir).
+          this.close();
         };
         this.quickAction = accept;
         buttons.push({ label: t('quest.accept'), primary: true, onClick: accept });
@@ -236,9 +244,13 @@ export class DialogUI {
           text: t('npc.coins', { have: Math.min(coins, cost.coins), need: cost.coins }),
           color: coins >= cost.coins ? 'lime' : 'red',
         });
+        // Enquanto faltar algo, o botão fica cinzento e diz o que se passa (continua a explicar ao tocar).
+        const ready =
+          coins >= cost.coins &&
+          cost.items.every(([item, qty]) => countItem([inventory, hotbar], item) >= qty);
         buttons.push({
-          label: t('npc.repair'),
-          primary: true,
+          label: ready ? t('npc.repair') : t('npc.repair_missing'),
+          primary: ready,
           onClick: () => {
             const result = quests.repairWaystone(zoneId);
             this.message = t(
@@ -276,8 +288,10 @@ export class DialogUI {
     const message = last ? this.message : '';
     const h = 24 + textH + 6 + lines.length * 11 + (message ? 14 : 0) + buttonRows * 20 + 8 + 10;
     const x = Math.round((width - w) / 2);
-    const y = Math.max(4, Math.min(panelTop(height), height - 4 - h));
+    // Em baixo, por cima da hotbar: o NPC e o boneco (ao meio do ecrã) ficam à vista.
+    const y = Math.max(Math.min(4, panelTop(height)), height - HOTBAR_SPACE - h);
     this.bottom = y + h;
+    this.top = y;
     this.add(
       scene.add
         .rectangle(0, 0, width, height, paletteNumber('ink'), 0.55)
@@ -346,8 +360,8 @@ export class DialogUI {
     });
     // Como sair/avançar (e em que página se está).
     const hint = last
-      ? t('npc.hint_close')
-      : `${t('npc.hint_next')}  ${String(this.page + 1)}/${String(pages.length)}`;
+      ? tInput('npc.hint_close', 'npc.hint_close.keys')
+      : `${tInput('npc.hint_next', 'npc.hint_next.keys')}  ${String(this.page + 1)}/${String(pages.length)}`;
     const hintLabel = this.label(x + PAD, y + h - 11, hint, 6, 'stone_light');
     hintLabel.setPosition(x + w - PAD - Math.ceil(hintLabel.text.width), y + h - 11);
   }

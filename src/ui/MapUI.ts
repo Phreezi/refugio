@@ -8,7 +8,7 @@ import { content } from '../world/content';
 import type { ZoneRect } from '../world/worldLayout';
 import { TILE_PX, villageNpcIds } from '../world/wilds';
 import { Button, CLOSE_ICON } from './Button';
-import { Label } from './text';
+import { Label, measureTextWidth } from './text';
 import { uiState } from './uiState';
 
 // Por cima dos botões do HUD (a pausa "II" está a 86).
@@ -223,18 +223,25 @@ export class MapUI {
       const wild = content.wild(rect.zoneId);
       // Nomes: as zonas do mapa-mundo, as aldeias e a zona onde se está (o resto enchia o mapa).
       if (!zone || (zone.hidden && !wild?.village && !current) || w < 14) return;
-      const cx = a.x + w / 2;
-      // Na zona onde se está, o nome vai para cima (o ponto do jogador fica à vista).
-      const cy = current ? a.y + Math.min(h / 2, 9) : a.y + h / 2;
+      // Só a parte do bloco à vista conta (o nome não sai do desenho).
+      const vx0 = Math.max(a.x, ix);
+      const vx1 = Math.min(a.x + w, ix + iw);
+      if (vx1 - vx0 < 14) return;
+      const cx = (vx0 + vx1) / 2;
+      // Na zona onde se está e nas aldeias, o nome vai para cima (o jogador e os "!" ficam à vista).
+      const cy = current || wild?.village ? a.y + Math.min(h / 2, 9) : a.y + h / 2;
       if (cy < iy + 6 || cy > iy + ih - 6) return;
       const name = tKey(zone.name);
+      const text = locked ? `${name} (${t('map.level', { n: zone.unlockLevel })})` : name;
+      // Se nem encolhido cabe no bloco, não se escreve (o mapa ficava com nomes por cima de tudo).
+      if (measureTextWidth(text, 7) > (vx1 - vx0 - 4) * 1.6) return;
       this.add(
         new Label(
           scene,
           Math.round(cx),
           Math.round(cy),
-          locked ? `${name} (${t('map.level', { n: zone.unlockLevel })})` : name,
-          { size: 7, color: 'cream', stroke: true, fit: Math.max(8, Math.floor(w - 4)) },
+          text,
+          { size: 7, color: 'cream', stroke: true, fit: Math.max(8, Math.floor(vx1 - vx0 - 4)) },
           [0.5, 0.5],
         ).setDepth(DEPTH.content),
       );
@@ -250,8 +257,17 @@ export class MapUI {
       const y = Math.round(p.y);
       if (y > iy && y < iy + ih && x > ix && x < ix + iw) {
         const dot = this.add(scene.add.graphics().setDepth(DEPTH.content + 1));
-        dot.fillStyle(paletteNumber('cream'), 1).fillRect(x - 3, y - 3, 6, 6);
-        dot.fillStyle(paletteNumber('red'), 1).fillRect(x - 2, y - 2, 4, 4);
+        // "Tu": losango azul-claro com contorno (o vermelho é dos chefes).
+        dot
+          .fillStyle(paletteNumber('ink'), 1)
+          .fillRect(x - 1, y - 5, 2, 10)
+          .fillRect(x - 5, y - 1, 10, 2);
+        dot.fillStyle(paletteNumber('ink'), 1).fillRect(x - 3, y - 3, 6, 6);
+        dot
+          .fillStyle(paletteNumber('ice'), 1)
+          .fillRect(x - 2, y - 2, 4, 4)
+          .fillRect(x - 1, y - 4, 2, 8)
+          .fillRect(x - 4, y - 1, 8, 2);
       }
     }
   }
@@ -273,6 +289,11 @@ export class MapUI {
       g.fillStyle(paletteNumber(color), 1).fillRect(at + 1, y - size / 2, size, size);
       return at + size + 2;
     };
+    entry((at) => {
+      g.fillStyle(paletteNumber('ink'), 1).fillRect(at, y - 3, 6, 6);
+      g.fillStyle(paletteNumber('ice'), 1).fillRect(at + 1, y - 2, 4, 4);
+      return at + 6;
+    }, t('map.legend_you'));
     entry((at) => {
       this.add(scene.add.image(at, y, 'bag_dropped').setOrigin(0, 0.5).setScale(0.5).setDepth(DEPTH.content));
       return at + 8;
@@ -321,7 +342,7 @@ export class MapUI {
       const p = text ? at(zoneId, x, y) : null;
       if (p)
         this.add(
-          new Label(scene, p.x, p.y, text, { size: 9, color: 'gold', stroke: true }, [0.5, 0.5]).setDepth(
+          new Label(scene, p.x, p.y - 4, text, { size: 9, color: 'gold', stroke: true }, [0.5, 1]).setDepth(
             DEPTH.content + 2,
           ),
         );

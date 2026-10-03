@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { tInput } from './touch';
 import { paletteNumber } from '../assets/palette';
 import { eventBus, type OtherContainerRef } from '../core/EventBus';
 import { gameState } from '../core/GameState';
@@ -15,6 +16,7 @@ import { describeItem } from './itemInfo';
 import { enchantOf } from '../systems/inventory/inventory';
 import { Label, measureTextWidth } from './text';
 import { panelTop, REOPEN_GUARD_MS, uiState } from './uiState';
+import { preferences } from './preferences';
 
 /** Dois toques no mesmo slot dentro deste tempo passam-no para o outro lado (baú ↔ mochila). */
 const DOUBLE_TAP_MS = 400;
@@ -413,9 +415,13 @@ export class InventoryUI {
     this.clearPanel();
     const scene = this.scene;
     const { width, height } = getView();
-    // Nos ecrãs táteis, slots ×2 (mais fáceis de tocar) se couberem.
+    // Nos ecrãs táteis, slots ×2 (mais fáceis de tocar) se couberem e se os de ×1 forem pequenos
+    // para o dedo — mas sem contrariar o "Tamanho da interface" (o Pequeno não fica maior).
     const touch = scene.sys.game.device.input.touch;
-    const layout = (touch ? this.layout(2) : null) ?? this.layout(1) ?? this.layoutFallback();
+    const slotCss = (SLOT_SIZE * getView().zoom) / (window.devicePixelRatio || 1);
+    const uiSize = preferences().uiSize;
+    const double = touch && slotCss < (uiSize === 'large' ? 44 : uiSize === 'medium' ? 34 : 26);
+    const layout = (double ? this.layout(2) : null) ?? this.layout(1) ?? this.layoutFallback();
     const { scale, cols, bag, chest, sideBySide, w, h } = layout;
     const size = slotSize(scale);
     const x = Math.round((width - w) / 2);
@@ -652,9 +658,13 @@ export class InventoryUI {
         );
       }
     } else {
-      add(new Label(scene, x, y + 2, t('inv.hint'), { size: 7, color: 'stone_light', wrap: w })).setDepth(
-        DEPTH.slots,
-      );
+      add(
+        new Label(scene, x, y + 2, tInput('inv.hint', 'inv.hint.keys'), {
+          size: 7,
+          color: 'stone_light',
+          wrap: w,
+        }),
+      ).setDepth(DEPTH.slots);
     }
 
     const other = this.other;

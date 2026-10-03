@@ -357,7 +357,8 @@ export class ZoneScene extends Phaser.Scene {
     simulation.setMoveIntent(blocked ? { x: 0, y: 0 } : moveInput.direction, moveInput.sneak, moveInput.run);
     // No modo construção, Espaço/clique colocam peças (UIScene) em vez da ação contextual.
     const actionKey = !buildMode.active && (this.keys?.action.some((key) => key.isDown) ?? false);
-    const pressed = actionKey || uiState.actionHeld;
+    const pressed = actionKey || uiState.actionHeld || uiState.actionTapped;
+    uiState.actionTapped = false;
     if (!pressed) uiState.actionLocked = false;
     simulation.setActionHeld(!blocked && !buildMode.active && !uiState.actionLocked && pressed);
     simulation.autoAttack = preferences().autoAttack && !blocked && !buildMode.active;

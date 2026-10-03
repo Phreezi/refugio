@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { getView } from '../display/view';
 import { paletteNumber, type PaletteColor } from '../assets/palette';
 import { Label } from './text';
 import { sfx } from '../audio/sfx';
@@ -30,6 +31,10 @@ export interface ButtonOptions {
  * não são arredondadas ao píxel pelo Phaser 4. Só conta como clique se o toque começar
  * E acabar no botão.
  */
+/** Altura mínima (px CSS) da área de toque e folga máxima (px de jogo). */
+const TOUCH_TARGET_CSS = 36;
+const TOUCH_PAD_MAX = 3;
+
 export class Button {
   private readonly border: Phaser.GameObjects.Rectangle;
   private readonly fill: Phaser.GameObjects.Rectangle;
@@ -74,8 +79,15 @@ export class Button {
     }
 
     let pressed = false;
+    // Com toque, a área que responde ao dedo é um pouco maior do que o desenho (até ~36 px CSS
+    // de altura), sem chegar aos botões vizinhos.
+    const pad = scene.sys.game.device.input.touch ? touchPad(height) : 0;
     this.fill
-      .setInteractive({ useHandCursor: true })
+      .setInteractive({
+        useHandCursor: true,
+        hitArea: new Phaser.Geom.Rectangle(-pad, -pad, width + pad * 2, height + pad * 2),
+        hitAreaCallback: (area: Phaser.Geom.Rectangle, x: number, y: number) => area.contains(x, y),
+      })
       .on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
         this.hovered = true;
         this.paint();
@@ -172,4 +184,11 @@ export class Button {
     this.label.setColor(colors.text);
     for (const px of this.cross) px.setFillStyle(paletteNumber(colors.text));
   }
+}
+
+/** Folga (px de jogo) à volta da área de toque de um botão com `height` px de jogo. */
+function touchPad(height: number): number {
+  const cssPerPx = getView().zoom / (window.devicePixelRatio || 1);
+  if (cssPerPx <= 0) return 0;
+  return Math.max(0, Math.min(TOUCH_PAD_MAX, Math.ceil((TOUCH_TARGET_CSS / cssPerPx - height) / 2)));
 }

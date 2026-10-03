@@ -365,16 +365,30 @@ export class BuildUI {
       ),
     ).setDepth(DEPTH);
     if (!scene.sys.game.device.input.touch) {
-      add(
+      // Teclas, no topo ao meio (os botões do canto saem no modo construção), com fundo.
+      const keys = add(
         new Label(
           scene,
           Math.round(width / 2),
-          4,
+          6,
           t('build.keys'),
-          { size: 7, color: 'parchment', stroke: true, align: 'center', wrap: width - 140 },
+          { size: 7, color: 'parchment', align: 'center', wrap: Math.max(120, width - 240) },
           [0.5, 0],
         ),
       ).setDepth(DEPTH);
+      add(
+        scene.add
+          .rectangle(
+            Math.round(width / 2 - keys.text.width / 2) - 4,
+            4,
+            Math.ceil(keys.text.width) + 8,
+            Math.ceil(keys.text.height) + 4,
+            paletteNumber('ink'),
+            0.75,
+          )
+          .setOrigin(0)
+          .setDepth(DEPTH - 1),
+      );
     }
     this.update();
   }

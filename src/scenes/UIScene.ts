@@ -58,6 +58,7 @@ const ACTION_RADIUS = 20;
 
 /** Barras do HUD (px de jogo; pares, porque as Shapes não são arredondadas). */
 const HUD_MARGIN = 6;
+/** Coluna mínima das barras (passa para a direita se os rótulos forem mais largos). */
 const BAR_X = 34;
 /** Abaixo desta largura (ecrã ao alto), a dica do tutorial vai para baixo das barras. */
 const NARROW_HUD_WIDTH = 420;
@@ -160,6 +161,13 @@ export class UIScene extends Phaser.Scene {
   private autoOptionsTimer: Phaser.Time.TimerEvent | null = null;
   /** Talento ativo "Correr" (só aparece depois de o aprender). */
   private sprintButton: Button | null = null;
+  /** Botões do canto (velocidade, Mapa, Casa) e a pausa: escondem-se com um painel aberto. */
+  private cornerButtons: Button[] = [];
+  private topLeftBg: Phaser.GameObjects.Rectangle | null = null;
+  private hintBg: Phaser.GameObjects.Rectangle | null = null;
+  /** Coluna das barras (px de jogo). */
+  private barX = BAR_X;
+  private pauseButton: Button | null = null;
   private sprintVisible = true;
   /** O botão "Correr" está aceso (a correr). */
   private sprintReady = false;
@@ -237,7 +245,7 @@ export class UIScene extends Phaser.Scene {
     this.coopLabel = new Label(
       this,
       width - HUD_MARGIN,
-      HUD_MARGIN + 40,
+      HUD_MARGIN + 48,
       '',
       { size: 7, color: 'wheat', bold: true, stroke: true },
       [1, 0],
@@ -246,7 +254,7 @@ export class UIScene extends Phaser.Scene {
     this.hordeLabel = new Label(
       this,
       width - HUD_MARGIN,
-      HUD_MARGIN + 30,
+      HUD_MARGIN + 37,
       '',
       { size: 7, color: 'amber', bold: true, stroke: true },
       [1, 0],
@@ -361,6 +369,8 @@ export class UIScene extends Phaser.Scene {
       this.beginnerLabel = null;
       this.bossBar = null;
       this.hint = null;
+      this.hintBg = null;
+      this.topLeftBg = null;
       this.hurtEdges = null;
       this.xpFill = null;
       this.actionButton = [];
@@ -413,7 +423,12 @@ export class UIScene extends Phaser.Scene {
       this.playButtonsVisible = playButtons;
       this.autoButton?.setVisible(playButtons);
       for (const obj of this.actionButton) obj.setVisible(playButtons);
+      // O HUD acessório também sai (não fica por cima dos painéis); a pausa só se vê sem
+      // painéis ou com o menu de pausa aberto (para o fechar).
+      for (const button of this.cornerButtons) button.setVisible(playButtons);
+      this.buildButton?.setVisible(playButtons && this.build?.available === true);
     }
+    this.pauseButton?.setVisible(!uiState.modalOpen || this.pause?.isOpen === true);
     if (this.sprintButton) {
       const visible = playButtons;
       const running = moveInput.run;
@@ -427,7 +442,8 @@ export class UIScene extends Phaser.Scene {
       }
     }
     this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
-    this.beginnerLabel?.setVisible(simulation.combat.beginner && !uiState.modalOpen);
+    // A proteção de principiante lembra-se só no primeiro dia (depois ocupava o canto 3 dias).
+    this.beginnerLabel?.setVisible(simulation.combat.beginner && clock.day === 1 && !uiState.modalOpen);
     this.renderQuest();
     this.renderBossBar();
     this.layoutTopLeft(player.bleed > 0);
@@ -460,7 +476,11 @@ export class UIScene extends Phaser.Scene {
   private renderHint(): void {
     const hint = this.hint;
     if (!hint) return;
-    const step = simulation.tutorial.current();
+    // Uma instrução de cada vez: a dica cede o lugar a um aviso e aos painéis.
+    const noticeShown = this.notice?.text.visible === true && this.notice.text.text !== '';
+    const quiet = uiState.modalOpen || buildMode.active || noticeShown;
+    const step = quiet ? null : simulation.tutorial.current();
+    this.layoutHintBg(step !== null);
     if (step === hint.step) return;
     hint.step = step;
     hint.label.setVisible(step !== null);
@@ -480,6 +500,19 @@ export class UIScene extends Phaser.Scene {
         simulation.tutorial.dismiss();
       },
     ).setDepth(40);
+  }
+
+  /** Caixa escura por trás da dica do tutorial (e do × dela). */
+  private layoutHintBg(visible: boolean): void {
+    const hint = this.hint;
+    if (!hint) return;
+    this.hintBg ??= this.add.rectangle(0, 0, 2, 2, paletteNumber('ink'), 0.75).setOrigin(0).setDepth(39);
+    this.hintBg.setVisible(visible);
+    if (!visible) return;
+    const text = hint.label.text;
+    const w = Math.ceil(text.width) + 26;
+    this.hintBg.setPosition(Math.round(hint.x - text.width / 2) - 4, hint.y - 3);
+    this.hintBg.setSize(w, Math.ceil(text.height) + 6);
   }
 
   /**
@@ -743,7 +776,9 @@ export class UIScene extends Phaser.Scene {
   }
 
   private createBars(): void {
-    this.bars = STATS.map((stat, i) => {
+    // Fundo translúcido do bloco do canto (barras, nível, avisos e missão): lê-se sobre o mundo.
+    this.topLeftBg = this.add.rectangle(0, 0, 2, 2, paletteNumber('ink'), 0.45).setOrigin(0).setDepth(-1);
+    const rows = STATS.map((stat, i) => {
       const y = HUD_MARGIN + i * BAR_SPACING;
       // Centrada na barra (a letra é mais alta do que a barra) e com sombra por cima do mundo.
       const label = new Label(
@@ -754,12 +789,20 @@ export class UIScene extends Phaser.Scene {
         { size: 7, color: 'cream', bold: true, stroke: true },
         [0, 0.5],
       );
+      return { stat, label };
+    });
+    // As barras começam a seguir ao rótulo mais largo (com zooms grandes a letra cresce).
+    const barX = Math.max(
+      BAR_X,
+      HUD_MARGIN + Math.ceil(Math.max(...rows.map((r) => r.label.text.width))) + 3,
+    );
+    this.barX = barX;
+    this.bars = rows.map(({ stat, label }, i) => {
+      const y = HUD_MARGIN + i * BAR_SPACING;
       // Contorno (retângulo maior por trás), fundo e enchimento; origem 0 e posições inteiras.
-      this.add.rectangle(BAR_X - 1, y - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2, paletteNumber('ink')).setOrigin(0);
-      this.add.rectangle(BAR_X, y, BAR_WIDTH, BAR_HEIGHT, paletteNumber('shadow')).setOrigin(0);
-      const fill = this.add
-        .rectangle(BAR_X, y, BAR_WIDTH, BAR_HEIGHT, paletteNumber(stat.color))
-        .setOrigin(0);
+      this.add.rectangle(barX - 1, y - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2, paletteNumber('ink')).setOrigin(0);
+      this.add.rectangle(barX, y, BAR_WIDTH, BAR_HEIGHT, paletteNumber('shadow')).setOrigin(0);
+      const fill = this.add.rectangle(barX, y, BAR_WIDTH, BAR_HEIGHT, paletteNumber(stat.color)).setOrigin(0);
       return { key: stat.key, label, fill };
     });
     const y = HUD_MARGIN + STATS.length * BAR_SPACING;
@@ -773,19 +816,19 @@ export class UIScene extends Phaser.Scene {
     );
     // Moedas (§7.16): à direita da barra de XP.
     this.add
-      .image(BAR_X + BAR_WIDTH + 5, y + 2, 'icon_coin')
+      .image(barX + BAR_WIDTH + 5, y + 2, 'icon_coin')
       .setOrigin(0, 0.5)
       .setScale(0.5);
     this.coinLabel = new Label(
       this,
-      BAR_X + BAR_WIDTH + 15,
+      barX + BAR_WIDTH + 15,
       y + 2,
       '',
       { size: 7, color: 'gold', bold: true, stroke: true },
       [0, 0.5],
     );
-    this.add.rectangle(BAR_X - 1, y, BAR_WIDTH + 2, 4, paletteNumber('ink')).setOrigin(0);
-    this.xpFill = this.add.rectangle(BAR_X, y + 1, 0, 2, paletteNumber('gold')).setOrigin(0);
+    this.add.rectangle(barX - 1, y, BAR_WIDTH + 2, 4, paletteNumber('ink')).setOrigin(0);
+    this.xpFill = this.add.rectangle(barX, y + 1, 0, 2, paletteNumber('gold')).setOrigin(0);
     this.bleedLabel = new Label(this, HUD_MARGIN, y + 6, t('hud.bleeding'), {
       size: 7,
       color: 'red',
@@ -808,11 +851,10 @@ export class UIScene extends Phaser.Scene {
     const bg = this.noticeBg;
     const text = this.notice?.text;
     if (!bg || !text || !this.notice) return;
-    // A falar com um NPC: o aviso passa para baixo do painel da conversa (senão ficava tapado).
     const { width, height } = getView();
-    const dialogBottom = this.dialog?.isOpen ? this.dialog.bottom : null;
-    const noticeY =
-      dialogBottom !== null ? Math.min(height - 40, dialogBottom + 14) : Math.round(height * 0.28);
+    // A conversa fica em baixo: o aviso vai por cima dela.
+    const dialogTop = this.dialog?.isOpen ? this.dialog.top : null;
+    const noticeY = dialogTop !== null ? Math.max(24, dialogTop - 14) : Math.round(height * 0.28);
     if (this.noticeY !== noticeY) {
       this.noticeY = noticeY;
       this.notice.setPosition(Math.round(width / 2), noticeY);
@@ -835,11 +877,17 @@ export class UIScene extends Phaser.Scene {
       [this.beginnerLabel, this.beginnerLabel?.text.visible === true],
       [this.questLabel, this.questLabel?.text.visible === true],
     ];
+    let right = this.barX + BAR_WIDTH + 30;
     for (const [label, shown] of rows) {
       if (!label || !shown) continue;
       label.setPosition(HUD_MARGIN, y);
       y += Math.ceil(label.text.height) + 2;
+      right = Math.max(right, HUD_MARGIN + Math.ceil(label.text.width));
     }
+    this.topLeftBg
+      ?.setPosition(HUD_MARGIN - 3, HUD_MARGIN - 3)
+      .setSize(right - HUD_MARGIN + 6, y - HUD_MARGIN + 1)
+      .setVisible(!uiState.modalOpen);
     const hint = this.hint;
     if (!hint || getView().width >= NARROW_HUD_WIDTH) return;
     const hintY = Math.max(HINT_Y_NARROW, y + 2);
@@ -872,51 +920,55 @@ export class UIScene extends Phaser.Scene {
   /** Botão de velocidade (x1 → x2 → x3 → x1), por baixo do relógio. */
   private createSpeedButton(): void {
     const { width } = getView();
+    this.cornerButtons = [];
     const button = new Button(
       this,
-      width - HUD_MARGIN - 12,
-      HUD_MARGIN + 20,
+      width - HUD_MARGIN - 13,
+      HUD_MARGIN + 21,
       `x${String(gameSpeed())}`,
-      { width: 24, height: 12, fontSize: 8, style: 'secondary' },
+      { width: 26, height: 15, fontSize: 8, style: 'secondary' },
       () => {
         const speed = nextGameSpeed();
         button.setText(`x${String(speed)}`).setStyle(speed === 1 ? 'secondary' : 'primary');
       },
     ).setDepth(70);
     if (gameSpeed() !== 1) button.setStyle('primary');
+    this.cornerButtons.push(button);
     // Pausa ("II"), à esquerda da velocidade.
-    new Button(
+    this.pauseButton = new Button(
       this,
-      width - HUD_MARGIN - 12 - 28,
-      HUD_MARGIN + 20,
+      width - HUD_MARGIN - 13 - 30,
+      HUD_MARGIN + 21,
       'II',
-      { width: 24, height: 12, fontSize: 8, style: 'secondary' },
+      { width: 26, height: 15, fontSize: 8, style: 'secondary' },
       () => {
         this.pause?.toggle();
       },
     ).setDepth(86); // por cima do menu de pausa: carregar outra vez fecha-o
     // Casa (H), por baixo do Mapa: volta à base de qualquer lado ao fim de uns segundos parado.
-    new Button(
+    const home = new Button(
       this,
-      width - HUD_MARGIN - 12 - 28 - 12 - 4 - 18,
-      HUD_MARGIN + 20 + 16,
+      width - HUD_MARGIN - 13 - 30 - 13 - 4 - 19,
+      HUD_MARGIN + 21 + 19,
       t('hud.home'),
-      { width: 36, height: 12, fontSize: 8, style: 'secondary' },
+      { width: 38, height: 15, fontSize: 8, style: 'secondary' },
       () => {
         this.startRecall();
       },
     ).setDepth(70);
+    this.cornerButtons.push(home);
     // Mapa (M), à esquerda da pausa: no telemóvel é a forma de saber onde se está.
-    new Button(
+    const map = new Button(
       this,
-      width - HUD_MARGIN - 12 - 28 - 12 - 4 - 18,
-      HUD_MARGIN + 20,
+      width - HUD_MARGIN - 13 - 30 - 13 - 4 - 19,
+      HUD_MARGIN + 21,
       t('hud.map'),
-      { width: 36, height: 12, fontSize: 8, style: 'secondary' },
+      { width: 38, height: 15, fontSize: 8, style: 'secondary' },
       () => {
         this.toggleMap();
       },
     ).setDepth(70);
+    this.cornerButtons.push(map);
   }
 
   /** Começa (ou interrompe) a contagem para voltar a casa. */
@@ -1086,10 +1138,11 @@ export class UIScene extends Phaser.Scene {
     // Correr (por cima do "Auto"): um toque liga/desliga; segurar corre enquanto se segura.
     const autoY = fitsRow ? hotbar.y + hotbar.h / 2 : touch ? cy - ACTION_RADIUS - 16 : hotbar.y - 12;
     const autoH = fitsRow ? hotbar.h : 16;
+    const sprintY = Math.round(autoY - autoH / 2 - 11);
     this.sprintButton = new Button(
       this,
       touch && !fitsRow ? cx : width - 4 - autoW / 2,
-      Math.round(autoY - autoH / 2 - 11),
+      sprintY,
       t('hud.sprint'),
       { width: autoW, height: 16, fontSize: 8, style: 'secondary' },
       () => undefined,
@@ -1105,12 +1158,14 @@ export class UIScene extends Phaser.Scene {
       .setDepth(70);
 
     if (!touch) return;
-    const ring = this.add.circle(cx, cy, ACTION_RADIUS + 1, paletteNumber('ink'), 0.5).setDepth(5);
-    const button = this.add.circle(cx, cy, ACTION_RADIUS, paletteNumber('wood'), 0.8).setDepth(6);
+    // Com o Auto na linha da hotbar, o Correr fica por cima dele: o botão de ação sobe mais.
+    const ay = fitsRow ? Math.min(cy, sprintY - 8 - 6 - ACTION_RADIUS) : cy;
+    const ring = this.add.circle(cx, ay, ACTION_RADIUS + 1, paletteNumber('ink'), 0.5).setDepth(5);
+    const button = this.add.circle(cx, ay, ACTION_RADIUS, paletteNumber('wood'), 0.8).setDepth(6);
     const label = new Label(
       this,
       cx,
-      cy,
+      ay,
       t('hud.action'),
       { size: 8, bold: true, color: 'cream' },
       [0.5, 0.5],
@@ -1124,6 +1179,7 @@ export class UIScene extends Phaser.Scene {
         if (uiState.modalOpen || buildMode.active) return;
         this.actionPointer = pointer.id;
         uiState.actionHeld = true;
+        uiState.actionTapped = true;
         button.setFillStyle(paletteNumber('wood_light'), 0.9);
       });
     this.events.on('ui:action-released', () => button.setFillStyle(paletteNumber('wood'), 0.8));
@@ -1371,6 +1427,7 @@ export class UIScene extends Phaser.Scene {
         if (pointer.leftButtonDown()) {
           this.actionPointer = pointer.id;
           uiState.actionHeld = true;
+          uiState.actionTapped = true;
         }
         return;
       }
