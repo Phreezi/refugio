@@ -11,6 +11,7 @@ import { getView, getWorldView, setupFixedCamera } from '../display/view';
 import { pinchStep, stepWorldZoom } from '../display/worldZoom';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
 import { coop } from '../net/coop';
+import { presence } from '../net/presence';
 import { content } from '../world/content';
 import { readJoystick } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
@@ -24,6 +25,7 @@ import { LevelUpUI } from '../ui/LevelUpUI';
 import { PauseUI } from '../ui/PauseUI';
 import { DialogUI, goalText } from '../ui/DialogUI';
 import { MapUI } from '../ui/MapUI';
+import { Minimap, MINIMAP_SIZE } from '../ui/Minimap';
 import { SkillsUI, skillEffectText } from '../ui/SkillsUI';
 import { preferences, setPreference } from '../ui/preferences';
 import { autosave } from '../save';
@@ -35,6 +37,7 @@ import { xpToNext } from '../systems/progression/progression';
 import { countItem } from '../systems/inventory/inventory';
 import { missingInputs } from '../systems/crafting/crafting';
 import { SceneKey, ZONE_CROSSED_EVENT } from './keys';
+import type { MainMenuData } from './MainMenuScene';
 
 /** Raio do joystick virtual e do manípulo, em píxeis de jogo. */
 const JOYSTICK_RADIUS = 24;
@@ -58,11 +61,19 @@ const ACTION_RADIUS = 20;
 
 /** Barras do HUD (px de jogo; pares, porque as Shapes não são arredondadas). */
 const HUD_MARGIN = 6;
+/** Ecrã de espera do co-op (por cima de tudo) e de quanto em quanto tempo se convida o parceiro. */
+const COOP_WAIT_DEPTH = 95;
+const COOP_INVITE_MS = 15000;
+const COOP_HOST_RETRY_MS = 5000;
+/** Altura da hotbar com a margem de baixo, e o espaço entre ela e a dica do tutorial. */
+const HOTBAR_SPACE = 28;
+const HINT_GAP = 24;
+/** Largura da coluna de botões da direita (Correr, Auto, Ação) com a margem. */
+const RIGHT_COLUMN = 54;
+/** Topo do minimapa (por baixo dos botões Mapa/Casa). */
+const MINIMAP_TOP = HUD_MARGIN + 21 + 19 + 12;
 /** Coluna mínima das barras (passa para a direita se os rótulos forem mais largos). */
 const BAR_X = 34;
-/** Abaixo desta largura (ecrã ao alto), a dica do tutorial vai para baixo das barras. */
-const NARROW_HUD_WIDTH = 420;
-const HINT_Y_NARROW = 60;
 const BAR_WIDTH = 60;
 const BAR_HEIGHT = 6;
 const BAR_SPACING = 11;
@@ -130,8 +141,15 @@ export class UIScene extends Phaser.Scene {
   /** Bordas do ecrã avermelhadas ao levar dano (em vez de abanar a câmara). */
   private hurtEdges: Phaser.GameObjects.Container | null = null;
   /** Dica do tutorial (em cima, ao centro) e o × que a desliga. */
-  private hint: { label: Label; close: Button | null; step: string | null; x: number; y: number } | null =
-    null;
+  private hint: {
+    label: Label;
+    close: Button | null;
+    step: string | null;
+    x: number;
+    y: number;
+    /** Fundo da dica (o texto cresce para cima). */
+    bottom: number;
+  } | null = null;
   /** "A sangrar" (por baixo da barra de XP), a piscar. */
   private bleedLabel: Label | null = null;
   /** Proteção de principiante (armas sem desgaste até ao dia 4). */
@@ -144,6 +162,10 @@ export class UIScene extends Phaser.Scene {
   /** Auto e Ação à vista (escondem-se com painéis abertos e no modo construção). */
   private playButtonsVisible = true;
   private worldMap: MapUI | null = null;
+  private minimap: Minimap | null = null;
+  /** Ecrã de espera do co-op (anfitrião sem parceiro): objetos e o estado desenhado. */
+  private coopWait: { objects: { destroy(): void }[]; key: string } | null = null;
+  private lastCoopInvite = 0;
   private seedHintShown = false;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
   private hordeLabel: Label | null = null;
@@ -202,14 +224,17 @@ export class UIScene extends Phaser.Scene {
       [1, 0],
     );
     const bossX = Math.round(width / 2);
-    const cx = Math.round(width / 2);
-    // Num ecrã estreito (ao alto) a dica não cabe entre as barras e o relógio: vai por baixo.
-    const hintY = width < NARROW_HUD_WIDTH ? HINT_Y_NARROW : HUD_MARGIN + 24;
+    // A dica fica entre a borda esquerda e a coluna da direita (Correr/Auto/Ação).
+    const hintRight = width - RIGHT_COLUMN;
+    const hintX = Math.round((4 + hintRight) / 2);
+    // A dica fica ao meio, logo acima da hotbar (o topo é das barras, dos botões e do minimapa).
+    const hintY = height - HOTBAR_SPACE - HINT_GAP;
     this.hint = {
       y: hintY,
+      bottom: hintY,
       label: new Label(
         this,
-        cx,
+        hintX,
         hintY,
         '',
         {
@@ -218,13 +243,13 @@ export class UIScene extends Phaser.Scene {
           color: 'wheat',
           stroke: true,
           align: 'center',
-          wrap: Math.min(260, width - 60),
+          wrap: Math.min(260, hintRight - 4 - 34),
         },
         [0.5, 0],
       ).setDepth(40),
       close: null,
       step: null,
-      x: cx,
+      x: hintX,
     };
     this.bossBar = {
       label: new Label(
@@ -245,12 +270,34 @@ export class UIScene extends Phaser.Scene {
     this.coopLabel = new Label(
       this,
       width - HUD_MARGIN,
-      HUD_MARGIN + 48,
+      MINIMAP_TOP + MINIMAP_SIZE + 6,
       '',
       { size: 7, color: 'wheat', bold: true, stroke: true },
       [1, 0],
     ).setDepth(70);
     this.updateCoopLabel();
+    // Jogo co-op (anfitrião): abre a sessão com o código do jogo e espera pelo parceiro.
+    const link = gameState.data.coop;
+    if (link?.role === 'host' && !coop.isHost && !coop.isGuest) {
+      // Sem rede (ou o código ainda preso): continua à espera e tenta de novo.
+      let alive = true;
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        alive = false;
+      });
+      const open = (): void => {
+        coop.host(link.code).catch((error: unknown) => {
+          console.warn('[coop] não foi possível abrir o jogo co-op:', error);
+          if (!alive) return;
+          this.showNotice(t('coop.host_failed'));
+          this.time.delayedCall(COOP_HOST_RETRY_MS, open);
+        });
+      };
+      open();
+    }
+    // Um dos dois sai: o co-op grava e acaba para os dois.
+    coop.onPartnerLeft = () => {
+      this.quitToMenu('coop.ended');
+    };
     this.hordeLabel = new Label(
       this,
       width - HUD_MARGIN,
@@ -301,6 +348,11 @@ export class UIScene extends Phaser.Scene {
     };
     this.createButtons();
     this.createSpeedButton();
+    // Minimapa por baixo dos botões do canto (tocar abre o mapa).
+    this.minimap = new Minimap(this, () => {
+      this.toggleMap();
+    });
+    this.minimap.setPosition(width - HUD_MARGIN - MINIMAP_SIZE - 2, MINIMAP_TOP);
     this.createJoystick();
     this.createKeys();
     const offEvents = this.listenForMessages();
@@ -341,6 +393,11 @@ export class UIScene extends Phaser.Scene {
       this.dialog = null;
       this.worldMap?.destroy();
       this.worldMap = null;
+      this.minimap = null;
+      for (const object of this.coopWait?.objects ?? []) object.destroy();
+      this.coopWait = null;
+      uiState.coopWaiting = false;
+      coop.onPartnerLeft = null;
       this.questLabel = null;
       this.recallUi = null;
       this.autoOptions = [];
@@ -389,6 +446,9 @@ export class UIScene extends Phaser.Scene {
 
   override update(time: number): void {
     if (!gameState.hasGame) return;
+    this.updateCoopWait(time);
+    this.minimap?.setVisible(!uiState.modalOpen && !buildMode.active);
+    this.minimap?.update(time);
     this.updateRecall();
     this.crafting?.update();
     this.build?.update();
@@ -478,7 +538,7 @@ export class UIScene extends Phaser.Scene {
     if (!hint) return;
     // Uma instrução de cada vez: a dica cede o lugar a um aviso e aos painéis.
     const noticeShown = this.notice?.text.visible === true && this.notice.text.text !== '';
-    const quiet = uiState.modalOpen || buildMode.active || noticeShown;
+    const quiet = uiState.modalOpen || buildMode.active || noticeShown || uiState.coopWaiting;
     const step = quiet ? null : simulation.tutorial.current();
     this.layoutHintBg(step !== null);
     if (step === hint.step) return;
@@ -489,6 +549,8 @@ export class UIScene extends Phaser.Scene {
     if (!step) return;
     const touch = window.matchMedia('(pointer: coarse)').matches;
     hint.label.setText(tKey(`tut.${step}.${touch ? 'touch' : 'keys'}`));
+    hint.y = Math.round(hint.bottom - hint.label.text.height);
+    hint.label.setPosition(hint.x, hint.y);
     // O × (desligar as dicas) fica à direita do texto.
     hint.close = new Button(
       this,
@@ -868,7 +930,7 @@ export class UIScene extends Phaser.Scene {
 
   /**
    * Textos do canto (por baixo das barras): "a sangrar", principiante e missão, uns por baixo dos
-   * outros conforme os que se veem; ao alto, a dica do tutorial vai logo a seguir (nada se sobrepõe).
+   * outros conforme os que se veem (com um fundo escuro por trás).
    */
   private layoutTopLeft(bleeding: boolean): void {
     let y = HUD_MARGIN + STATS.length * BAR_SPACING + 7;
@@ -888,13 +950,6 @@ export class UIScene extends Phaser.Scene {
       ?.setPosition(HUD_MARGIN - 3, HUD_MARGIN - 3)
       .setSize(right - HUD_MARGIN + 6, y - HUD_MARGIN + 1)
       .setVisible(!uiState.modalOpen);
-    const hint = this.hint;
-    if (!hint || getView().width >= NARROW_HUD_WIDTH) return;
-    const hintY = Math.max(HINT_Y_NARROW, y + 2);
-    if (hint.y === hintY) return;
-    hint.y = hintY;
-    hint.label.setPosition(hint.x, hintY);
-    hint.step = ''; // refaz o × na posição nova
   }
 
   /** Registo da missão em curso (a primeira ativa): título e objetivos com progresso. */
@@ -1022,20 +1077,84 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** Grava e volta ao menu inicial (a cena de jogo, ao parar, também pára o HUD). */
-  private quitToMenu(): void {
-    // Co-op: o convidado sai (não tem nada a gravar); o anfitrião fecha a sessão.
+  private quitToMenu(message?: MessageKey): void {
+    const data = message ? ({ message } satisfies MainMenuData) : {};
+    // Co-op: o convidado grava a personagem dele (ao sair); o anfitrião grava o mundo.
     if (coop.isGuest) {
       coop.leave();
       gameState.clear();
       this.game.scene.stop(SceneKey.Zone);
-      this.game.scene.start(SceneKey.MainMenu, {});
+      this.game.scene.start(SceneKey.MainMenu, data);
       return;
     }
     coop.leave();
     void autosave.flush().then(() => {
       this.game.scene.stop(SceneKey.Zone);
-      this.game.scene.start(SceneKey.MainMenu, {});
+      this.game.scene.start(SceneKey.MainMenu, data);
     });
+  }
+
+  /**
+   * Jogo co-op sem o parceiro (anfitrião): o jogo fica parado com um ecrã de espera (o código e
+   * "Gravar e sair"), e o aparelho do parceiro recebe um convite de vez em quando.
+   */
+  private updateCoopWait(now: number): void {
+    const link = gameState.data.coop;
+    const waiting = link?.role === 'host' && !coop.isGuest && !coop.connected;
+    uiState.coopWaiting = waiting;
+    const key = !waiting ? '' : coop.isHost ? `wait:${link.partnerName ?? ''}` : 'opening';
+    if (key !== (this.coopWait?.key ?? '')) {
+      for (const object of this.coopWait?.objects ?? []) object.destroy();
+      this.coopWait = waiting ? { objects: this.buildCoopWait(key === 'opening'), key } : null;
+    }
+    if (waiting && link.partner && now - this.lastCoopInvite >= COOP_INVITE_MS) {
+      this.lastCoopInvite = now;
+      void presence.invite(link.partner, { code: link.code, name: gameState.data.player.name });
+    }
+  }
+
+  private buildCoopWait(opening: boolean): { destroy(): void }[] {
+    const link = gameState.data.coop;
+    const { width, height } = getView();
+    const w = Math.min(240, width - 16);
+    const cx = Math.round(width / 2);
+    const objects: { destroy(): void }[] = [];
+    objects.push(
+      this.add
+        .rectangle(0, 0, width, height, paletteNumber('ink'), 0.8)
+        .setOrigin(0)
+        .setDepth(COOP_WAIT_DEPTH)
+        .setInteractive(),
+    );
+    const lines = opening
+      ? [t('coop.wait_opening')]
+      : [
+          link?.partnerName ? t('coop.wait_partner', { name: link.partnerName }) : t('coop.wait_friend'),
+          t('coop.wait_code', { code: link?.code ?? '' }),
+          ...(link?.partner ? [] : [t('coop.wait_share')]),
+        ];
+    const text = new Label(
+      this,
+      cx,
+      Math.round(height / 2) - 24,
+      lines.join('\n'),
+      { size: 9, color: 'cream', align: 'center', wrap: w - 16 },
+      [0.5, 0.5],
+    ).setDepth(COOP_WAIT_DEPTH + 1);
+    objects.push(
+      text,
+      new Button(
+        this,
+        cx,
+        Math.round(height / 2 + text.text.height / 2) + 4,
+        t('coop.save_quit'),
+        { width: 110, height: 18, fontSize: 9, style: 'secondary' },
+        () => {
+          this.quitToMenu();
+        },
+      ).setDepth(COOP_WAIT_DEPTH + 1),
+    );
+    return objects;
   }
 
   /** Botão da mochila (junto à hotbar) e, com toque, o botão grande de ação (CLAUDE.md §7.2). */

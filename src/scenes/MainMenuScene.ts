@@ -10,6 +10,8 @@ import { simulation } from '../core/Simulation';
 import {
   BASE_ZONE_ID,
   CHARACTER_LOOKS,
+  createNewGameState,
+  type GameStateData,
   DEFAULT_PLAYER_NAME,
   gameState,
   PLAYER_NAME_MAX,
@@ -19,7 +21,8 @@ import { BALANCE } from '../data/balance';
 import { getView, setupFixedCamera } from '../display/view';
 import { t, type MessageKey } from '../i18n';
 import { coop } from '../net/coop';
-import { normalizeCode } from '../net/protocol';
+import { normalizeCode, randomCode } from '../net/protocol';
+import { presence } from '../net/presence';
 import { autosave, loadSlotSummaries, saves, selectSlot } from '../save';
 import type { LoadedSave, LoadResult } from '../save/SaveManager';
 import { SaveError } from '../save/schema';
@@ -35,7 +38,13 @@ import type { ZoneSceneData } from './ZoneScene';
 export interface MainMenuData {
   /** Mensagem a mostrar ao abrir (ex.: depois de importar ou apagar um save). */
   message?: MessageKey;
+  /** Abrir logo o jogo co-op com este código (aceitou-se o convite do parceiro). */
+  resume?: string;
 }
+
+/** De quanto em quanto tempo o convidado tenta de novo entrar e convida o anfitrião (ms). */
+const COOP_RETRY_MS = 4000;
+const COOP_INVITE_MS = 15000;
 
 const MAIN_BUTTON = { width: 136, height: 22 } as const;
 const SMALL_BUTTON = { width: 64, height: 14, fontSize: 8, style: 'secondary' } as const;
@@ -63,6 +72,10 @@ export class MainMenuScene extends Phaser.Scene {
   private overlayOpen = false;
   /** Campos de texto do DOM abertos (fecham-se com o painel ou ao sair da cena). */
   private inputs: TextInput[] = [];
+  /** Os 3 jogos (para o co-op: o lugar da personagem de um jogo de um amigo). */
+  private slots: (LoadResult | null)[] = [];
+  /** À espera do anfitrião (convidado): fecha o ecrã de espera e pára as tentativas. */
+  private stopWaiting: (() => void) | null = null;
 
   constructor() {
     super(SceneKey.MainMenu);
@@ -123,7 +136,10 @@ export class MainMenuScene extends Phaser.Scene {
       ([result, slots]) => {
         if (!alive) return;
         loading.destroy();
+        this.slots = slots;
         this.buildButtons(result, data.message !== undefined, slots);
+        // Aceitou-se o convite do parceiro: abre-se logo esse jogo co-op.
+        if (data.resume) this.resumeCoop(data.resume);
       },
       (error: unknown) => {
         if (!alive) return;
@@ -147,6 +163,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       alive = false;
+      this.stopWaiting?.();
       for (const input of this.inputs) input.destroy();
       this.inputs = [];
       this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
@@ -202,8 +219,13 @@ export class MainMenuScene extends Phaser.Scene {
       new Button(this, cx, y, t('menu.new_game'), MAIN_BUTTON, this.primaryAction);
     }
 
+    // Co-op (Fase 15): um jogo co-op começa sempre novo e fica só dos dois que o jogam.
+    const coopY = y + (save ? spacing * 2 : spacing);
+    new Button(this, cx, coopY, t('menu.new_coop'), { ...SMALL_BUTTON, width: MAIN_BUTTON.width }, () => {
+      this.openNewGame(true);
+    });
     // Hordas (desligadas por defeito): definição do jogo, gravada no save.
-    const hordeY = y + (save ? spacing * 2 : spacing);
+    const hordeY = coopY + (short ? 20 : 22);
     const hordeButton = new Button(
       this,
       cx,
@@ -220,7 +242,7 @@ export class MainMenuScene extends Phaser.Scene {
     // principais: no canto sobrepunha-se à lista de jogos).
     const joinY = hordeY + (short ? 20 : 22);
     new Button(this, cx, joinY, t('coop.join'), { ...SMALL_BUTTON, width: MAIN_BUTTON.width }, () => {
-      this.openJoin(save);
+      this.openJoin();
     });
 
     // Os meus jogos: à direita (lista) ou, sem espaço, numa linha de 3 por baixo. Tocar escolhe.
@@ -239,7 +261,8 @@ export class MainMenuScene extends Phaser.Scene {
             day: clockAt(summary.state.world.tick, BALANCE.dayLengthSec, BALANCE.dayStartHour).day,
           }
         : null;
-      const label = vars ? t(inRow ? 'menu.slot_short' : 'menu.slot', vars) : t('menu.slot_empty');
+      const base = vars ? t(inRow ? 'menu.slot_short' : 'menu.slot', vars) : t('menu.slot_empty');
+      const label = summary?.state.coop ? t('menu.coop_tag', { label: base }) : base;
       const x = inRow ? cx + (i - 1) * (rowSlotW + 4) : listX;
       new Button(
         this,
@@ -353,9 +376,9 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   /** Novo jogo: nome da personagem e rapaz/rapariga (o nome aparece no co-op e na lista). */
-  private openNewGame(): void {
+  private openNewGame(coopGame = false, onStart?: (name: string, look: CharacterLook) => void): void {
     if (this.busy || this.overlayOpen) return;
-    const panel = this.overlay(t('menu.new_game'), 112);
+    const panel = this.overlay(t(coopGame ? 'coop.new_title' : 'menu.new_game'), 112);
     const { x, y, w } = panel;
     const add = <T extends { destroy(): void }>(object: T): T => {
       const close = panel.close;
@@ -373,7 +396,8 @@ export class MainMenuScene extends Phaser.Scene {
     const start = (): void => {
       const name = nameInput.value.trim().slice(0, PLAYER_NAME_MAX) || DEFAULT_PLAYER_NAME;
       panel.close();
-      this.startNewGame(name, look);
+      if (onStart) onStart(name, look);
+      else this.startNewGame(name, look, coopGame);
     };
     const nameInput = createTextInput(this.game.canvas, {
       x: x + 10,
@@ -427,7 +451,7 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   /** Entrar no jogo de um amigo: o código escreve-se num campo com o aspeto do jogo. */
-  private openJoin(save: LoadedSave | null): void {
+  private openJoin(): void {
     if (this.busy || this.overlayOpen) return;
     const panel = this.overlay(t('coop.join'), 86);
     const { x, y, w } = panel;
@@ -444,7 +468,7 @@ export class MainMenuScene extends Phaser.Scene {
     const join = (): void => {
       const value = codeInput.value;
       close();
-      this.joinCoop(value, save);
+      this.joinCoop(value);
     };
     const codeInput = createTextInput(this.game.canvas, {
       x: x + 10,
@@ -516,6 +540,11 @@ export class MainMenuScene extends Phaser.Scene {
 
   private continueGame(save: LoadedSave): void {
     if (this.busy) return; // Enter com a tecla presa repete o evento
+    // A personagem de um jogo co-op de um amigo: continua-se entrando no jogo dele.
+    if (save.state.coop?.role === 'guest') {
+      this.resumeGuest(save.state);
+      return;
+    }
     this.busy = true;
     const state = gameState.load(save.state);
     this.applyHordes();
@@ -530,12 +559,14 @@ export class MainMenuScene extends Phaser.Scene {
     this.scene.start(SceneKey.Zone, { zoneId: state.player.zoneId } satisfies ZoneSceneData);
   }
 
-  private startNewGame(name: string, look: CharacterLook): void {
+  private startNewGame(name: string, look: CharacterLook, coopGame = false): void {
     if (this.busy) return;
     this.busy = true;
     const state = gameState.newGame(content.zoneMap(BASE_ZONE_ID).playerSpawn);
     state.player.name = name;
     state.player.look = look;
+    // Jogo co-op: o código fica fixo e o primeiro amigo que entrar fica ligado a este jogo.
+    if (coopGame) state.coop = { role: 'host', code: randomCode(), partner: null, partnerName: null };
     this.applyHordes();
     eventBus.emit('game:started', { zoneId: state.player.zoneId });
     void autosave.flush(); // o jogo novo substitui já o antigo
@@ -543,34 +574,132 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   /**
-   * Entra no jogo de um amigo: pede o código, liga-se e joga no mundo dele (que não se grava
-   * aqui) com a personagem do nosso save, que continua a ser gravada cá.
+   * Entrar com código: num jogo co-op de um amigo, a personagem fica num dos 3 lugares (o que já
+   * tiver esse código, ou um vazio, com nome e aparência novos). Depois espera-se pelo anfitrião.
    */
-  private joinCoop(input: string, save: LoadedSave | null): void {
+  private joinCoop(input: string): void {
     if (this.busy) return;
     const code = normalizeCode(input);
     if (!code) {
       this.setStatus('coop.bad_code');
       return;
     }
+    const existing = this.slots.findIndex((slot) => slot?.save?.state.coop?.code === code);
+    const existingState = existing >= 0 ? this.slots[existing]?.save?.state : undefined;
+    if (existingState) {
+      selectSlot(existing);
+      this.resumeGuest(existingState);
+      return;
+    }
+    const empty =
+      this.slots.length === 0 || this.slots[saves.slot] === null
+        ? saves.slot
+        : this.slots.findIndex((slot) => slot === null);
+    if (empty < 0) {
+      this.setStatus('coop.no_slot');
+      return;
+    }
+    this.openNewGame(true, (name, look) => {
+      const state = createNewGameState(content.zoneMap(BASE_ZONE_ID).playerSpawn);
+      state.player.name = name;
+      state.player.look = look;
+      state.coop = { role: 'guest', code, partner: null, partnerName: null };
+      selectSlot(empty);
+      this.resumeGuest(state);
+    });
+  }
+
+  /** Abre o jogo co-op com este código (convite aceite): o do anfitrião ou a personagem. */
+  private resumeCoop(code: string): void {
+    const i = this.slots.findIndex((slot) => slot?.save?.state.coop?.code === code);
+    const save = i >= 0 ? this.slots[i]?.save : undefined;
+    if (!save) return;
+    selectSlot(i);
+    this.continueGame(save);
+  }
+
+  /**
+   * Convidado: entra no jogo do anfitrião com a personagem `own`. Se ele ainda não estiver lá,
+   * espera (tenta de novo de vez em quando e manda-lhe um convite), até se cancelar.
+   */
+  private resumeGuest(own: GameStateData): void {
+    const link = own.coop;
+    if (this.busy || !link) return;
     this.busy = true;
-    this.setStatus('coop.joining');
-    // A personagem do save deste jogador vai para o mundo do amigo (e volta com o que ganhar).
-    coop.join(code, save?.state ?? null).then(
-      (state) => {
-        gameState.load(state, true);
-        simulation.reset();
-        // Aviso claro de que se entrou no mundo do amigo (senão parecia um jogo novo).
-        uiState.pendingNotice = t('coop.joined', { name: coop.partnerName ?? '?' });
-        this.scene.start(SceneKey.Zone, { zoneId: state.player.zoneId } satisfies ZoneSceneData);
+    const panel = this.overlay(t('coop.title'), 70);
+    const text = new Label(
+      this,
+      panel.x + panel.w / 2,
+      panel.y + 32,
+      link.partnerName ? t('coop.wait_partner', { name: link.partnerName }) : t('coop.joining'),
+      { size: 8, color: 'cream', align: 'center', wrap: panel.w - 16 },
+      [0.5, 0.5],
+    ).setDepth(OVERLAY_DEPTH + 1);
+    let stopped = false;
+    let timer: Phaser.Time.TimerEvent | null = null;
+    let lastInvite = -Infinity;
+    uiState.coopWaitingCode = link.code;
+    const stop = (): void => {
+      if (stopped) return;
+      stopped = true;
+      timer?.remove();
+      uiState.coopWaitingCode = null;
+      text.destroy();
+      cancel.destroy();
+      panel.close();
+      this.stopWaiting = null;
+      this.busy = false;
+    };
+    this.stopWaiting = stop;
+    const cancel = new Button(
+      this,
+      panel.x + panel.w / 2,
+      panel.y + 54,
+      t('menu.cancel'),
+      { ...SMALL_BUTTON, width: 76 },
+      () => {
+        coop.leave();
+        stop();
       },
-      (error: unknown) => {
-        console.warn('[coop] não foi possível entrar:', error);
-        this.busy = false;
-        const reason = error instanceof Error ? error.message : '';
-        this.setStatus(reason === 'not_found' ? 'coop.not_found' : 'coop.join_failed');
-      },
-    );
+    ).setDepth(OVERLAY_DEPTH + 1);
+    const attempt = (): void => {
+      if (stopped) return;
+      // Convida o anfitrião (se ele estiver noutro jogo, aparece-lhe um aviso).
+      const now = this.time.now;
+      if (link.partner && now - lastInvite >= COOP_INVITE_MS) {
+        lastInvite = now;
+        void presence.invite(link.partner, { code: link.code, name: own.player.name });
+      }
+      coop.join(link.code, own).then(
+        (state) => {
+          if (stopped) {
+            coop.leave();
+            return;
+          }
+          stop();
+          this.busy = true;
+          gameState.load(state, true);
+          simulation.reset();
+          uiState.pendingNotice = t('coop.joined', { name: coop.partnerName ?? '?' });
+          this.scene.start(SceneKey.Zone, { zoneId: state.player.zoneId } satisfies ZoneSceneData);
+        },
+        (error: unknown) => {
+          if (stopped) return;
+          const reason = error instanceof Error ? error.message : '';
+          if (reason === 'taken') {
+            stop();
+            this.setStatus('coop.taken');
+            return;
+          }
+          // O anfitrião ainda não abriu o jogo (ou a rede falhou): espera e tenta de novo.
+          text.setText(
+            link.partnerName ? t('coop.wait_partner', { name: link.partnerName }) : t('coop.wait_friend'),
+          );
+          timer = this.time.delayedCall(COOP_RETRY_MS, attempt);
+        },
+      );
+    };
+    attempt();
   }
 
   private async importSave(): Promise<void> {

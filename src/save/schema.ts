@@ -6,7 +6,7 @@ import { TALENT_EFFECTS } from '../systems/progression/talents';
 // Formato do save (CLAUDE.md §10). Qualquer alteração ao formato de GameStateData obriga a
 // incrementar SAVE_VERSION, acrescentar a migração em migrations.ts e um teste.
 
-export const SAVE_VERSION = 24;
+export const SAVE_VERSION = 25;
 
 /** O que fica gravado (JSON): a versão e o timestamp também entram no checksum. */
 export interface SaveEnvelope {
@@ -310,6 +310,16 @@ export function validateState(input: unknown): GameStateData {
     typeof tutorial.off !== 'boolean'
   )
     problems.push('tutorial inválido');
+  const link = isObject(input) ? input.coop : undefined;
+  if (
+    link !== undefined &&
+    (!isObject(link) ||
+      (link.role !== 'host' && link.role !== 'guest') ||
+      typeof link.code !== 'string' ||
+      (link.partner !== null && typeof link.partner !== 'string') ||
+      (link.partnerName !== null && typeof link.partnerName !== 'string'))
+  )
+    problems.push('coop inválido');
   if (problems.length > 0) throw new SaveError('state', problems.join('; '));
   return input as GameStateData;
 }

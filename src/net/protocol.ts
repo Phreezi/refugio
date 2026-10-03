@@ -73,7 +73,15 @@ export type HostMessage =
    * O mundo com a personagem do convidado (depois dos comandos até `ack`). `warp` muda quando
    * o anfitrião muda o convidado de sítio (ao entrar, ao morrer): só aí conta a posição.
    */
-  | { t: 'snap'; state: GameStateData; ack: number; warp: number; host?: string }
+  | {
+      t: 'snap';
+      state: GameStateData;
+      ack: number;
+      warp: number;
+      host?: string;
+      /** Aparelho do anfitrião (o convidado guarda-o: o jogo co-op fica ligado aos dois). */
+      device?: string;
+    }
   /** 10×/s: o anfitrião (se estiver na mesma zona), a vida/fome/sede, os inimigos, a pesca. */
   | {
       t: 'frame';
@@ -86,11 +94,13 @@ export type HostMessage =
     }
   /** Evento do jogo: do convidado (o que lhe acontece) ou do anfitrião (`host`: o que se vê). */
   | { t: 'ev'; name: string; payload: unknown; host?: 1 }
-  | { t: 'bye' };
+  /** Fim da sessão; `taken`: este jogo co-op já tem outro parceiro. */
+  | { t: 'bye'; reason?: 'taken' };
 
 /** Convidado → anfitrião. */
 export type GuestMessage =
-  | { t: 'join'; character: GuestCharacter }
+  /** Entrar com a personagem e o aparelho (o anfitrião só aceita o parceiro deste jogo). */
+  | { t: 'join'; character: GuestCharacter; device: string }
   /** Onde está o convidado (15×/s). */
   | {
       t: 'me';
@@ -130,7 +140,11 @@ export function parseGuestMessage(raw: unknown): GuestMessage | null {
   if (m.t === 'act' && isNumber(m.tick)) return { t: 'act', held: m.held === 1 ? 1 : 0, tick: m.tick };
   if (m.t === 'away') return { t: 'away', on: m.on === 1 ? 1 : 0 };
   if (m.t === 'join' && isRecord(m.character) && isRecord(m.character.player))
-    return { t: 'join', character: m.character as unknown as GuestCharacter };
+    return {
+      t: 'join',
+      character: m.character as unknown as GuestCharacter,
+      device: typeof m.device === 'string' && /^[a-z0-9]{12}$/.test(m.device) ? m.device : '',
+    };
   if (m.t === 'cmd' && isNumber(m.seq) && Array.isArray(m.args) && isGuestCommand(m.sys, m.m))
     return { t: 'cmd', seq: m.seq, sys: m.sys, m: m.m as string, args: m.args as unknown[] };
   if (

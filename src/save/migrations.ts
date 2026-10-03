@@ -198,6 +198,9 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
       player: { ...player, stamina: 100 },
     };
   },
+  // v24 → v25: jogos co-op (`coop`, só nos jogos criados como co-op); os que já existem são
+  // de um jogador e ficam como estão.
+  24: (s) => s,
 };
 
 /** Duração do dia de jogo (s) antes e depois da v24 (a migração mantém o dia e a hora). */

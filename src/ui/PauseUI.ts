@@ -37,8 +37,6 @@ export class PauseUI {
   private readonly scene: Phaser.Scene;
   private objects: Destroyable[] = [];
   private view: View | null = null;
-  /** Erro ao abrir a sessão de co-op (mostra-se na vista do co-op). */
-  private coopError = false;
   /** Sair para o menu inicial (a UIScene trata de gravar e mudar de cena). */
   onQuit: () => void = () => undefined;
   /** Abrir o painel de perícias (UIScene). */
@@ -156,6 +154,7 @@ export class PauseUI {
   }
 
   private buildMain(cx: number, top: number): void {
+    const link = gameState.hasGame ? gameState.data.coop : undefined;
     const entries: [MessageKey, () => void][] = [
       [
         'pause.resume',
@@ -182,16 +181,6 @@ export class PauseUI {
           this.go('stats');
         },
       ],
-      // Co-op: o anfitrião convida (mostra o código); o convidado só pode sair.
-      [
-        coop.isGuest ? 'coop.leave' : 'coop.invite',
-        () => {
-          if (coop.isGuest) {
-            this.close();
-            this.onQuit();
-          } else this.openCoop();
-        },
-      ],
       [
         'pause.quit',
         () => {
@@ -200,6 +189,23 @@ export class PauseUI {
         },
       ],
     ];
+    // Co-op (só nos jogos co-op): o anfitrião vê o código do jogo; o convidado só pode sair.
+    // Um jogo de um jogador não convida ninguém (o co-op começa sempre num jogo novo).
+    if (link?.role === 'host')
+      entries.splice(entries.length - 1, 0, [
+        'coop.invite',
+        () => {
+          this.go('coop');
+        },
+      ]);
+    else if (coop.isGuest)
+      entries.splice(entries.length - 1, 0, [
+        'coop.leave',
+        () => {
+          this.close();
+          this.onQuit();
+        },
+      ]);
     entries.forEach(([key, action], i) => {
       this.button(cx, top + i * ROW + 6, t(key), 120, action, i === 0);
     });
@@ -345,32 +351,13 @@ export class PauseUI {
     });
   }
 
-  /** Abre a sessão (se ainda não houver) e mostra o código a partilhar. */
-  private openCoop(): void {
-    this.coopError = false;
-    this.go('coop');
-    if (coop.isHost) return;
-    coop.host().then(
-      () => {
-        if (this.view === 'coop') this.go('coop');
-      },
-      (error: unknown) => {
-        console.warn('[coop] não foi possível abrir a sessão:', error);
-        this.coopError = true;
-        if (this.view === 'coop') this.go('coop');
-      },
-    );
-  }
-
   private buildCoop(cx: number, top: number): void {
-    const code = coop.isHost ? coop.code : null;
-    const status: MessageKey = this.coopError
+    const code = gameState.hasGame ? (gameState.data.coop?.code ?? null) : null;
+    const status: MessageKey = !coop.isHost
       ? 'coop.error'
-      : !code
-        ? 'coop.creating'
-        : coop.connected
-          ? 'coop.connected'
-          : 'coop.waiting';
+      : coop.connected
+        ? 'coop.connected'
+        : 'coop.waiting';
     if (code) this.label(cx, top, code, { size: 20, bold: true, color: 'gold' }, [0.5, 0]);
     this.label(
       cx,
@@ -379,12 +366,6 @@ export class PauseUI {
       { size: 8, color: 'cream', wrap: W - 20, align: 'center' },
       [0.5, 0],
     );
-    if (code) {
-      this.button(cx, top + ROW * 3, t('coop.stop'), 120, () => {
-        coop.leave();
-        this.go('main');
-      });
-    }
     this.button(cx, top + ROW * 4, t('pause.back'), 80, () => {
       this.go('main');
     });
