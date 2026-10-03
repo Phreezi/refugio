@@ -8,7 +8,7 @@ import { content } from '../world/content';
 import type { ZoneRect } from '../world/worldLayout';
 import { TILE_PX, villageNpcIds } from '../world/wilds';
 import { Button, CLOSE_ICON } from './Button';
-import { Label } from './text';
+import { Label, measureTextWidth } from './text';
 import { uiState } from './uiState';
 
 // Por cima dos botões do HUD (a pausa "II" está a 86).
@@ -232,12 +232,15 @@ export class MapUI {
       const cy = current || wild?.village ? a.y + Math.min(h / 2, 9) : a.y + h / 2;
       if (cy < iy + 6 || cy > iy + ih - 6) return;
       const name = tKey(zone.name);
+      const text = locked ? `${name} (${t('map.level', { n: zone.unlockLevel })})` : name;
+      // Se nem encolhido cabe no bloco, não se escreve (o mapa ficava com nomes por cima de tudo).
+      if (measureTextWidth(text, 7) > (vx1 - vx0 - 4) * 1.6) return;
       this.add(
         new Label(
           scene,
           Math.round(cx),
           Math.round(cy),
-          locked ? `${name} (${t('map.level', { n: zone.unlockLevel })})` : name,
+          text,
           { size: 7, color: 'cream', stroke: true, fit: Math.max(8, Math.floor(vx1 - vx0 - 4)) },
           [0.5, 0.5],
         ).setDepth(DEPTH.content),

@@ -245,7 +245,7 @@ export class UIScene extends Phaser.Scene {
     this.coopLabel = new Label(
       this,
       width - HUD_MARGIN,
-      HUD_MARGIN + 40,
+      HUD_MARGIN + 48,
       '',
       { size: 7, color: 'wheat', bold: true, stroke: true },
       [1, 0],
@@ -254,7 +254,7 @@ export class UIScene extends Phaser.Scene {
     this.hordeLabel = new Label(
       this,
       width - HUD_MARGIN,
-      HUD_MARGIN + 30,
+      HUD_MARGIN + 37,
       '',
       { size: 7, color: 'amber', bold: true, stroke: true },
       [1, 0],
@@ -921,10 +921,10 @@ export class UIScene extends Phaser.Scene {
     this.cornerButtons = [];
     const button = new Button(
       this,
-      width - HUD_MARGIN - 12,
-      HUD_MARGIN + 20,
+      width - HUD_MARGIN - 13,
+      HUD_MARGIN + 21,
       `x${String(gameSpeed())}`,
-      { width: 24, height: 12, fontSize: 8, style: 'secondary' },
+      { width: 26, height: 15, fontSize: 8, style: 'secondary' },
       () => {
         const speed = nextGameSpeed();
         button.setText(`x${String(speed)}`).setStyle(speed === 1 ? 'secondary' : 'primary');
@@ -935,10 +935,10 @@ export class UIScene extends Phaser.Scene {
     // Pausa ("II"), à esquerda da velocidade.
     this.pauseButton = new Button(
       this,
-      width - HUD_MARGIN - 12 - 28,
-      HUD_MARGIN + 20,
+      width - HUD_MARGIN - 13 - 30,
+      HUD_MARGIN + 21,
       'II',
-      { width: 24, height: 12, fontSize: 8, style: 'secondary' },
+      { width: 26, height: 15, fontSize: 8, style: 'secondary' },
       () => {
         this.pause?.toggle();
       },
@@ -946,10 +946,10 @@ export class UIScene extends Phaser.Scene {
     // Casa (H), por baixo do Mapa: volta à base de qualquer lado ao fim de uns segundos parado.
     const home = new Button(
       this,
-      width - HUD_MARGIN - 12 - 28 - 12 - 4 - 18,
-      HUD_MARGIN + 20 + 16,
+      width - HUD_MARGIN - 13 - 30 - 13 - 4 - 19,
+      HUD_MARGIN + 21 + 19,
       t('hud.home'),
-      { width: 36, height: 12, fontSize: 8, style: 'secondary' },
+      { width: 38, height: 15, fontSize: 8, style: 'secondary' },
       () => {
         this.startRecall();
       },
@@ -958,10 +958,10 @@ export class UIScene extends Phaser.Scene {
     // Mapa (M), à esquerda da pausa: no telemóvel é a forma de saber onde se está.
     const map = new Button(
       this,
-      width - HUD_MARGIN - 12 - 28 - 12 - 4 - 18,
-      HUD_MARGIN + 20,
+      width - HUD_MARGIN - 13 - 30 - 13 - 4 - 19,
+      HUD_MARGIN + 21,
       t('hud.map'),
-      { width: 36, height: 12, fontSize: 8, style: 'secondary' },
+      { width: 38, height: 15, fontSize: 8, style: 'secondary' },
       () => {
         this.toggleMap();
       },
@@ -1136,10 +1136,11 @@ export class UIScene extends Phaser.Scene {
     // Correr (por cima do "Auto"): um toque liga/desliga; segurar corre enquanto se segura.
     const autoY = fitsRow ? hotbar.y + hotbar.h / 2 : touch ? cy - ACTION_RADIUS - 16 : hotbar.y - 12;
     const autoH = fitsRow ? hotbar.h : 16;
+    const sprintY = Math.round(autoY - autoH / 2 - 11);
     this.sprintButton = new Button(
       this,
       touch && !fitsRow ? cx : width - 4 - autoW / 2,
-      Math.round(autoY - autoH / 2 - 11),
+      sprintY,
       t('hud.sprint'),
       { width: autoW, height: 16, fontSize: 8, style: 'secondary' },
       () => undefined,
@@ -1155,12 +1156,14 @@ export class UIScene extends Phaser.Scene {
       .setDepth(70);
 
     if (!touch) return;
-    const ring = this.add.circle(cx, cy, ACTION_RADIUS + 1, paletteNumber('ink'), 0.5).setDepth(5);
-    const button = this.add.circle(cx, cy, ACTION_RADIUS, paletteNumber('wood'), 0.8).setDepth(6);
+    // Com o Auto na linha da hotbar, o Correr fica por cima dele: o botão de ação sobe mais.
+    const ay = fitsRow ? Math.min(cy, sprintY - 8 - 6 - ACTION_RADIUS) : cy;
+    const ring = this.add.circle(cx, ay, ACTION_RADIUS + 1, paletteNumber('ink'), 0.5).setDepth(5);
+    const button = this.add.circle(cx, ay, ACTION_RADIUS, paletteNumber('wood'), 0.8).setDepth(6);
     const label = new Label(
       this,
       cx,
-      cy,
+      ay,
       t('hud.action'),
       { size: 8, bold: true, color: 'cream' },
       [0.5, 0.5],

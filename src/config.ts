@@ -15,6 +15,9 @@ export const DISPLAY = {
   targetHeight: 270,
   /** Idem em ecrãs táteis (separado para se poder afinar no telemóvel). */
   touchTargetHeight: 270,
+  /** Idem em tablets (ecrã tátil com o lado curto ≥ `tabletMinCss` px CSS): vê-se mais mundo. */
+  tabletTargetHeight: 340,
+  tabletMinCss: 700,
   /** Altura mínima (abaixo disto, zoom fracionário): a UI precisa deste espaço. */
   minHeight: 216,
   /** Proporções permitidas (largura/altura), do telemóvel ao alto ao ultrawide; fora delas, barras. */

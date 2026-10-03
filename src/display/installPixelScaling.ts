@@ -19,8 +19,13 @@ export interface PixelScaling {
 
 function displayOptions(): PixelScaleOptions {
   const touch = window.matchMedia('(pointer: coarse)').matches;
+  const tablet = touch && Math.min(window.innerWidth, window.innerHeight) >= DISPLAY.tabletMinCss;
   return {
-    targetHeight: touch ? DISPLAY.touchTargetHeight : DISPLAY.targetHeight,
+    targetHeight: tablet
+      ? DISPLAY.tabletTargetHeight
+      : touch
+        ? DISPLAY.touchTargetHeight
+        : DISPLAY.targetHeight,
     minHeight: DISPLAY.minHeight,
     minAspect: DISPLAY.minAspect,
     maxAspect: DISPLAY.maxAspect,
