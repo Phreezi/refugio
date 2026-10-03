@@ -185,7 +185,8 @@ export class DialogUI {
       if (state === 'offer') {
         const accept = (): void => {
           quests.accept(quest.id);
-          this.rebuildSoon();
+          // Aceite: a conversa fecha (o aviso e a seta da missão dizem o que fazer a seguir).
+          this.close();
         };
         this.quickAction = accept;
         buttons.push({ label: t('quest.accept'), primary: true, onClick: accept });
@@ -243,9 +244,13 @@ export class DialogUI {
           text: t('npc.coins', { have: Math.min(coins, cost.coins), need: cost.coins }),
           color: coins >= cost.coins ? 'lime' : 'red',
         });
+        // Enquanto faltar algo, o botão fica cinzento e diz o que se passa (continua a explicar ao tocar).
+        const ready =
+          coins >= cost.coins &&
+          cost.items.every(([item, qty]) => countItem([inventory, hotbar], item) >= qty);
         buttons.push({
-          label: t('npc.repair'),
-          primary: true,
+          label: ready ? t('npc.repair') : t('npc.repair_missing'),
+          primary: ready,
           onClick: () => {
             const result = quests.repairWaystone(zoneId);
             this.message = t(

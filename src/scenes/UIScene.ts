@@ -442,7 +442,8 @@ export class UIScene extends Phaser.Scene {
       }
     }
     this.bleedLabel?.setVisible(player.bleed > 0 && !blinkOff);
-    this.beginnerLabel?.setVisible(simulation.combat.beginner && !uiState.modalOpen);
+    // A proteção de principiante lembra-se só no primeiro dia (depois ocupava o canto 3 dias).
+    this.beginnerLabel?.setVisible(simulation.combat.beginner && clock.day === 1 && !uiState.modalOpen);
     this.renderQuest();
     this.renderBossBar();
     this.layoutTopLeft(player.bleed > 0);
@@ -476,7 +477,8 @@ export class UIScene extends Phaser.Scene {
     const hint = this.hint;
     if (!hint) return;
     // Uma instrução de cada vez: a dica cede o lugar a um aviso e aos painéis.
-    const quiet = uiState.modalOpen || buildMode.active || this.notice?.text.visible === true;
+    const noticeShown = this.notice?.text.visible === true && this.notice.text.text !== '';
+    const quiet = uiState.modalOpen || buildMode.active || noticeShown;
     const step = quiet ? null : simulation.tutorial.current();
     this.layoutHintBg(step !== null);
     if (step === hint.step) return;
@@ -1177,6 +1179,7 @@ export class UIScene extends Phaser.Scene {
         if (uiState.modalOpen || buildMode.active) return;
         this.actionPointer = pointer.id;
         uiState.actionHeld = true;
+        uiState.actionTapped = true;
         button.setFillStyle(paletteNumber('wood_light'), 0.9);
       });
     this.events.on('ui:action-released', () => button.setFillStyle(paletteNumber('wood'), 0.8));
@@ -1424,6 +1427,7 @@ export class UIScene extends Phaser.Scene {
         if (pointer.leftButtonDown()) {
           this.actionPointer = pointer.id;
           uiState.actionHeld = true;
+          uiState.actionTapped = true;
         }
         return;
       }

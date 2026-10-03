@@ -17,6 +17,9 @@ export interface PixelScaling {
   dispose(): void;
 }
 
+/** Mínimo de px CSS por píxel de jogo da interface em ecrãs táteis. */
+const TOUCH_MIN_CSS_PER_PX = 1.3;
+
 function displayOptions(): PixelScaleOptions {
   const touch = window.matchMedia('(pointer: coarse)').matches;
   const tablet = touch && Math.min(window.innerWidth, window.innerHeight) >= DISPLAY.tabletMinCss;
@@ -40,11 +43,16 @@ export function measurePixelScale(host: HTMLElement): PixelScale {
 
 /** Vista da interface (tamanho escolhido nas definições) para uma escala. */
 function uiViewFor(scale: PixelScale): View {
-  const zoom = uiZoomFor(
+  const chosen = uiZoomFor(
     scale.deviceZoom,
     preferences().uiSize,
     Math.min(scale.canvasWidth, scale.canvasHeight),
   );
+  // Com toque, a interface nunca fica abaixo de ~1,3 px CSS por píxel de jogo (Médio/Pequeno
+  // deixavam texto de 6 px e botões de 8 px nos telemóveis); nos tablets ainda dá para reduzir.
+  const touch = window.matchMedia('(pointer: coarse)').matches;
+  const floor = touch ? Math.ceil(TOUCH_MIN_CSS_PER_PX * (window.devicePixelRatio || 1)) : 1;
+  const zoom = Math.min(scale.deviceZoom, Math.max(chosen, floor));
   if (zoom === scale.deviceZoom) {
     return { width: scale.gameWidth, height: scale.gameHeight, zoom };
   }

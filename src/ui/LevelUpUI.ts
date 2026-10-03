@@ -5,6 +5,7 @@ import { getView } from '../display/view';
 import { itemName, t, tKey } from '../i18n';
 import { content } from '../world/content';
 import { Label } from './text';
+import { tInput } from './touch';
 
 const DEPTH = 85;
 /** Fecha-se sozinho ao fim deste tempo (não interrompe o jogo). */
@@ -63,7 +64,7 @@ export class LevelUpUI {
     const shown = next.lines.slice(0, MAX_LINES);
     const more = next.lines.length - shown.length;
     const list = more > 0 ? `${shown.join(', ')} ${t('level.more', { n: more })}` : shown.join(', ');
-    const body = `${next.lines.length > 0 ? `${t('level.unlocked')} ${list}` : t('level.nothing')}\n${t('level.points')}`;
+    const body = `${next.lines.length > 0 ? `${t('level.unlocked')} ${list}` : t('level.nothing')}\n${tInput('level.points.touch', 'level.points')}`;
     const add = <T extends { destroy(): void }>(obj: T): T => {
       this.objects.push(obj);
       return obj;

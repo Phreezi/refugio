@@ -11,6 +11,8 @@ export const REOPEN_GUARD_MS = 300;
 export const uiState = {
   /** Botão de ação (toque) ou clique no mundo premido. */
   actionHeld: false,
+  /** Toque no botão de ação ainda por ler (um toque rápido larga antes do frame seguinte). */
+  actionTapped: false,
   /** A ação fica ignorada até se largar a tecla/botão (Espaço que fechou uma conversa não fala outra vez). */
   actionLocked: false,
   /** Painel aberto (mochila/baú/crafting): o jogador não anda nem faz ações. */

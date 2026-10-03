@@ -96,7 +96,7 @@ export class MainMenuScene extends Phaser.Scene {
       this,
       cx,
       height - 30,
-      data.message ? t(data.message) : tInput('menu.hint', 'menu.hint.keys'),
+      data.message ? t(data.message) : tInput('menu.hint.touch', 'menu.hint.keys'),
       { size: 8, color: 'stone_light', wrap: width - 16, align: 'center' },
       [0.5, 0],
     );
