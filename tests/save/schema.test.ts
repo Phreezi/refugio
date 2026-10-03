@@ -257,6 +257,18 @@ describe('save: migrações', () => {
     expect(() => validateState(bad)).toThrow();
   });
 
+  it('v24 → v25: os jogos em curso ficam de um jogador; a ligação co-op valida-se', () => {
+    const stateJson = JSON.stringify(STATE);
+    const text = `{"version":24,"timestamp":9,"checksum":"${checksum(`24|9|${stateJson}`)}","state":${stateJson}}`;
+    expect(parseSave(text).state.coop).toBeUndefined();
+    const linked = structuredClone(STATE);
+    linked.coop = { role: 'host', code: 'AB12C', partner: null, partnerName: null };
+    expect(validateState(linked).coop?.code).toBe('AB12C');
+    const bad = structuredClone(STATE) as unknown as { coop: unknown };
+    bad.coop = { role: 'spectator', code: 'AB12C', partner: null, partnerName: null };
+    expect(() => validateState(bad)).toThrow();
+  });
+
   it('v23 → v24: resistência cheia; relógio ×5 e prazos deslocados (falta o mesmo tempo)', () => {
     const v23 = structuredClone(STATE) as unknown as {
       player: Record<string, unknown>;

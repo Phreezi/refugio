@@ -11,6 +11,7 @@ import { getView, getWorldView, setupFixedCamera } from '../display/view';
 import { pinchStep, stepWorldZoom } from '../display/worldZoom';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
 import { coop } from '../net/coop';
+import { presence } from '../net/presence';
 import { content } from '../world/content';
 import { readJoystick } from '../input/joystick';
 import { moveInput } from '../input/moveInput';
@@ -36,6 +37,7 @@ import { xpToNext } from '../systems/progression/progression';
 import { countItem } from '../systems/inventory/inventory';
 import { missingInputs } from '../systems/crafting/crafting';
 import { SceneKey, ZONE_CROSSED_EVENT } from './keys';
+import type { MainMenuData } from './MainMenuScene';
 
 /** Raio do joystick virtual e do manípulo, em píxeis de jogo. */
 const JOYSTICK_RADIUS = 24;
@@ -59,6 +61,10 @@ const ACTION_RADIUS = 20;
 
 /** Barras do HUD (px de jogo; pares, porque as Shapes não são arredondadas). */
 const HUD_MARGIN = 6;
+/** Ecrã de espera do co-op (por cima de tudo) e de quanto em quanto tempo se convida o parceiro. */
+const COOP_WAIT_DEPTH = 95;
+const COOP_INVITE_MS = 15000;
+const COOP_HOST_RETRY_MS = 5000;
 /** Altura da hotbar com a margem de baixo, e o espaço entre ela e a dica do tutorial. */
 const HOTBAR_SPACE = 28;
 const HINT_GAP = 24;
@@ -157,6 +163,9 @@ export class UIScene extends Phaser.Scene {
   private playButtonsVisible = true;
   private worldMap: MapUI | null = null;
   private minimap: Minimap | null = null;
+  /** Ecrã de espera do co-op (anfitrião sem parceiro): objetos e o estado desenhado. */
+  private coopWait: { objects: { destroy(): void }[]; key: string } | null = null;
+  private lastCoopInvite = 0;
   private seedHintShown = false;
   /** Aviso da horda (por baixo da velocidade): quanto falta, ou quantos restam. */
   private hordeLabel: Label | null = null;
@@ -267,6 +276,28 @@ export class UIScene extends Phaser.Scene {
       [1, 0],
     ).setDepth(70);
     this.updateCoopLabel();
+    // Jogo co-op (anfitrião): abre a sessão com o código do jogo e espera pelo parceiro.
+    const link = gameState.data.coop;
+    if (link?.role === 'host' && !coop.isHost && !coop.isGuest) {
+      // Sem rede (ou o código ainda preso): continua à espera e tenta de novo.
+      let alive = true;
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        alive = false;
+      });
+      const open = (): void => {
+        coop.host(link.code).catch((error: unknown) => {
+          console.warn('[coop] não foi possível abrir o jogo co-op:', error);
+          if (!alive) return;
+          this.showNotice(t('coop.host_failed'));
+          this.time.delayedCall(COOP_HOST_RETRY_MS, open);
+        });
+      };
+      open();
+    }
+    // Um dos dois sai: o co-op grava e acaba para os dois.
+    coop.onPartnerLeft = () => {
+      this.quitToMenu('coop.ended');
+    };
     this.hordeLabel = new Label(
       this,
       width - HUD_MARGIN,
@@ -363,6 +394,10 @@ export class UIScene extends Phaser.Scene {
       this.worldMap?.destroy();
       this.worldMap = null;
       this.minimap = null;
+      for (const object of this.coopWait?.objects ?? []) object.destroy();
+      this.coopWait = null;
+      uiState.coopWaiting = false;
+      coop.onPartnerLeft = null;
       this.questLabel = null;
       this.recallUi = null;
       this.autoOptions = [];
@@ -411,6 +446,7 @@ export class UIScene extends Phaser.Scene {
 
   override update(time: number): void {
     if (!gameState.hasGame) return;
+    this.updateCoopWait(time);
     this.minimap?.setVisible(!uiState.modalOpen && !buildMode.active);
     this.minimap?.update(time);
     this.updateRecall();
@@ -502,7 +538,7 @@ export class UIScene extends Phaser.Scene {
     if (!hint) return;
     // Uma instrução de cada vez: a dica cede o lugar a um aviso e aos painéis.
     const noticeShown = this.notice?.text.visible === true && this.notice.text.text !== '';
-    const quiet = uiState.modalOpen || buildMode.active || noticeShown;
+    const quiet = uiState.modalOpen || buildMode.active || noticeShown || uiState.coopWaiting;
     const step = quiet ? null : simulation.tutorial.current();
     this.layoutHintBg(step !== null);
     if (step === hint.step) return;
@@ -1041,20 +1077,84 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** Grava e volta ao menu inicial (a cena de jogo, ao parar, também pára o HUD). */
-  private quitToMenu(): void {
-    // Co-op: o convidado sai (não tem nada a gravar); o anfitrião fecha a sessão.
+  private quitToMenu(message?: MessageKey): void {
+    const data = message ? ({ message } satisfies MainMenuData) : {};
+    // Co-op: o convidado grava a personagem dele (ao sair); o anfitrião grava o mundo.
     if (coop.isGuest) {
       coop.leave();
       gameState.clear();
       this.game.scene.stop(SceneKey.Zone);
-      this.game.scene.start(SceneKey.MainMenu, {});
+      this.game.scene.start(SceneKey.MainMenu, data);
       return;
     }
     coop.leave();
     void autosave.flush().then(() => {
       this.game.scene.stop(SceneKey.Zone);
-      this.game.scene.start(SceneKey.MainMenu, {});
+      this.game.scene.start(SceneKey.MainMenu, data);
     });
+  }
+
+  /**
+   * Jogo co-op sem o parceiro (anfitrião): o jogo fica parado com um ecrã de espera (o código e
+   * "Gravar e sair"), e o aparelho do parceiro recebe um convite de vez em quando.
+   */
+  private updateCoopWait(now: number): void {
+    const link = gameState.data.coop;
+    const waiting = link?.role === 'host' && !coop.isGuest && !coop.connected;
+    uiState.coopWaiting = waiting;
+    const key = !waiting ? '' : coop.isHost ? `wait:${link.partnerName ?? ''}` : 'opening';
+    if (key !== (this.coopWait?.key ?? '')) {
+      for (const object of this.coopWait?.objects ?? []) object.destroy();
+      this.coopWait = waiting ? { objects: this.buildCoopWait(key === 'opening'), key } : null;
+    }
+    if (waiting && link.partner && now - this.lastCoopInvite >= COOP_INVITE_MS) {
+      this.lastCoopInvite = now;
+      void presence.invite(link.partner, { code: link.code, name: gameState.data.player.name });
+    }
+  }
+
+  private buildCoopWait(opening: boolean): { destroy(): void }[] {
+    const link = gameState.data.coop;
+    const { width, height } = getView();
+    const w = Math.min(240, width - 16);
+    const cx = Math.round(width / 2);
+    const objects: { destroy(): void }[] = [];
+    objects.push(
+      this.add
+        .rectangle(0, 0, width, height, paletteNumber('ink'), 0.8)
+        .setOrigin(0)
+        .setDepth(COOP_WAIT_DEPTH)
+        .setInteractive(),
+    );
+    const lines = opening
+      ? [t('coop.wait_opening')]
+      : [
+          link?.partnerName ? t('coop.wait_partner', { name: link.partnerName }) : t('coop.wait_friend'),
+          t('coop.wait_code', { code: link?.code ?? '' }),
+          ...(link?.partner ? [] : [t('coop.wait_share')]),
+        ];
+    const text = new Label(
+      this,
+      cx,
+      Math.round(height / 2) - 24,
+      lines.join('\n'),
+      { size: 9, color: 'cream', align: 'center', wrap: w - 16 },
+      [0.5, 0.5],
+    ).setDepth(COOP_WAIT_DEPTH + 1);
+    objects.push(
+      text,
+      new Button(
+        this,
+        cx,
+        Math.round(height / 2 + text.text.height / 2) + 4,
+        t('coop.save_quit'),
+        { width: 110, height: 18, fontSize: 9, style: 'secondary' },
+        () => {
+          this.quitToMenu();
+        },
+      ).setDepth(COOP_WAIT_DEPTH + 1),
+    );
+    return objects;
   }
 
   /** Botão da mochila (junto à hotbar) e, com toque, o botão grande de ação (CLAUDE.md §7.2). */

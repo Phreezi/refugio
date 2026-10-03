@@ -365,7 +365,9 @@ export class ZoneScene extends Phaser.Scene {
     const speed = gameSpeed();
     // Menu de pausa aberto: o tempo de jogo pára (o ecrã continua a ser desenhado).
     // Em co-op o tempo nunca pára (o outro jogador continua a jogar).
-    if (!uiState.paused || uiState.coop) simulation.update(this.game.loop.rawDelta * speed);
+    // À espera do parceiro (jogo co-op), o tempo não anda.
+    if ((!uiState.paused || uiState.coop) && !uiState.coopWaiting)
+      simulation.update(this.game.loop.rawDelta * speed);
     if (this.pendingCross !== null) {
       const to = this.pendingCross;
       this.pendingCross = null;

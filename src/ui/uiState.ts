@@ -25,6 +25,10 @@ export const uiState = {
   reopenPause: null as 'main' | 'settings' | 'stats' | null,
   /** Co-op ligado: o tempo não pára (pausa, mapa-mundo) e a velocidade fica em x1. */
   coop: false,
+  /** Jogo co-op à espera do parceiro (o anfitrião: o jogo fica parado até ele entrar). */
+  coopWaiting: false,
+  /** Código do jogo co-op de que o menu está à espera (o convite desse jogo não pergunta). */
+  coopWaitingCode: null as string | null,
 };
 
 /** Topo dos painéis (mochila, fabrico): fixo perto de cima, para não saltarem ao mudar de conteúdo. */

@@ -8,6 +8,8 @@
 // repetidos, por isso o código de 5 caracteres (o id) é único entre as sessões ativas.
 
 import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
+import { deviceId } from './device';
+import { peerOptions } from './peer';
 import { EventBus, eventBus, type GameEvents } from '../core/EventBus';
 import {
   BASE_ZONE_ID,
@@ -33,7 +35,6 @@ import {
   PROGRESSION_EVENTS,
   SNAPSHOT_QUIET_EVENTS,
   parseGuestMessage,
-  randomCode,
   type CommandSystem,
   type GuestCharacter,
   type GuestMessage,
@@ -46,7 +47,9 @@ const SNAP_MIN_MS = 250;
 const SNAP_MAX_MS = 3000;
 const ME_MS = 66;
 const OWN_SAVE_MS = 10000;
+/** O código de um jogo co-op é fixo: se ainda estiver preso (sessão anterior), tenta de novo. */
 const CODE_ATTEMPTS = 6;
+const CODE_RETRY_MS = 3000;
 const JOIN_TIMEOUT_MS = 15000;
 
 export type CoopRole = 'host' | 'guest';
@@ -72,14 +75,6 @@ export interface AvatarView {
  * mudam o mundo também se veem no ecrã do anfitrião, se estiverem na mesma zona).
  */
 export const guestBus = new EventBus<GameEvents>();
-
-/** Servidor de sinalização: o do PeerJS, ou outro com `?peer=host:porta` (testes locais). */
-function peerOptions(): Partial<PeerOptions> {
-  const custom = new URLSearchParams(window.location.search).get('peer');
-  if (!custom) return { debug: 0 };
-  const [host, port] = custom.split(':');
-  return { host: host ?? 'localhost', port: Number(port ?? 9000), path: '/', secure: false, debug: 0 };
-}
 
 /** Um sítio livre ao lado do anfitrião (sem paredes do mapa), para o convidado aparecer. */
 function besideHost(host: { zoneId: string; x: number; y: number }): { x: number; y: number } {
@@ -115,6 +110,8 @@ class Coop {
   connected = false;
   /** Convidado: a ligação caiu (volta ao menu). */
   onLost: (() => void) | null = null;
+  /** Anfitrião: o parceiro saiu (o co-op grava e acaba para os dois). */
+  onPartnerLeft: (() => void) | null = null;
   /** Convidado: chegou o mundo (`warped`: o anfitrião mudou-o de sítio). */
   onSnapshot: ((warped: boolean) => void) | null = null;
   /** Quando o outro jogador deu o último golpe (ms), para a animação. */
@@ -162,26 +159,36 @@ class Coop {
 
   // ——— Anfitrião ———
 
-  /** Abre uma sessão e espera por um convidado. @returns o código a partilhar. */
-  async host(): Promise<string> {
-    if (this.role === 'host' && this.code) return this.code;
+  /**
+   * Abre a sessão do jogo co-op com o código `code` (fixo para esse jogo) e espera pelo parceiro.
+   * Se o código ainda estiver preso (a sessão anterior a fechar), tenta de novo uns segundos.
+   */
+  async host(code: string): Promise<string> {
+    if (this.role === 'host' && this.code === code) return code;
     this.leave();
     for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
-      const code = randomCode();
       const peer = await this.openPeer(PEER_PREFIX + code).catch((error: unknown) => {
-        if (error instanceof Error && error.message === 'taken') return null; // código em uso: tenta outro
+        if (error instanceof Error && error.message === 'taken') return null;
         throw error instanceof Error ? error : new Error(String(error));
       });
-      if (!peer) continue;
+      if (!peer) {
+        await new Promise((resolve) => window.setTimeout(resolve, CODE_RETRY_MS));
+        continue;
+      }
       this.peer = peer;
       this.role = 'host';
       this.code = code;
       peer.on('connection', (conn) => {
         this.acceptGuest(conn);
       });
+      // Ligação ao servidor caiu (não ao parceiro): volta a registar o código. Ao sair de
+      // propósito (`leave`), o `peer` já não é este e não se volta a ligar.
+      peer.on('disconnected', () => {
+        if (this.peer === peer && !peer.destroyed) peer.reconnect();
+      });
       return code;
     }
-    throw new Error('Não foi possível arranjar um código livre.');
+    throw new Error('taken');
   }
 
   private openPeer(id?: string): Promise<Peer> {
@@ -199,9 +206,13 @@ class Coop {
   }
 
   private acceptGuest(conn: DataConnection): void {
+    // Já há um parceiro a jogar: quem mais tentar entrar é recusado (o jogo é só dos dois).
     if (this.conn) {
       conn.on('open', () => {
-        conn.close();
+        void conn.send({ t: 'bye', reason: 'taken' } satisfies HostMessage);
+        window.setTimeout(() => {
+          conn.close();
+        }, 500);
       });
       return;
     }
@@ -220,7 +231,7 @@ class Coop {
 
   private fromGuest(message: GuestMessage): void {
     if (message.t === 'join') {
-      this.guestJoined(message.character);
+      this.guestJoined(message.character, message.device);
       return;
     }
     const sim = this.guestSim;
@@ -239,9 +250,23 @@ class Coop {
   }
 
   /** O convidado entrou com a personagem dele: aparece ao pé do anfitrião. */
-  private guestJoined(character: GuestCharacter): void {
+  private guestJoined(character: GuestCharacter, device: string): void {
     if (!gameState.hasGame || this.guestSim) return;
     const host = gameState.data;
+    // O jogo co-op fica ligado ao primeiro parceiro que entra: outro aparelho é recusado.
+    const link = host.coop;
+    if (!link || (link.partner !== null && link.partner !== device) || device === '') {
+      this.send({ t: 'bye', reason: 'taken' });
+      window.setTimeout(() => {
+        this.conn?.close();
+      }, 500);
+      return;
+    }
+    if (link.partner === null) {
+      link.partner = device;
+      link.partnerName = character.player.name;
+      gameState.markDirty();
+    }
     let state: GameStateData;
     try {
       // O mundo é o do anfitrião (os mesmos objetos: o que um muda, o outro vê); a personagem,
@@ -291,6 +316,7 @@ class Coop {
   }
 
   private guestLeft(): void {
+    const wasPlaying = this.guestSim !== null;
     this.partnerName = null;
     for (const off of this.offEvents) off();
     this.offEvents = [];
@@ -304,6 +330,8 @@ class Coop {
     simulation.away = false;
     uiState.coop = false;
     eventBus.emit('coop:changed', {});
+    // Um sai, o co-op acaba para os dois (grava-se e volta-se ao menu).
+    if (wasPlaying) this.onPartnerLeft?.();
   }
 
   /** Um comando dos painéis do convidado (só os da lista; o que ele já fez no ecrã dele). */
@@ -383,12 +411,16 @@ class Coop {
     if (!state?.hasGame) return;
     this.lastSnap = performance.now();
     this.snapDirty = false;
+    // O convidado não recebe a ligação do jogo co-op (é do anfitrião; a dele está no save dele).
+    const shared: GameStateData = { ...state.data };
+    delete shared.coop;
     this.send({
       t: 'snap',
-      state: state.data,
+      state: shared,
       ack: this.ack,
       warp: this.warp,
       host: gameState.data.player.name,
+      device: deviceId(),
     });
   }
 
@@ -463,13 +495,20 @@ class Coop {
           const conn = peer.connect(PEER_PREFIX + code, { reliable: true });
           this.conn = conn;
           conn.on('open', () => {
-            this.send({ t: 'join', character });
+            this.send({ t: 'join', character, device: deviceId() });
           });
           conn.on('data', (raw) => {
             const message = raw as HostMessage;
             if (message.t === 'snap' && !settled) {
               settled = true;
               this.partnerName = message.host ?? null;
+              // A personagem fica ligada a este jogo co-op (e ao aparelho do anfitrião).
+              mine.coop = {
+                role: 'guest',
+                code,
+                partner: message.device ?? mine.coop?.partner ?? null,
+                partnerName: message.host ?? mine.coop?.partnerName ?? null,
+              };
               window.clearTimeout(timer);
               this.role = 'guest';
               this.connected = true;
@@ -480,7 +519,7 @@ class Coop {
               return;
             }
             if (message.t === 'bye' && !settled) {
-              fail('refused');
+              fail(message.reason === 'taken' ? 'taken' : 'refused');
               return;
             }
             this.fromHost(message);
@@ -737,10 +776,11 @@ class Coop {
     this.offEvents = [];
     for (const restore of this.restoreCommands) restore();
     this.restoreCommands = [];
+    const peer = this.peer;
+    this.peer = null; // antes de destruir: o 'disconnected' não o volta a ligar
     this.conn?.close();
-    this.peer?.destroy();
+    peer?.destroy();
     this.conn = null;
-    this.peer = null;
     this.role = null;
     this.code = null;
     this.connected = false;

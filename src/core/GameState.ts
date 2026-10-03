@@ -155,6 +155,22 @@ export interface GameStateData {
   stats: GameStatsCounters & { playTicks: number };
   /** Tutorial (Fase 11): passos já feitos e se as dicas estão desligadas. */
   tutorial: { done: string[]; off: boolean };
+  /**
+   * Jogo co-op (Fase 15, save v25): só existe nos jogos criados como co-op. Fica ligado a dois
+   * aparelhos: o anfitrião (o mundo) e o parceiro (o primeiro que entrou com o código).
+   */
+  coop?: CoopLink;
+}
+
+/** Ligação de um jogo co-op aos dois aparelhos (§11, Fase 15). */
+export interface CoopLink {
+  /** Este jogo é o mundo (anfitrião) ou a personagem levada para o mundo do outro (convidado). */
+  role: 'host' | 'guest';
+  /** Código da sessão (fixo para este jogo). */
+  code: string;
+  /** Aparelho do parceiro (null até alguém entrar pela primeira vez). */
+  partner: string | null;
+  partnerName: string | null;
 }
 
 /** Baú da base num jogo novo: mantimentos para os primeiros minutos (e testar a fogueira). */

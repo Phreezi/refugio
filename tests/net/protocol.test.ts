@@ -55,6 +55,11 @@ describe('Mensagens do convidado', () => {
     expect(parseGuestMessage({ t: 'me', x: Number.NaN, y: 2, facing: 'up', zone: 'z' })).toBeNull();
     expect(parseGuestMessage({ t: 'me', x: 1, y: 2, facing: 'north', zone: 'z' })).toBeNull();
     expect(parseGuestMessage({ t: 'join' })).toBeNull();
+    // O aparelho do convidado vai com o pedido para entrar (o anfitrião só aceita o parceiro).
+    const join = parseGuestMessage({ t: 'join', character: { player: {} }, device: 'abc123def456' });
+    expect(join?.t === 'join' ? join.device : null).toBe('abc123def456');
+    const odd = parseGuestMessage({ t: 'join', character: { player: {} }, device: '<script>' });
+    expect(odd?.t === 'join' ? odd.device : null).toBe('');
     expect(parseGuestMessage({ t: 'give', item: 'pistol' })).toBeNull();
   });
 });
