@@ -3,7 +3,15 @@ import { describe, expect, it } from 'vitest';
 import wildsJson from '../../src/data/wilds.json';
 import { tKey } from '../../src/i18n';
 import { content } from '../../src/world/content';
-import { BASE_TILES, BASE_TILESET_NAME, baseTileIndex, type BaseTile } from '../../src/world/tileset';
+import {
+  BASE_TILES,
+  BASE_TILESET_NAME,
+  baseTileIndex,
+  URBAN_TILES_COLUMNS,
+  URBAN_TILES_COUNT,
+  URBAN_TILESET_NAME,
+  type BaseTile,
+} from '../../src/world/tileset';
 import { installWilds } from '../../src/world/wildContent';
 import {
   generateWild,
@@ -18,13 +26,23 @@ import { parseZoneMap, type ZoneMapRules } from '../../src/world/zoneMap';
 import { loadContent } from '../helpers/content';
 
 const gid = (tile: string): number => baseTileIndex(tile as BaseTile) + 1;
-const TILESET = { name: BASE_TILESET_NAME, image: '../tiles/base_tiles.png', count: BASE_TILES.length };
+const TILESET = {
+  name: BASE_TILESET_NAME,
+  image: '../tiles/base_tiles.png',
+  count: BASE_TILES.length,
+  urban: {
+    name: URBAN_TILESET_NAME,
+    image: '../tiles/urban_tiles.png',
+    count: URBAN_TILES_COUNT,
+    columns: URBAN_TILES_COLUMNS,
+  },
+};
 
 function rules(): ZoneMapRules {
   const c = loadContent();
   return {
     tileSize: 16,
-    tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
+    tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length, [URBAN_TILESET_NAME]: URBAN_TILES_COUNT },
     resourceIds: Object.keys(c.resources),
     propIds: Object.keys(c.props),
     stationIds: Object.keys(c.stations),
@@ -107,7 +125,7 @@ describe('generateWild', () => {
   const plan = parseWildPlan(wildsJson);
   const sample: WildZone[] = [
     ...plan.zones.filter((z) => z.village).slice(0, 3),
-    ...['meadow', 'forest', 'hills', 'marsh'].flatMap((b) =>
+    ...['meadow', 'forest', 'hills', 'marsh', 'urban'].flatMap((b) =>
       plan.zones.filter((z) => z.biome === b && !z.village).slice(0, 2),
     ),
   ];
@@ -137,8 +155,23 @@ describe('generateWild', () => {
         }
       }
       if (zone.village) expect(map.npcs?.length).toBe(2);
+      // Subúrbios: o segundo tileset (Kenney, CC0) vem logo a seguir ao da base.
+      const tilesets = (json as { tilesets: { name: string; firstgid: number }[] }).tilesets;
+      if (zone.biome === 'urban')
+        expect(tilesets.find((t) => t.name === URBAN_TILESET_NAME)?.firstgid).toBe(BASE_TILES.length + 1);
+      else expect(tilesets.map((t) => t.name)).toEqual([BASE_TILESET_NAME]);
     },
   );
+
+  it('subúrbios: só em zonas grandes, longe de casa e que não são aldeias', () => {
+    const urban = plan.zones.filter((z) => z.biome === 'urban');
+    expect(urban.length).toBeGreaterThan(10);
+    for (const z of urban) {
+      expect(z.village).toBeFalsy();
+      expect(z.level).toBeGreaterThanOrEqual(5);
+      expect(Math.min(z.w, z.h)).toBeGreaterThanOrEqual(48);
+    }
+  });
 });
 
 describe('wilds.json (o mundo do jogo)', () => {

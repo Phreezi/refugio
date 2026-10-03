@@ -22,6 +22,7 @@ const BIOME_COLOR: Readonly<Record<string, PaletteColor>> = {
   forest: 'forest',
   hills: 'sand',
   marsh: 'teal',
+  urban: 'stone',
 };
 
 interface Destroyable {

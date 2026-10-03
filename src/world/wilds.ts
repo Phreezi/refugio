@@ -5,7 +5,7 @@
 // quando é preciso (com seed: é sempre igual), por isso o jogo não fica maior para descarregar.
 // Módulo puro: também é usado por scripts/ (Node), por isso não importa nada em runtime.
 
-export const BIOMES = ['meadow', 'forest', 'hills', 'marsh'] as const;
+export const BIOMES = ['meadow', 'forest', 'hills', 'marsh', 'urban'] as const;
 export type Biome = (typeof BIOMES)[number];
 
 export type Side = 'n' | 's' | 'w' | 'e';
@@ -61,6 +61,9 @@ export const WILD = {
   home: { x: 24, y: 24 },
   /** Distância mínima entre aldeias (tiles). */
   villageSpacing: 190,
+  /** Subúrbios: nível mínimo e probabilidade (zonas grandes que não são aldeias). */
+  urbanMinLevel: 5,
+  urbanChance: 0.15,
 } as const;
 
 // --- Ruído e aleatório com seed ---------------------------------------------------------------
@@ -322,6 +325,7 @@ export function planWilds(
     z.village = true;
     villages.push(z);
   }
+  assignUrban(zones);
   // Passagens entre zonas vizinhas: uma árvore que liga tudo (as zonas à mão contam como uma só,
   // já estão ligadas pelos Caminhos) e mais algumas ao acaso — um labirinto largo, à Pokémon.
   const byId = new Map(zones.map((z) => [z.id, z]));
@@ -429,6 +433,7 @@ type Tile =
   | 'cliff';
 
 const BARRIERS: Readonly<Record<Biome, readonly Tile[]>> = {
+  urban: ['wall'],
   meadow: ['mound', 'mound', 'rocks', 'mound'],
   forest: ['mound', 'log', 'mound', 'rocks'],
   hills: ['rocks', 'boulder', 'cliff', 'rocks'],
@@ -437,6 +442,7 @@ const BARRIERS: Readonly<Record<Biome, readonly Tile[]>> = {
 
 /** Recursos por 1000 tiles, por bioma: [id, densidade, nível mínimo]. */
 const RESOURCES: Readonly<Record<Biome, readonly [string, number, number][]>> = {
+  urban: [],
   forest: [
     ['tree_small', 8, 1],
     ['tree_large', 4, 1],
@@ -466,6 +472,7 @@ const RESOURCES: Readonly<Record<Biome, readonly [string, number, number][]>> = 
 };
 
 const PROPS: Readonly<Record<Biome, readonly string[]>> = {
+  urban: [],
   forest: ['log', 'stump', 'stump', 'pebbles'],
   meadow: ['pebbles', 'fence_broken', 'stump', 'crate'],
   hills: ['pebbles', 'pebbles', 'log', 'barrel'],
@@ -534,6 +541,384 @@ interface Placed {
 }
 
 /**
+ * Tiles do RPG Urban Pack (Kenney, CC0) usados nas zonas urbanas: índices no PNG (27 colunas).
+ * Os 9-slices são [canto sup. esq., topo, canto sup. dir., esq., meio, dir., canto inf. esq.,
+ * baixo, canto inf. dir.].
+ */
+export const URBAN = {
+  asphalt: 441,
+  laneH: 433,
+  laneV: 462,
+  sidewalk: [8, 9, 10, 35, 36, 37, 62, 63, 64],
+  park: [0, 1, 2, 27, 28, 29, 54, 55, 56],
+  roofs: [
+    [17, 18, 19, 71, 72, 73, 98, 99, 100],
+    [125, 126, 127, 179, 180, 181, 206, 207, 208],
+  ],
+  window: 364,
+  windowLow: 391,
+  doorTop: 339,
+  doorBottom: 366,
+  /** Mobiliário urbano de 1 tile (bloqueia): boca de incêndio, caixotes, marco do correio, cone, saco. */
+  streetProps: [251, 279, 280, 305, 307, 254, 278],
+  trees: [291, 292, 346, 373],
+  bench: 270,
+  /** Carros 2×2 (vistos de cima): [sup. esq., sup. dir., inf. esq., inf. dir.]. */
+  cars: [
+    [393, 394, 420, 421],
+    [447, 448, 474, 475],
+  ],
+} as const;
+
+/** Um tile do mapa: do tileset da base (nome), do urbano (índice) ou nada. */
+type Cell = Tile | number | null;
+
+/** Tilesets do mapa gerado: o da base e, nas zonas urbanas, o urbano. */
+export interface WildTilesets {
+  name: string;
+  image: string;
+  count: number;
+  urban?: { name: string; image: string; count: number; columns: number };
+}
+
+/** JSON do Tiled a partir das camadas e dos objetos. */
+function toTiled(
+  W: number,
+  H: number,
+  layers: { ground: readonly Cell[]; collision: readonly Cell[]; decorHigh?: readonly Cell[] },
+  points: readonly Placed[],
+  objects: Placed[],
+  gid: (tile: Tile) => number,
+  tileset: WildTilesets,
+): Record<string, unknown> {
+  const urbanFirst = tileset.count + 1;
+  let nextObjectId = 1;
+  const obj = (p: Placed) => ({
+    id: nextObjectId++,
+    name: p.name,
+    type: '',
+    x: p.x,
+    y: p.y,
+    width: 0,
+    height: 0,
+    rotation: 0,
+    point: true,
+    visible: true,
+  });
+  const layerObjects = [...points.map(obj), ...objects.sort((a, b) => a.y - b.y || a.x - b.x).map(obj)];
+  let nextLayerId = 1;
+  const cellGid = (t: Cell): number => (t === null ? 0 : typeof t === 'number' ? urbanFirst + t : gid(t));
+  const tileLayer = (name: string, data: readonly Cell[] | undefined) => ({
+    id: nextLayerId++,
+    name,
+    type: 'tilelayer',
+    x: 0,
+    y: 0,
+    width: W,
+    height: H,
+    opacity: 1,
+    visible: true,
+    data: data ? data.map(cellGid) : new Array<number>(W * H).fill(0),
+  });
+  const urban = tileset.urban;
+  return {
+    type: 'map',
+    version: '1.10',
+    tiledversion: '1.11.2',
+    orientation: 'orthogonal',
+    renderorder: 'right-down',
+    infinite: false,
+    compressionlevel: -1,
+    width: W,
+    height: H,
+    tilewidth: TILE_PX,
+    tileheight: TILE_PX,
+    layers: [
+      tileLayer('ground', layers.ground),
+      tileLayer('decor_low', undefined),
+      tileLayer('collision', layers.collision),
+      tileLayer('decor_high', layers.decorHigh),
+      {
+        id: nextLayerId++,
+        name: 'objects',
+        type: 'objectgroup',
+        draworder: 'topdown',
+        x: 0,
+        y: 0,
+        opacity: 1,
+        visible: true,
+        objects: layerObjects,
+      },
+    ],
+    tilesets: [
+      {
+        firstgid: 1,
+        name: tileset.name,
+        image: tileset.image,
+        imagewidth: TILE_PX * tileset.count,
+        imageheight: TILE_PX,
+        tilewidth: TILE_PX,
+        tileheight: TILE_PX,
+        tilecount: tileset.count,
+        columns: tileset.count,
+        margin: 0,
+        spacing: 0,
+      },
+      ...(urban
+        ? [
+            {
+              firstgid: urbanFirst,
+              name: urban.name,
+              image: urban.image,
+              imagewidth: TILE_PX * urban.columns,
+              imageheight: TILE_PX * Math.ceil(urban.count / urban.columns),
+              tilewidth: TILE_PX,
+              tileheight: TILE_PX,
+              tilecount: urban.count,
+              columns: urban.columns,
+              margin: 0,
+              spacing: 0,
+            },
+          ]
+        : []),
+    ],
+    nextlayerid: nextLayerId,
+    nextobjectid: nextObjectId,
+  };
+}
+
+/** Grupos de inimigos das zonas urbanas, por perigo. */
+const URBAN_GROUPS: readonly (readonly string[])[] = [
+  ['walkers'],
+  ['walkers', 'walker'],
+  ['t2_mixed', 'runners', 'bloated', 'walkers'],
+  ['t3_mixed', 'screamer', 'spitters', 'armored', 'tanks'],
+  ['t4_mixed', 'squad', 'screamers', 'armored', 'spitters'],
+];
+const URBAN_CONTAINERS: readonly (readonly string[])[] = [
+  ['crate', 'car_trunk'],
+  ['crate', 'car_trunk', 'cabinet'],
+  ['car_trunk', 'cabinet', 'village_cabinet', 'city_store'],
+  ['city_store', 'medical_cabinet', 'industrial_locker', 'car_trunk'],
+  ['city_store', 'armory', 'medical_cabinet', 'car_trunk'],
+];
+
+/**
+ * Zona urbana (RPG Urban Pack): ruas de 3 tiles em grelha com riscas, quarteirões com passeio à
+ * volta e, dentro, prédios (telhado + fachada com janelas e porta — à porta, uma loja para
+ * saquear), parques com árvores ou parques de estacionamento; carros parados nas ruas e
+ * mobiliário urbano nos passeios. As passagens nas bordas dão para a rua mais perto.
+ */
+function generateUrban(
+  z: WildZone,
+  gid: (tile: Tile) => number,
+  tileset: WildTilesets,
+): Record<string, unknown> {
+  const W = z.w;
+  const H = z.h;
+  const random = rng(z.seed);
+  const danger = dangerOf(z.level);
+  const at = (x: number, y: number): number => y * W + x;
+  const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)] as T;
+  const ground: Cell[] = new Array<Cell>(W * H).fill(URBAN.sidewalk[4]);
+  const collision: Cell[] = new Array<Cell>(W * H).fill(null);
+  const road = new Uint8Array(W * H);
+  const keep = new Uint8Array(W * H); // ruas e passagens: nada se põe por cima
+  const objects: Placed[] = [];
+  const points: Placed[] = [];
+  for (let x = 0; x < W; x++) {
+    collision[at(x, 0)] = 'wall';
+    collision[at(x, H - 1)] = 'wall';
+  }
+  for (let y = 0; y < H; y++) {
+    collision[at(0, y)] = 'wall';
+    collision[at(W - 1, y)] = 'wall';
+  }
+  // Grelha de ruas (3 tiles), com quarteirões de 10–14 por 8–11 tiles.
+  const lines = (size: number, min: number, max: number): number[] => {
+    const out: number[] = [];
+    let v = 3 + Math.floor(random() * 3);
+    while (v + 2 <= size - 4) {
+      out.push(v);
+      v += 3 + min + Math.floor(random() * (max - min + 1));
+    }
+    if (out.length === 0) out.push(Math.max(1, Math.floor(size / 2) - 1));
+    return out;
+  };
+  const xs = lines(W, 10, 14);
+  const ys = lines(H, 8, 11);
+  const paintRoad = (x: number, y: number, tile: number = URBAN.asphalt): void => {
+    if (x < 1 || y < 1 || x > W - 2 || y > H - 2) return;
+    const i = at(x, y);
+    ground[i] = tile;
+    road[i] = 1;
+    keep[i] = 1;
+  };
+  for (const x0 of xs)
+    for (let y = 1; y < H - 1; y++)
+      for (let k = 0; k < 3; k++) paintRoad(x0 + k, y, k === 1 ? URBAN.laneV : URBAN.asphalt);
+  for (const y0 of ys)
+    for (let x = 1; x < W - 1; x++)
+      for (let k = 0; k < 3; k++) paintRoad(x, y0 + k, k === 1 ? URBAN.laneH : URBAN.asphalt);
+  // Cruzamentos: asfalto liso.
+  for (const x0 of xs)
+    for (const y0 of ys)
+      for (let dx = 0; dx < 3; dx++) for (let dy = 0; dy < 3; dy++) paintRoad(x0 + dx, y0 + dy);
+  // Passagens: da borda até à primeira rua.
+  for (const [side, start, width] of z.open) {
+    for (let k = 0; k < width; k++) {
+      const p = start + k;
+      const cells: [number, number][] = [];
+      if (side === 'n') for (let y = 0; y < (ys[0] ?? H); y++) cells.push([p, y]);
+      else if (side === 's') for (let y = H - 1; y > (ys[ys.length - 1] ?? 0) + 2; y--) cells.push([p, y]);
+      else if (side === 'w') for (let x = 0; x < (xs[0] ?? W); x++) cells.push([x, p]);
+      else for (let x = W - 1; x > (xs[xs.length - 1] ?? 0) + 2; x--) cells.push([x, p]);
+      for (const [x, y] of cells) {
+        const i = at(x, y);
+        collision[i] = null;
+        ground[i] = URBAN.asphalt;
+        keep[i] = 1;
+      }
+    }
+  }
+  // Quarteirões: entre as ruas (e as bordas).
+  const spans = (lines0: number[], size: number): [number, number][] => {
+    const out: [number, number][] = [];
+    let from = 1;
+    for (const v of lines0) {
+      out.push([from, v - 1]);
+      from = v + 3;
+    }
+    out.push([from, size - 2]);
+    return out.filter(([a, b]) => b - a >= 2);
+  };
+  const free = (x0: number, y0: number, x1: number, y1: number): boolean => {
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) if (keep[at(x, y)] || collision[at(x, y)] !== null) return false;
+    return true;
+  };
+  const nine = (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    set: readonly number[],
+    layer: Cell[],
+  ): void => {
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        const col = x === x0 ? 0 : x === x1 ? 2 : 1;
+        const row = y === y0 ? 0 : y === y1 ? 2 : 1;
+        layer[at(x, y)] = set[row * 3 + col] ?? set[4] ?? null;
+      }
+  };
+  const tables = URBAN_CONTAINERS[danger] ?? URBAN_CONTAINERS[1] ?? [];
+  const feetAt = (tx: number, ty: number): { x: number; y: number } => ({
+    x: tx * TILE_PX + TILE_PX / 2,
+    y: (ty + 1) * TILE_PX - 2,
+  });
+  for (const [bx0, bx1] of spans(xs, W))
+    for (const [by0, by1] of spans(ys, H)) {
+      // Passeio à volta (o lote fica 1 tile para dentro).
+      const lx0 = bx0 + 1;
+      const ly0 = by0 + 1;
+      const lx1 = bx1 - 1;
+      const ly1 = by1 - 1;
+      if (lx1 - lx0 < 2 || ly1 - ly0 < 3 || !free(lx0, ly0, lx1, ly1 + 1)) {
+        // Lote pequeno ou cortado por uma passagem: só passeio com mobiliário.
+        continue;
+      }
+      const kind = random();
+      if (kind < 0.62) {
+        // Prédios (um ou dois lado a lado): telhado e, em baixo, fachada de 2 filas com porta.
+        const parts = lx1 - lx0 >= 11 ? 2 : 1;
+        const pw = Math.floor((lx1 - lx0 + 1 - (parts - 1)) / parts);
+        for (let b = 0; b < parts; b++) {
+          const x0 = lx0 + b * (pw + 1);
+          const x1 = b === parts - 1 ? lx1 : x0 + pw - 1;
+          const roof = pick(URBAN.roofs);
+          nine(x0, ly0, x1, ly1 - 2, roof, collision);
+          const door = x0 + Math.floor((x1 - x0) / 2);
+          for (let x = x0; x <= x1; x++) {
+            collision[at(x, ly1 - 1)] = x === door ? URBAN.doorTop : URBAN.window;
+            collision[at(x, ly1)] = x === door ? URBAN.doorBottom : URBAN.windowLow;
+          }
+          // À porta, no passeio: o que há para saquear.
+          objects.push({ name: `container:${pick(tables)}`, ...feetAt(door, ly1 + 1) });
+          keep[at(door, ly1 + 1)] = 1;
+        }
+      } else if (kind < 0.82) {
+        // Parque: relva com árvores e um banco.
+        nine(lx0, ly0, lx1, ly1, URBAN.park, ground);
+        for (let i = 0, n = Math.floor(((lx1 - lx0) * (ly1 - ly0)) / 9); i < n; i++) {
+          const x = lx0 + 1 + Math.floor(random() * Math.max(1, lx1 - lx0 - 1));
+          const y = ly0 + 1 + Math.floor(random() * Math.max(1, ly1 - ly0 - 1));
+          if (collision[at(x, y)] === null) collision[at(x, y)] = pick(URBAN.trees);
+        }
+        if (collision[at(lx0 + 1, ly1)] === null) collision[at(lx0 + 1, ly1)] = URBAN.bench;
+      } else {
+        // Parque de estacionamento: asfalto com carros em filas (com espaço para passar).
+        for (let y = ly0; y <= ly1; y++) for (let x = lx0; x <= lx1; x++) ground[at(x, y)] = URBAN.asphalt;
+        for (let y = ly0; y + 1 <= ly1; y += 3)
+          for (let x = lx0; x + 1 <= lx1; x += 3) {
+            if (random() < 0.4) continue;
+            const car = pick(URBAN.cars);
+            collision[at(x, y)] = car[0];
+            collision[at(x + 1, y)] = car[1];
+            collision[at(x, y + 1)] = car[2];
+            collision[at(x + 1, y + 1)] = car[3];
+          }
+        objects.push({ name: 'container:car_trunk', ...feetAt(lx1, ly1) });
+      }
+    }
+  // Mobiliário nos passeios (só onde não está a passagem nem a porta de um prédio).
+  for (let y = 1; y < H - 1; y++)
+    for (let x = 1; x < W - 1; x++) {
+      const i = at(x, y);
+      if (keep[i] || collision[i] !== null || ground[i] !== URBAN.sidewalk[4]) continue;
+      const nearRoad = [at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)].some((j) => road[j]);
+      if (nearRoad && random() < 0.05) collision[i] = pick(URBAN.streetProps);
+    }
+  // Carros abandonados nas ruas (só em 2 das 3 faixas, longe dos cruzamentos).
+  const nearCross = (v: number, lines0: number[]): boolean => lines0.some((l) => v >= l - 3 && v <= l + 5);
+  for (const x0 of xs)
+    for (let y = 3; y + 1 < H - 3; y += 6)
+      if (!nearCross(y, ys) && random() < 0.35) {
+        const car = pick(URBAN.cars);
+        const ok = [0, 1].every((dy) =>
+          [0, 1].every((dx) => collision[at(x0 + dx, y + dy)] === null && !keep[at(x0 + dx, y + dy)]),
+        );
+        if (!ok) continue;
+        collision[at(x0, y)] = car[0];
+        collision[at(x0 + 1, y)] = car[1];
+        collision[at(x0, y + 1)] = car[2];
+        collision[at(x0 + 1, y + 1)] = car[3];
+      }
+  // Inimigos nas ruas, longe das passagens; o jogador começa no cruzamento mais ao meio.
+  const groups = URBAN_GROUPS[danger] ?? URBAN_GROUPS[1] ?? ['walkers'];
+  const roads: [number, number][] = [];
+  for (let y = 1; y < H - 1; y++)
+    for (let x = 1; x < W - 1; x++) if (road[at(x, y)] && collision[at(x, y)] === null) roads.push([x, y]);
+  const spawns: [number, number][] = [];
+  const count = 2 + Math.floor((W * H) / 2200);
+  for (let tries = 0; spawns.length < count && tries < 300 && roads.length > 0; tries++) {
+    const [x, y] = pick(roads);
+    if (spawns.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 10)) continue;
+    spawns.push([x, y]);
+    points.push({
+      name: `enemy_spawn:${pick(groups)}`,
+      x: x * TILE_PX + TILE_PX / 2,
+      y: y * TILE_PX + TILE_PX / 2,
+    });
+  }
+  const cx = (xs[Math.floor(xs.length / 2)] ?? 1) + 1;
+  const cy = (ys[Math.floor(ys.length / 2)] ?? 1) + 1;
+  collision[at(cx, cy)] = null;
+  points.push({ name: 'player_spawn', x: cx * TILE_PX + TILE_PX / 2, y: cy * TILE_PX + TILE_PX / 2 });
+  return toTiled(W, H, { ground, collision }, points, objects, gid, tileset);
+}
+
+/**
  * Gera o mapa (JSON do Tiled, como os desenhados à mão) de uma zona selvagem.
  * @param gid gid de cada tile do tileset da base (firstgid 1).
  * @param tileset dados do tileset embebido (nome, ficheiro, número de tiles).
@@ -541,8 +926,9 @@ interface Placed {
 export function generateWild(
   z: WildZone,
   gid: (tile: Tile) => number,
-  tileset: { name: string; image: string; count: number },
+  tileset: WildTilesets,
 ): Record<string, unknown> {
+  if (z.biome === 'urban') return generateUrban(z, gid, tileset);
   const W = z.w;
   const H = z.h;
   const random = rng(z.seed);
@@ -840,84 +1226,23 @@ export function generateWild(
   }
   points.push({ name: 'player_spawn', x: hub.x * TILE_PX + TILE_PX / 2, y: hub.y * TILE_PX + TILE_PX / 2 });
 
-  // JSON do Tiled (o mesmo formato que scripts/mapgen.ts escreve).
-  let nextObjectId = 1;
-  const obj = (p: Placed) => ({
-    id: nextObjectId++,
-    name: p.name,
-    type: '',
-    x: p.x,
-    y: p.y,
-    width: 0,
-    height: 0,
-    rotation: 0,
-    point: true,
-    visible: true,
-  });
-  const layerObjects = [...points.map(obj), ...objects.sort((a, b) => a.y - b.y || a.x - b.x).map(obj)];
-  let nextLayerId = 1;
-  const tileLayer = (name: string, data: readonly (Tile | null)[] | null) => ({
-    id: nextLayerId++,
-    name,
-    type: 'tilelayer',
-    x: 0,
-    y: 0,
-    width: W,
-    height: H,
-    opacity: 1,
-    visible: true,
-    data: data ? data.map((t) => (t === null ? 0 : gid(t))) : new Array<number>(W * H).fill(0),
-  });
-  return {
-    type: 'map',
-    version: '1.10',
-    tiledversion: '1.11.2',
-    orientation: 'orthogonal',
-    renderorder: 'right-down',
-    infinite: false,
-    compressionlevel: -1,
-    width: W,
-    height: H,
-    tilewidth: TILE_PX,
-    tileheight: TILE_PX,
-    layers: [
-      tileLayer('ground', ground),
-      tileLayer('decor_low', null),
-      tileLayer('collision', collision),
-      tileLayer('decor_high', null),
-      {
-        id: nextLayerId++,
-        name: 'objects',
-        type: 'objectgroup',
-        draworder: 'topdown',
-        x: 0,
-        y: 0,
-        opacity: 1,
-        visible: true,
-        objects: layerObjects,
-      },
-    ],
-    tilesets: [
-      {
-        firstgid: 1,
-        name: tileset.name,
-        image: tileset.image,
-        imagewidth: TILE_PX * tileset.count,
-        imageheight: TILE_PX,
-        tilewidth: TILE_PX,
-        tileheight: TILE_PX,
-        tilecount: tileset.count,
-        columns: tileset.count,
-        margin: 0,
-        spacing: 0,
-      },
-    ],
-    nextlayerid: nextLayerId,
-    nextobjectid: nextObjectId,
-  };
+  // JSON do Tiled (o mesmo formato que scripts/mapgen.ts escreve), só com o tileset da base.
+  return toTiled(W, H, { ground, collision }, points, objects, gid, { ...tileset, urban: undefined });
 }
 
 /** Valida a forma de `wilds.json` (sem verificar as referências: isso faz o validate-data). */
+/**
+ * Subúrbios (zonas urbanas): algumas zonas grandes, longe de casa e que não são aldeias passam a
+ * ter ruas e prédios. Depende só da semente de cada zona, por isso pode aplicar-se a um plano já
+ * feito sem mudar a geometria (`npm run map:wilds -- --update-biomes`).
+ */
+export function assignUrban(zones: WildZone[]): void {
+  for (const z of zones) {
+    if (z.village || z.level < WILD.urbanMinLevel || z.w < 48 || z.h < 48) continue;
+    if (hash(z.seed, 13) < WILD.urbanChance) z.biome = 'urban';
+  }
+}
+
 export function parseWildPlan(input: unknown): WildPlan {
   const fail = (why: string): never => {
     throw new Error(`wilds.json inválido: ${why}`);

@@ -51,3 +51,13 @@ export const BASE_LEDGE_TILES: readonly BaseTile[] = ['ledge'];
 
 /** Tiles do chão que contam como fundação (o chão da casa em ruínas, CLAUDE.md §7.7). */
 export const BASE_FLOOR_TILES: readonly BaseTile[] = ['floor_wood', 'floor_concrete'];
+
+/**
+ * Segundo tileset: o das zonas urbanas (RPG Urban Pack da Kenney, CC0; ver assets/LICENSES.md),
+ * o PNG tal como vem (27 × 18 tiles de 16 px, sem espaços). Nos mapas fica depois do da base
+ * (firstgid = número de tiles da base + 1). Os índices usados estão em world/wilds.ts.
+ */
+export const URBAN_TILESET_NAME = 'urban_tiles';
+export const URBAN_TILESET_FILE = 'tiles/urban_tiles.png';
+export const URBAN_TILES_COUNT = 486;
+export const URBAN_TILES_COLUMNS = 27;

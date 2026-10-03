@@ -27,7 +27,7 @@ import { structureArea, structureFeet, type StructureRecord } from '../systems/b
 import { buildMode, buildTargetTile } from '../ui/buildMode';
 import type { Facing } from '../systems/movement/movement';
 import { content } from '../world/content';
-import { BASE_TILESET_NAME, baseTileIndex } from '../world/tileset';
+import { BASE_TILESET_NAME, baseTileIndex, URBAN_TILESET_NAME } from '../world/tileset';
 import { TILE_LAYERS, type TileLayerName } from '../world/zoneMap';
 import { darknessAt } from '../core/DayNight';
 import { BALANCE } from '../data/balance';
@@ -82,6 +82,7 @@ const FLOAT_TEXT_RISE = 14;
 const GAIN_TEXT_MS = 5000;
 const GAIN_TEXT_RISE = 18;
 const TILESET_TEXTURE = 'tileset_base';
+const URBAN_TILESET_TEXTURE = 'tileset_urban';
 const WALK_FRAME_RATE = 8;
 /** Intervalo mínimo entre passos de zoom com a roda do rato. */
 const WHEEL_COOLDOWN_MS = 150;
@@ -1273,7 +1274,12 @@ export class ZoneScene extends Phaser.Scene {
       tilemap.destroy();
       return null;
     }
-    for (const name of TILE_LAYERS) tilemap.createLayer(name, tileset, ox, oy).setDepth(LAYER_DEPTH[name]);
+    // Zonas urbanas: segundo tileset (Kenney RPG Urban Pack, CC0).
+    const urban = tilemap.getTileset(URBAN_TILESET_NAME)
+      ? tilemap.addTilesetImage(URBAN_TILESET_NAME, URBAN_TILESET_TEXTURE)
+      : null;
+    const tilesets = urban ? [tileset, urban] : tileset;
+    for (const name of TILE_LAYERS) tilemap.createLayer(name, tilesets, ox, oy).setDepth(LAYER_DEPTH[name]);
     const view: ZoneView = {
       zoneId,
       tilemap,

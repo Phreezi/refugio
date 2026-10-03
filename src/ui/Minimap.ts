@@ -24,6 +24,7 @@ const COLORS = {
   solid: 'forest_dark',
   floor: 'wood',
   free: 'grass',
+  street: 'stone',
 } as const satisfies Record<string, PaletteColor>;
 type Cell = keyof typeof COLORS;
 
@@ -130,7 +131,8 @@ export class Minimap {
         let cell: Cell = 'void';
         if (hit && map) {
           const i = hit.ty * map.width + hit.tx;
-          cell = map.solid[i] ? 'solid' : map.floor[i] ? 'floor' : 'free';
+          const free = content.wild(hit.zone.zoneId)?.biome === 'urban' ? 'street' : 'free';
+          cell = map.solid[i] ? 'solid' : map.floor[i] ? 'floor' : free;
         }
         if (cell !== runCell) {
           flush(col);

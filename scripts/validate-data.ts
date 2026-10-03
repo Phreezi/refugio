@@ -32,6 +32,10 @@ import {
   BASE_TILESET_FILE,
   BASE_TILESET_NAME,
   baseTileIndex,
+  URBAN_TILESET_NAME,
+  URBAN_TILES_COUNT,
+  URBAN_TILESET_FILE,
+  URBAN_TILES_COLUMNS,
 } from '../src/world/tileset.ts';
 import { ZoneMapError, parseZoneMap, type ZoneMap, type ZoneMapRules } from '../src/world/zoneMap.ts';
 import { buildWorldLayout, WorldLayout } from '../src/world/worldLayout.ts';
@@ -417,7 +421,7 @@ function checkMaps(): string[] {
         readJson(`public/assets/${file}`),
         {
           tileSize: TILE_SIZE,
-          tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
+          tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length, [URBAN_TILESET_NAME]: URBAN_TILES_COUNT },
           resourceIds: Object.keys(resources),
           propIds: Object.keys(props),
           stationIds: Object.keys(stations),
@@ -441,7 +445,7 @@ function checkMaps(): string[] {
     problems.push(
       ...checkWilds(zones, parsed, {
         tileSize: TILE_SIZE,
-        tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length },
+        tilesets: { [BASE_TILESET_NAME]: BASE_TILES.length, [URBAN_TILESET_NAME]: URBAN_TILES_COUNT },
         resourceIds: Object.keys(resources),
         propIds: Object.keys(props),
         stationIds: Object.keys(stations),
@@ -475,7 +479,17 @@ function checkWilds(zones: ZoneDefs, handMaps: ReadonlyMap<string, ZoneMap>, rul
     ...plan.zones.flatMap((z) => (z.village ? Object.values(villageNpcIds(z)) : [])),
   ];
   const gid = (tile: string): number => baseTileIndex(tile as (typeof BASE_TILES)[number]) + 1;
-  const tileset = { name: BASE_TILESET_NAME, image: `../${BASE_TILESET_FILE}`, count: BASE_TILES.length };
+  const tileset = {
+    name: BASE_TILESET_NAME,
+    image: `../${BASE_TILESET_FILE}`,
+    count: BASE_TILES.length,
+    urban: {
+      name: URBAN_TILESET_NAME,
+      image: `../${URBAN_TILESET_FILE}`,
+      count: URBAN_TILES_COUNT,
+      columns: URBAN_TILES_COLUMNS,
+    },
+  };
   for (const zone of plan.zones) {
     if (zones[zone.id]) problems.push(`wilds.json: ${zone.id} também está em zones.json`);
     try {
