@@ -15,6 +15,7 @@ import { UIScene } from './scenes/UIScene';
 import { installSaveOnHide } from './save';
 import { preferences } from './ui/preferences';
 import { installSfx } from './audio/sfx';
+import { installSoundtrack } from './audio/soundtrackDirector';
 import { installRuntimeErrors } from './ui/runtimeErrors';
 import { loadPixelFont } from './display/fonts';
 
@@ -64,6 +65,7 @@ function start(): void {
   if (import.meta.env.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game;
   installContextLossRecovery(game);
   installCoopInvites(game);
+  installSoundtrack(game);
   const scaling = installPixelScaling(game, host);
   installDebugOverlay(game, scaling, params.has(DEBUG_QUERY_PARAM));
 }

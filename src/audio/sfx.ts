@@ -129,7 +129,23 @@ class Sfx {
   unlock(): void {
     if (typeof AudioContext === 'undefined') return;
     this.context ??= new AudioContext();
-    if (this.context.state === 'suspended') void this.context.resume();
+    if (this.context.state === 'suspended' && !document.hidden) void this.context.resume();
+  }
+
+  /**
+   * Página escondida: o áudio pára todo (música, ambiente, efeitos) e retoma ao voltar. Os
+   * agendadores (music.ts, ambience.ts) não recuperam o tempo perdido.
+   */
+  private onVisibility = (): void => {
+    const context = this.context;
+    if (!context) return;
+    if (document.hidden) {
+      if (context.state === 'running') void context.suspend();
+    } else if (context.state === 'suspended') void context.resume();
+  };
+
+  installVisibility(): void {
+    document.addEventListener('visibilitychange', this.onVisibility);
   }
 
   /** O contexto de áudio (partilhado com a música), depois do primeiro gesto. */
@@ -190,7 +206,8 @@ class Sfx {
     return gain;
   }
 
-  private whiteNoise(context: AudioContext): AudioBuffer {
+  /** Ruído branco (0,6 s), partilhado com a música (percussão). */
+  whiteNoise(context: AudioContext): AudioBuffer {
     if (this.noiseBuffer) return this.noiseBuffer;
     const length = Math.floor(context.sampleRate * 0.6);
     const buffer = context.createBuffer(1, length, context.sampleRate);
@@ -211,6 +228,7 @@ export function installSfx(bus: EventBus<GameEvents> = eventBus): void {
   };
   window.addEventListener('pointerdown', unlock);
   window.addEventListener('keydown', unlock);
+  sfx.installVisibility();
 
   bus.on('player:action', ({ kind }) => {
     if (kind === 'swing') sfx.play('swing');

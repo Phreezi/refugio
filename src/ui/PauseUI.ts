@@ -15,6 +15,7 @@ import { preferences, setPreference, UI_SIZES } from './preferences';
 import { applyUiSize } from '../display/installPixelScaling';
 import { sfx } from '../audio/sfx';
 import { music } from '../audio/music';
+import { ambience } from '../audio/ambience';
 import { Label } from './text';
 import { uiState } from './uiState';
 
@@ -113,10 +114,10 @@ export class PauseUI {
           ? 8 + this.skillRows().length
           : this.view === 'coop'
             ? 5
-            : // Definições: 7 linhas + hordas e dificuldade (as do jogo) + "Voltar".
+            : // Definições: 8 linhas + hordas e dificuldade (as do jogo) + "Voltar".
               gameState.hasGame && !coop.isGuest
-              ? 10
-              : 8;
+              ? 11
+              : 9;
     const h = Math.min(height - 8, 34 + lines * ROW + 10);
     const x = Math.round((width - W) / 2);
     const y = Math.max(4, Math.round((height - h) / 2));
@@ -229,7 +230,7 @@ export class PauseUI {
     x: number,
     y: number,
     title: string,
-    key: 'volume' | 'musicVolume',
+    key: 'volume' | 'musicVolume' | 'ambientVolume',
     onRelease: () => void,
   ): void {
     this.label(x + 10, y + 1, title, { size: 8, color: 'cream' });
@@ -321,6 +322,9 @@ export class PauseUI {
     });
     this.slider(x, next(), t('pause.music'), 'musicVolume', () => {
       music.refresh();
+    });
+    this.slider(x, next(), t('pause.ambient'), 'ambientVolume', () => {
+      ambience.refresh();
     });
     this.setting(x, next(), t('pause.damage_numbers'), onOff(prefs.damageNumbers), () => {
       setPreference('damageNumbers', !prefs.damageNumbers);
