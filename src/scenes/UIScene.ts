@@ -5,6 +5,7 @@ import { eventBus } from '../core/EventBus';
 import { BASE_ZONE_ID, gameState, type PlayerState } from '../core/GameState';
 import { hoursToTicks } from '../core/Homestead';
 import { simulation } from '../core/Simulation';
+import { TUTORIAL_RECIPE, TUTORIAL_STRUCTURE } from '../core/Tutorial';
 import { BALANCE } from '../data/balance';
 import type { SkillId } from '../data/types';
 import { getView, getWorldView, setupFixedCamera } from '../display/view';
@@ -541,14 +542,14 @@ export class UIScene extends Phaser.Scene {
     const quiet = uiState.modalOpen || buildMode.active || noticeShown || uiState.coopWaiting;
     const step = quiet ? null : simulation.tutorial.current();
     this.layoutHintBg(step !== null);
-    if (step === hint.step) return;
-    hint.step = step;
-    hint.label.setVisible(step !== null);
+    const text = step ? this.hintText(step) : null;
+    if (text === hint.step) return;
+    hint.step = text;
+    hint.label.setVisible(text !== null);
     hint.close?.destroy();
     hint.close = null;
-    if (!step) return;
-    const touch = window.matchMedia('(pointer: coarse)').matches;
-    hint.label.setText(tKey(`tut.${step}.${touch ? 'touch' : 'keys'}`));
+    if (!text) return;
+    hint.label.setText(text);
     hint.y = Math.round(hint.bottom - hint.label.text.height);
     hint.label.setPosition(hint.x, hint.y);
     // O × (desligar as dicas) fica à direita do texto.
@@ -562,6 +563,38 @@ export class UIScene extends Phaser.Scene {
         simulation.tutorial.dismiss();
       },
     ).setDepth(40);
+  }
+
+  /**
+   * Texto da dica do passo `step` (de teclado ou de toque). Fabricar o machado e pôr a fogueira
+   * dizem primeiro o que falta juntar (e quanto se tem), para a dica nunca pedir o impossível.
+   */
+  private hintText(step: string): string {
+    const touch = window.matchMedia('(pointer: coarse)').matches;
+    const mode = touch ? 'touch' : 'keys';
+    const inputs =
+      step === 'craft'
+        ? content.recipes.find((r) => r.id === TUTORIAL_RECIPE)?.inputs
+        : step === 'build'
+          ? content.structures[TUTORIAL_STRUCTURE]?.cost
+          : undefined;
+    if (inputs) {
+      const { inventory, hotbar } = gameState.data.player;
+      const missing = inputs.filter(({ item, qty }) => countItem([inventory, hotbar], item) < qty);
+      if (missing.length > 0) {
+        const list = inputs
+          .map(({ item, qty }) =>
+            t('tut.need_item', {
+              have: Math.min(countItem([inventory, hotbar], item), qty),
+              qty,
+              item: itemName(item),
+            }),
+          )
+          .join(', ');
+        return t(step === 'craft' ? 'tut.craft.gather' : 'tut.build.gather', { list });
+      }
+    }
+    return tKey(`tut.${step}.${mode}`);
   }
 
   /** Caixa escura por trás da dica do tutorial (e do × dela). */
@@ -916,7 +949,15 @@ export class UIScene extends Phaser.Scene {
     const { width, height } = getView();
     // A conversa fica em baixo: o aviso vai por cima dela.
     const dialogTop = this.dialog?.isOpen ? this.dialog.top : null;
-    const noticeY = dialogTop !== null ? Math.max(24, dialogTop - 14) : Math.round(height * 0.28);
+    // Com um painel aberto (fabrico, mochila…), o aviso vai para baixo, entre o painel e a hotbar,
+    // em vez de tapar o meio do painel.
+    const hotbarTop = uiState.modalOpen ? this.inventory?.hotbarRect().y : undefined;
+    const noticeY =
+      dialogTop !== null
+        ? Math.max(24, dialogTop - 14)
+        : hotbarTop !== undefined
+          ? Math.round(hotbarTop - 6 - text.height / 2)
+          : Math.round(height * 0.28);
     if (this.noticeY !== noticeY) {
       this.noticeY = noticeY;
       this.notice.setPosition(Math.round(width / 2), noticeY);
@@ -957,8 +998,14 @@ export class UIScene extends Phaser.Scene {
     const label = this.questLabel;
     if (!label) return;
     const quest = simulation.quests.active()[0];
-    if (!quest || uiState.modalOpen) {
+    if (uiState.modalOpen) {
       label.setVisible(false);
+      return;
+    }
+    if (!quest) {
+      // Sem missão ativa, o próximo passo continua à vista (a seta do minimapa aponta para lá).
+      const next = this.nextObjective();
+      label.setText(next ?? '').setVisible(next !== null);
       return;
     }
     const progress = simulation.quests.progress(quest.id);
@@ -970,6 +1017,18 @@ export class UIScene extends Phaser.Scene {
     if (simulation.quests.ready(quest.id))
       lines.push(t('quest.ready_hint', { npc: tKey(`npc.${quest.turnIn}`) }));
     label.setText(lines.join('\n')).setVisible(true);
+  }
+
+  /**
+   * Objetivo sem missão ativa: falar com o NPC com missão mais perto ou, se nenhum tiver missões
+   * por agora, o nível da próxima. Com a dica do tutorial à vista não se repete (ela já guia).
+   */
+  private nextObjective(): string | null {
+    if (simulation.tutorial.current() !== null) return null;
+    const npc = this.minimap?.nearestNpc;
+    if (npc) return t('quest.next_talk', { npc: tKey(`npc.${npc.npc}`) });
+    const level = simulation.quests.nextLevel();
+    return level !== null ? t('quest.next_level', { level }) : null;
   }
 
   /** Botão de velocidade (x1 → x2 → x3 → x1), por baixo do relógio. */

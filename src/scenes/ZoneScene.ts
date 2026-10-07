@@ -12,6 +12,7 @@ import { zoneMapKey } from '../config';
 import { BASE_ZONE_ID, CHARACTER_LOOKS, gameState, type CharacterLook } from '../core/GameState';
 import { simulation } from '../core/Simulation';
 import { getWorldView } from '../display/view';
+import { boxOutside, cullRect, pointOutside, setCulled } from '../display/culling';
 import { WeaponFx } from '../display/weaponFx';
 import { questKillTargets } from '../world/questGuide';
 import { onWorldZoomChange, stepWorldZoom, worldZoomFor } from '../display/worldZoom';
@@ -137,6 +138,14 @@ const NPC_MARK_DEPTH = 900_000;
 const VOID_DEPTH = -10;
 const VOID_TEXTURE = 'void_cliffs';
 
+/**
+ * Culling: o que tem os pés a mais disto (px) fora da vista não se desenha. Cobre o maior
+ * sprite do mundo (64 px) e as marcas por cima dos NPCs.
+ */
+const CULL_MARGIN_PX = 80;
+/** …e refaz-se quando a vista anda isto (px; menos do que a margem). */
+const CULL_STEP_PX = 16;
+
 /** Mundo contínuo (Etapa E): desenham-se as zonas a menos disto (tiles) da zona atual. */
 const NEIGHBOR_MARGIN_TILES = 40;
 /** …e só se apagam quando ficam a mais disto (evita criar e apagar a andar junto a uma borda). */
@@ -146,6 +155,10 @@ const NEIGHBOR_DROP_TILES = 48;
 interface ZoneView {
   zoneId: string;
   tilemap: Phaser.Tilemaps.Tilemap;
+  /** As camadas de tiles (para as tirar da câmara quando a zona não se vê). */
+  layers: Phaser.GameObjects.GameObject[];
+  /** O chão tapa tudo (sem píxeis transparentes; os tiles urbanos têm alguns). */
+  opaque: boolean;
   objects: Phaser.GameObjects.GameObject[];
   resources: Map<number, Phaser.GameObjects.Image>;
   containers: Map<number, Phaser.GameObjects.Image>;
@@ -225,20 +238,34 @@ export class ZoneScene extends Phaser.Scene {
   private shift = { x: 0, y: 0 };
   /** Cenário fora das zonas (penhascos e montanhas), em vez de preto. */
   private voidFill: Phaser.GameObjects.TileSprite | null = null;
+  /** Última verificação "a vista está toda coberta de chão?" (só se refaz quando muda). */
+  private coverKey = '';
+  /** Última vista em que se fez o culling (ver cullWorld). */
+  private cullKey = '';
+  private covered = false;
 
   constructor() {
     super(SceneKey.Zone);
   }
 
   create(data: ZoneSceneData): void {
+    // Marca de desempenho (medir o arranque: performance.getEntriesByName).
+    performance.mark('refugio:zone');
     const zoneId = data.zoneId ?? gameState.data.player.zoneId;
     this.zoneId = content.zones[zoneId] ? zoneId : BASE_ZONE_ID;
+    // Zona que já não existe (ex.: save de um plano do mundo selvagem antigo): o jogador passa
+    // para o ponto de partida da base, senão ficava com a posição (e o id) da zona perdida.
+    if (this.zoneId !== zoneId || !content.zones[gameState.data.player.zoneId]) {
+      simulation.enterZone(this.zoneId, content.zoneMap(this.zoneId));
+    }
     this.leaving = false;
     this.hurtUntil = 0;
     this.views = new Map();
     this.streamQueue = [];
     this.pendingCross = null;
     this.shift = { x: 0, y: 0 };
+    this.coverKey = '';
+    this.cullKey = '';
     this.voidFill = this.add.tileSprite(0, 0, 16, 16, this.voidTexture()).setOrigin(0).setDepth(VOID_DEPTH);
     const current = this.createZoneView(this.zoneId);
     if (!current) throw new Error(`O mapa de ${this.zoneId} não tem o tileset "${BASE_TILESET_NAME}".`);
@@ -262,8 +289,9 @@ export class ZoneScene extends Phaser.Scene {
     this.questFx = this.add.graphics().setDepth(QUEST_FX_DEPTH);
 
     const camera = this.cameras.main;
-    // Fora do mapa (ecrãs maiores do que ele, ou zoom afastado) vê-se "noite".
-    camera.setBackgroundColor(PALETTE.ink);
+    // Sem cor de fundo na câmara: era mais uma passagem pelo ecrã inteiro (pesa nos telemóveis,
+    // com o canvas à resolução do dispositivo). Fora das zonas vêem-se as montanhas e, por trás,
+    // a cor de limpeza do jogo (ink).
     camera.startFollow(this.player, true);
     const applyZoom = (): void => {
       this.applyCameraZoom(this.viewBounds());
@@ -385,6 +413,7 @@ export class ZoneScene extends Phaser.Scene {
     this.renderHomestead();
     this.renderLighting();
     this.renderVoid();
+    this.cullWorld();
     // Com toque, andar volta a pôr a peça à frente do jogador.
     if (simulation.playerMoved && buildMode.pickedBy === 'touch') {
       buildMode.picked = null;
@@ -1279,10 +1308,14 @@ export class ZoneScene extends Phaser.Scene {
       ? tilemap.addTilesetImage(URBAN_TILESET_NAME, URBAN_TILESET_TEXTURE)
       : null;
     const tilesets = urban ? [tileset, urban] : tileset;
-    for (const name of TILE_LAYERS) tilemap.createLayer(name, tilesets, ox, oy).setDepth(LAYER_DEPTH[name]);
+    const layers: Phaser.GameObjects.GameObject[] = [];
+    for (const name of TILE_LAYERS)
+      layers.push(tilemap.createLayer(name, tilesets, ox, oy).setDepth(LAYER_DEPTH[name]));
     const view: ZoneView = {
       zoneId,
       tilemap,
+      layers,
+      opaque: !urban,
       objects: [
         this.drawShore(tilemap, tileset.firstgid, ox, oy),
         ...this.drawFences(tilemap, tileset.firstgid, ox, oy),
@@ -1497,6 +1530,51 @@ export class ZoneScene extends Phaser.Scene {
     simulation.combat.keepZones(contexts);
   }
 
+  /**
+   * Tira da câmara o que está fora da vista (ver display/culling.ts): as zonas que não se veem
+   * inteiras (camadas, margens da água, imagens) e, nas que se veem, as imagens longe.
+   */
+  private cullWorld(): void {
+    const camera = this.cameras.main;
+    const view = this.cameraView();
+    // Só se refaz quando a vista anda um tile (a margem chega para isso) ou o mundo muda.
+    const key = [
+      this.zoneId,
+      Math.floor(view.x / CULL_STEP_PX),
+      Math.floor(view.y / CULL_STEP_PX),
+      Math.round(view.width),
+      Math.round(view.height),
+      this.views.size,
+      this.structureSprites.size,
+      this.cropSprites.size,
+    ].join(',');
+    if (key === this.cullKey) return;
+    this.cullKey = key;
+    const area = cullRect(view, CULL_MARGIN_PX);
+    const cullPoint = (object: Phaser.GameObjects.GameObject, zoneOff: boolean): void => {
+      // A margem da água é um Graphics da zona inteira (posição = deslocamento do mundo).
+      const positioned = !(object instanceof Phaser.GameObjects.Graphics) && 'x' in object && 'y' in object;
+      const off =
+        zoneOff ||
+        (positioned && typeof object.x === 'number' && typeof object.y === 'number'
+          ? pointOutside(area, object.x, object.y)
+          : false);
+      setCulled(object, camera, off);
+    };
+    for (const zone of this.views.values()) {
+      const map = content.zoneMap(zone.zoneId);
+      const { x, y } = this.offsetOf(zone.zoneId);
+      const size = map.tileSize;
+      const zoneOff = boxOutside(area, x, y, map.width * size, map.height * size);
+      for (const layer of zone.layers) setCulled(layer, camera, zoneOff);
+      for (const object of zone.objects) cullPoint(object, zoneOff);
+      for (const image of zone.statics) cullPoint(image, zoneOff);
+    }
+    // Peças "vivas" da base (podem ser centenas).
+    for (const sprite of this.structureSprites.values()) cullPoint(sprite, false);
+    for (const sprite of this.cropSprites.values()) cullPoint(sprite, false);
+  }
+
   /** Desenha a próxima zona vizinha da fila (uma por frame). */
   private streamNext(): void {
     const zoneId = this.streamQueue.shift();
@@ -1517,6 +1595,10 @@ export class ZoneScene extends Phaser.Scene {
     const fill = this.voidFill;
     if (!fill) return;
     const view = this.cameraView();
+    // Com a vista toda dentro de zonas desenhadas, o chão tapa as montanhas: não se desenham
+    // (eram uma passagem a mais pelo ecrã inteiro, a mais cara depois do próprio chão).
+    fill.setVisible(!this.viewCovered(view));
+    if (!fill.visible) return;
     const x = Math.floor(view.x) - 16;
     const y = Math.floor(view.y) - 16;
     const w = Math.ceil(view.width) + 32;
@@ -1526,6 +1608,41 @@ export class ZoneScene extends Phaser.Scene {
     const size = content.zoneMap(this.zoneId).tileSize;
     fill.setPosition(x, y);
     fill.setTilePosition(x + (here?.x ?? 0) * size, y + (here?.y ?? 0) * size);
+  }
+
+  /** A vista (px da zona atual) está toda sobre o chão opaco de zonas já desenhadas? */
+  private viewCovered(view: { x: number; y: number; width: number; height: number }): boolean {
+    const size = content.zoneMap(this.zoneId).tileSize;
+    const tx0 = Math.floor(view.x / size);
+    const ty0 = Math.floor(view.y / size);
+    const tx1 = Math.ceil((view.x + view.width) / size) - 1;
+    const ty1 = Math.ceil((view.y + view.height) / size) - 1;
+    const key = [this.zoneId, tx0, ty0, tx1, ty1, this.views.size].join(',');
+    if (key === this.coverKey) return this.covered;
+    this.coverKey = key;
+    this.covered = this.tilesCovered(tx0, ty0, tx1, ty1);
+    return this.covered;
+  }
+
+  /** Os tiles [tx0..tx1] × [ty0..ty1] (da zona atual) caem todos em zonas desenhadas e opacas? */
+  private tilesCovered(tx0: number, ty0: number, tx1: number, ty1: number): boolean {
+    const here = content.world.rect(this.zoneId);
+    if (!here) {
+      // Fora do mundo contínuo (masmorras, eventos): só a própria zona.
+      const map = content.zoneMap(this.zoneId);
+      const opaque = this.views.get(this.zoneId)?.opaque ?? false;
+      return opaque && tx0 >= 0 && ty0 >= 0 && tx1 < map.width && ty1 < map.height;
+    }
+    for (let ty = ty0; ty <= ty1; ty++) {
+      let tx = tx0;
+      while (tx <= tx1) {
+        const hit = content.world.at(here.x + tx, here.y + ty);
+        if (!hit || !this.views.get(hit.zone.zoneId)?.opaque) return false;
+        // Salta o resto da linha dentro desta zona.
+        tx = hit.zone.x + hit.zone.w - here.x;
+      }
+    }
+    return true;
   }
 
   /** Textura das montanhas (64×64, repete sem costuras), desenhada uma vez com a paleta. */

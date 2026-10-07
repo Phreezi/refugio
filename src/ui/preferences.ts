@@ -17,6 +17,8 @@ export interface Preferences {
   volume: number;
   /** Volume da música de fundo (0–1; 0 = sem música). */
   musicVolume: number;
+  /** Volume dos sons de ambiente (vento, pássaros, grilos, água; 0–1). */
+  ambientVolume: number;
   /** Ataque automático ligado (botão "Auto" do HUD). */
   autoAttack: boolean;
   /** Com o Auto ligado: atacar sozinho os inimigos ao alcance. */
@@ -38,6 +40,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   colorblind: false,
   volume: 0.6,
   musicVolume: 0.4,
+  ambientVolume: 0.5,
   autoAttack: false,
   autoFight: true,
   autoGather: true,
@@ -73,7 +76,7 @@ export function parsePreferences(text: string | null): Preferences {
   if (typeof r.uiSize === 'string' && (UI_SIZES as readonly string[]).includes(r.uiSize)) {
     prefs.uiSize = r.uiSize as UiSize;
   }
-  for (const key of ['volume', 'musicVolume'] as const) {
+  for (const key of ['volume', 'musicVolume', 'ambientVolume'] as const) {
     const value = r[key];
     if (typeof value === 'number' && value >= 0 && value <= 1) prefs[key] = value;
   }

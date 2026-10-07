@@ -1,6 +1,8 @@
 dist/
 coverage/
 node_modules/
+# Cópias de trabalho dos agentes (git worktrees).
+.claude/
 package-lock.json
 # Documento escrito à mão; o Prettier desalinharia as tabelas.
 CLAUDE.md

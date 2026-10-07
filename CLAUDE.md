@@ -96,11 +96,19 @@ Base (casa) → escolher zona no mapa-mundo → viajar (custa um pouco de comida
   - **Fonte**: pixel mas de formas arredondadas, **Jersey 10** (SIL OFL, com minúsculas e acentos; `public/assets/fonts/`, carregada antes do arranque por `src/display/fonts.ts`). Cada píxel da letra mede 3/56 do tamanho da fonte; o `Label` escolhe um número inteiro de píxeis do ecrã por píxel da letra (`FONT_SCALE` 0,08 × tamanho pedido × zoom, ~1,5× o tamanho "natural") — letras nítidas a qualquer zoom. Com `fit` (os botões usam-no) a letra encolhe píxel a píxel se o texto não couber. Um só peso (sem negrito falso); o "contorno" é uma sombra de 1 píxel da letra. Títulos grandes em maiúsculas. *(Antes: Pixelify Sans — 2/5 pareciam Z/S — e Tiny5, difícil de ler.)* Campos de texto (nome, código do co-op) são `<input>` do DOM com o aspeto do jogo (`src/ui/textInput.ts`).
   - Implementação (`src/display/`): `Scale.NONE` + `scale.resize(canvas)` + `scale.setZoom(1 / dpr)`, com a posição do canvas alinhada a píxeis físicos (também com DPR 1,25 ou 2,625).
   - Com zoom na câmara o Phaser **não arredonda** posições: tudo o que se desenha tem de estar na grelha de píxeis do **ecrã** — coordenadas inteiras de jogo para o que está parado; o jogador e os inimigos (interpolados) em múltiplos de 1/zoom (`toScreenGrid` em `ZoneScene`), o que mantém a pixel art exata e deixa o movimento zoom× mais suave. A câmara segue o jogador, por isso o mundo fica alinhado.
+  - **Culling** (`src/display/culling.ts`, `ZoneScene.cullWorld`): o que está fora da vista (mais 80 px) sai da câmara pelo `cameraFilter` (nunca pelo `visible`, que é estado do jogo): zonas vizinhas inteiras (camadas, margens da água, imagens) e, nas que se veem, as imagens longe. A câmara do mundo não tem cor de fundo e as montanhas só se desenham quando a vista não está toda sobre chão opaco (cada passagem pelo ecrã inteiro pesa nos telemóveis, com o canvas à resolução do dispositivo).
   - **Nenhuma cena pode assumir um tamanho fixo**: usar `getView()` (não `this.scale.width`, que está em píxeis do dispositivo) e reagir a `Phaser.Scale.Events.RESIZE` (removendo o listener no SHUTDOWN). Ponteiros: converter com `camera.getWorldPoint`.
 - **Zoom do jogador** (`src/display/worldZoom.ts`): o zoom da vista é o máximo; pode afastar-se **só um nível** inteiro (×4 → ×3; ×3 → ×2; ×2 fica), nunca abaixo de ×2, ao alto e ao baixo (pedido do jogador: ver o mundo de muito longe tirava a graça). **Ctrl + roda** (ou pinça no touchpad) ou +/− no PC — a roda sozinha não faz zoom; pinça com 2 dedos no telemóvel (UIScene).
 - **Tamanho da interface** (definições, preferência do dispositivo `uiSize`: Grande/Médio/Pequeno): a interface (HUD, menus, painéis) tem uma vista própria (`getView()`) com zoom inteiro um ou dois níveis abaixo do do mundo (`uiZoomFor`: nunca abaixo de metade, nem com o lado curto da interface acima de 560 px de jogo; com toque, nunca abaixo de ~1,3 px CSS por píxel de jogo — nos telemóveis o Médio/Pequeno ficavam ilegíveis). **Tablets** (toque com o lado curto ≥ 700 px CSS) usam o alvo `tabletTargetHeight` (340 px): vê-se mais mundo. Com toque, os botões respondem numa área um pouco maior do que o desenho (até ~36 px CSS); o mundo usa `getWorldView()` e os textos da ZoneScene seguem o zoom do mundo. A câmara fixa (`setupFixedCamera`) tem origem no canto.
 - **Velocidade do jogo** (`src/ui/gameSpeed.ts`, botão x1/x2/x3 no HUD): multiplica o tempo real que entra na `Simulation`, por isso acelera tudo o que corre no passo fixo (relógio, fome/sede, movimento, golpes, respawn) e as animações do jogador. Guardada no localStorage (`refugio.speed`). Guardado no localStorage (`refugio.zoomOut`). Só a câmara do mundo muda; o HUD mantém o tamanho. Se se vê mais do que o mapa, este fica centrado.
 - 60 FPS alvo; lógica de jogo com passo fixo (ver 5.2).
+
+### 3.2 Publicação web (PWA)
+
+- `public/manifest.webmanifest` com `display: standalone` (o jogo não trata as safe areas: em `fullscreen` o HUD ficaria por baixo do recorte da câmara), ícone em pixel art gerado por código (`npm run icons`) e metas Open Graph/Twitter.
+- **Service worker** escrito à mão (sem Workbox), só no build de produção (`src/pwa/serviceWorker.ts`): uma cache por build (`refugio-<versão>-<hash>`), preenchida inteira na instalação sem passar pela cache HTTP; uma página controlada recebe tudo dessa cache, por isso **nunca mistura versões**. Sem `skipWaiting`/`claim`: a versão nova ativa-se na próxima abertura ou com "Nova versão — recarregar" no menu inicial. Não toca nos saves nem nos pedidos a outras origens (PeerJS). Nas Fases 13/14 confirmar se é permitido (ou desligá-lo).
+- **Ecrã de carregamento** em DOM no `index.html` (antes do JS), com mensagens quando falta WebGL ou o jogo não carrega (botão Recarregar).
+- **Sobre / Créditos / Privacidade** (`src/ui/AboutUI.ts`): botão "Sobre" no menu inicial e "Sobre e créditos" na pausa.
 
 ---
 
@@ -109,7 +117,7 @@ Base (casa) → escolher zona no mapa-mundo → viajar (custa um pouco de comida
 ```
 refugio/
 ├── CLAUDE.md
-├── index.html
+├── index.html                # ecrã de carregamento em DOM (textos `loader.*` do i18n, metidos pelo Vite), metas Open Graph
 ├── package.json
 ├── vite.config.ts            # inclui a config do Vitest; appType 'mpa' (404 reais em dev)
 ├── tsconfig.json
@@ -119,6 +127,7 @@ refugio/
 ├── public/
 │   └── assets/
 │       ├── manifest.json     # chave → ficheiro + especificação do placeholder
+│       ├── icons/            # ícones e imagem de partilha (gerados por `npm run icons`)
 │       ├── palette.png       # gerado de src/assets/palette.json (npm run palette)
 │       ├── sprites/          # recursos e obstáculos (PNG gerados por `npm run sprites`)
 │       ├── tiles/            # tilesets (base_tiles.png gerado por `npm run tiles`)
@@ -135,8 +144,10 @@ refugio/
 │   │   ├── palette.json/.ts  # paleta de 32 cores (fonte de verdade)
 │   │   ├── characterSheet.ts # layout das spritesheets de personagem + desenho do placeholder
 │   │   └── placeholders.ts   # texturas placeholder geradas por código
-│   ├── audio/                # sfx.ts: efeitos sonoros sintetizados (Web Audio), ligados aos eventos
-│   ├── display/              # escala inteira + vista (view.ts) + zoom do jogador (worldZoom.ts)
+│   ├── audio/                # sfx.ts: efeitos sintetizados (Web Audio); music.ts: temas por contexto; ambience.ts: vento, pássaros, grilos, água; soundtrack.ts: escolha do tema/ambiente e frases com seed (puro); soundtrackDirector.ts: lê o jogo 2×/s
+│   ├── display/              # escala inteira + vista (view.ts) + zoom do jogador (worldZoom.ts) + ecrã de carregamento do index.html (loader.ts) + culling.ts (o que se desenha)
+│   ├── pwa/                  # serviceWorker.ts: registo do service worker (só em produção) e aviso de versão nova
+│   ├── serviceWorker/        # sw.js: modelo do service worker (o vite.config.ts gera dist/sw.js com a lista de ficheiros e a cache da build)
 │   ├── world/                # mapas: tileset.ts, zoneMap.ts (validação Tiled, puro), content.ts, zoneContext.ts, wilds.ts (mundo selvagem: plano + gerador, puro), wildContent.ts (aldeias, missões e textos gerados)
 │   ├── debug/                # overlay F3 (DOM)
 │   ├── scenes/
@@ -179,7 +190,7 @@ refugio/
 │   │   ├── progression/      # curva de XP, subir de nível
 │   │   └── travel/           # ponto de chegada a uma zona, custo da viagem
 │   ├── entities/             # Player, Zombie, ResourceNode, Container, Structure
-│   ├── ui/                   # Label, Button, SlotView, InventoryUI, CraftingUI, SkillsUI, BuildUI (+ buildMode), FishingUI, LevelUpUI, gameSpeed, uiState, fileTransfer, fatalError
+│   ├── ui/                   # Label, Button, SlotView, AboutUI, InventoryUI, CraftingUI, SkillsUI, BuildUI (+ buildMode), FishingUI, LevelUpUI, gameSpeed, uiState, fileTransfer, fatalError
 │   ├── input/                # joystick.ts (matemática pura), moveInput.ts (teclado + joystick)
 │   ├── net/                  # co-op (Fase 15): protocol.ts (código, mensagens, comandos; puro), coop.ts (PeerJS, sessões, sincronização)
 │   ├── save/
@@ -270,6 +281,7 @@ npm run palette    # regenera public/assets/palette.png
 npm run tiles      # regenera public/assets/tiles/base_tiles.png (ordem = src/world/tileset.ts)
 npm run sprites    # regenera public/assets/sprites/*.png (pixel art de recursos e obstáculos; `-- --preview f.png`)
 npm run characters # regenera public/assets/sprites/player.png e player_girl.png (spritesheets das personagens; `-- --preview f.png`)
+npm run icons      # regenera public/icons/ (favicons, apple-touch-icon, 192/512 + maskable, og-image 1200×630; `-- --preview f.png`)
 npm run map:base   # gera maps/base.json (recusa substituir sem `-- --force`: o mapa edita-se no Tiled)
 npm run map:pine   # gera maps/pine_forest.json (idem)
 npm run map:farm   # gera maps/farm.json (idem; usa scripts/mapgen.ts)
@@ -302,6 +314,7 @@ Debug: **F3** mostra/esconde o overlay (FPS, tick, posição, cenas, escala); `?
 - `setTintFill` é um no-op (usar `setTint(c).setTintMode(Phaser.TintModes.FILL)`); `Geom.Point` e `Struct.Set` já não existem.
 - O Phaser não pode ser importado em Node (usa `window`): `core/` e `systems/` não o importam (o ESLint impõe esta regra).
 - `load.image` com uma chave que já existe é ignorado em silêncio: fazer `textures.remove(key)` antes, para trocar arte em runtime.
+- O loader limita-se a 6 pedidos de cada vez no Android (`loader.maxParallelDownloads`): pomos 32, e `imageLoadType: 'HTMLImageElement'` (sem XHR + Blob por imagem). O Phaser não faz culling de imagens: o que está fora da vista desenha-se na mesma (usar `cameraFilter`).
 - Os eventos do Phaser são tipados como `Function`: anotar sempre os parâmetros dos listeners.
 
 ---
@@ -351,6 +364,7 @@ Usar uma paleta limitada (32 cores, quente, estilo Stardew). Guardar em `assets/
 - HUD: por baixo das barras, "a sangrar", principiante e a missão empilham-se conforme os que se veem; ao alto, a dica do tutorial vai logo a seguir. Com um painel aberto (loja, mochila, conversa…) os botões Auto/Ação/Correr escondem-se; os avisos têm fundo escuro.
 - Ao subir de nível aparece "Subiste de nível!" numa faixa compacta no topo, com até 5 desbloqueios ("e mais N"); fecha com um toque ou ao fim de 6 s (não pausa o jogo).
 - **Uma camada de cada vez** (auditoria de UI/UX, v0.0.57): com um painel aberto, os botões do canto (Mapa, Casa, x1), o Construir, o Auto/Correr/Ação, a dica e o bloco do canto escondem-se; o "II" só aparece sem painéis (ou para fechar a pausa). O bloco do canto (barras, nível, avisos, missão) e a dica do tutorial têm fundo escuro; a dica cede o lugar a um aviso. "Principiante" só se lembra no dia 1. A conversa com os NPCs fica em baixo (por cima da hotbar) e fecha ao aceitar a missão. Textos de ajuda com variante de PC ("clica", Esc; `tInput` em `src/ui/touch.ts`). O HUD mostra o nível e uma barra de XP.
+- Sem missão ativa, o registo da missão mostra o próximo passo: "Próximo: fala com X (!)" (o NPC com missão mais perto, o mesmo da seta do minimapa) ou "Próxima missão no nível N" (`Quests.nextLevel`). Com um painel aberto (fabrico, mochila…), os avisos aparecem entre o painel e a hotbar.
 - Movimento 8 direções. Velocidade base 80 px/s; mais lento com inventário > 90% cheio (opcional).
 
 ### 7.2 Controlos
@@ -428,7 +442,7 @@ Os nós de recurso reaparecem (ver zonas).
 - Peças (`structures.json`): fundação (madeira, pedra; metal mais tarde), parede (madeira, pedra), porta, janela, vedação, fogueira, bancada, baú. Duas camadas por tile: `floor` (fundação) e `top` (o resto).
 - Paredes, janelas, vedações e portas fechadas bloqueiam o tile inteiro; estações e baús bloqueiam com o `footprint`. Peças sólidas não se põem em cima do jogador, no ponto onde ele aparece nem nas saídas.
 - Colocação: pré-visualização verde/vermelha (com o motivo), rodar (portas, janelas, vedações: horizontal/vertical), desfazer nos últimos 10 s (de jogo) com reembolso total. A peça vai para o tile à frente do jogador, ou para o tile do rato/toque. Uma **porta ou janela por cima de uma parede troca-a** (a parede volta toda). Portas de madeira (4 madeira + 2 fibra, nível 2) e de pedra (nível 8).
-- Paleta: separadores por tipo (`category` em `structures.json`: chão, paredes, fabrico, quinta, defesa, outros) e uma linha de peças com setas (ou roda do rato) quando não cabem.
+- Paleta: separadores por tipo (`category` em `structures.json`: chão, paredes, fabrico, quinta, defesa, outros) e uma linha de peças com setas (ou roda do rato) quando não cabem; mudar de separador escolhe a primeira peça já desbloqueada.
 - Arte: paredes, portas e janelas são blocos **16×32** (topo de 16 px = a espessura vista de cima, e face da frente de 16 px com toros/tijolos a 3 tons e sombra por baixo do beiral), desenhados por `npm run sprites`.
 - Demolir devolve 50% dos materiais (arredondado para baixo); só demole se o reembolso couber na mochila. Não se demole uma fundação com estação/baú por cima, uma estação com trabalhos/itens nem um baú com itens.
 - Vedações (`connects`) ligam-se às vizinhas nos 4 lados (verticais, cantos, T, cruz): 16 variantes desenhadas em runtime (`src/display/fences.ts`, máscara em `src/world/fences.ts`), também para os tiles `fence` dos mapas (o tile fica escondido; a colisão continua a ser a dele).
@@ -460,7 +474,7 @@ Os nós de recurso reaparecem (ver zonas).
 - **Populações por zona** (`Combat.populations`, blocos de uids de 100000 por zona): as zonas vizinhas desenhadas (mundo contínuo) já têm os seus inimigos, animais e NPCs a passear antes de se lá chegar, e ao passar a borda continuam os mesmos (nada aparece/desaparece). Quem morre volta ao ponto de onde nasceu ao fim de `enemyRespawnSec` (90 s de jogo), só com o jogador a mais de `enemyRespawnMinPx` (dá para "farmar"); chefes e hordas não. Viajar, recarregar ou morrer recomeça as populações.
 - **Um só mapa para o combate** (mundo contínuo): um inimigo de uma zona vizinha que entra na zona do jogador passa a ser desta (vê-o, ataca-o e pode ser atacado — `Combat.adoptWanderers`); ao passar a borda, os que o perseguem (ou estão a menos de `FOLLOW_CROSS_PX`) passam com ele. Quando morrem, voltam a nascer na zona de onde vieram.
 - **Monstros mais fortes** (tingidos, `tint` em `enemies.json`): arrastado alfa, lobo terrível, devastador, urso-pardo, titã (900 de vida, blindado 50%) e abominação (1800, blindado 60%) — aparecem às vezes nos grupos das zonas T2–T4.
-- **Minimapa** (estilo GTA, `src/ui/Minimap.ts`; canto superior direito, por baixo de Mapa/Casa; tocar abre o mapa): o terreno à volta (1 píxel por tile, só dos mapas já carregados), o jogador ao meio e marcas — destino da missão ativa (dourado), inimigos a derrotar (vermelho), NPCs com missão para dar ("!", trigo) ou entregar (verde). O que está fora do quadrado aparece como uma seta a piscar na borda: o destino da missão ativa ou, **sem missão ativa, o NPC com missão mais perto** (`world/questGuide.ts`). Os inimigos a derrotar têm também uma marca dourada por cima no mundo. (Substituiu a seta à volta do boneco.) A dica do tutorial fica por cima da hotbar.
+- **Minimapa** (estilo GTA, `src/ui/Minimap.ts`; canto superior direito, por baixo de Mapa/Casa; tocar abre o mapa): o terreno à volta (1 píxel por tile, só dos mapas já carregados), o jogador ao meio e marcas — destino da missão ativa (dourado), inimigos a derrotar (vermelho), NPCs com missão para dar ("!", trigo) ou entregar (verde). O que está fora do quadrado aparece como uma seta a piscar na borda: o destino da missão ativa ou, **sem missão ativa, o NPC com missão mais perto** (`world/questGuide.ts`). Os inimigos a derrotar têm também uma marca dourada por cima no mundo. (Substituiu a seta à volta do boneco.) A dica do tutorial fica por cima da hotbar. A mochila da morte tem uma marca laranja e a seta aponta para ela antes de tudo.
 - **Animações das armas** (`display/weaponPose.ts` puro + `display/weaponFx.ts`): golpe em arco com o ícone da arma/ferramenta e um rasto; soco com o punho, alternando as mãos; arco/besta apontados ao alvo (`player:action.aim`), com a corda puxada e a flecha, e clarão na pistola.
 
 ### 7.9 Inimigos
@@ -572,6 +586,7 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 ### 8.1 Mapa-mundo
 
 - Ecrã próprio (`WorldMapScene`) com a base ao centro e zonas à volta. Abre-se ao pisar uma saída `exit` (sem destino); o tempo de jogo fica parado enquanto está aberto; "Voltar" regressa pela mesma saída.
+- Ao continuar um jogo gravado com o mapa-mundo aberto, aparece-se em cima da saída: as saídas só contam depois de se sair de cima delas (`Simulation.exitArmed`).
 - Viajar custa comida e água (`zones.json` → `travelCost`, valores baixos; o Pinhal é gratuito). Não se viaja se isso deixasse a fome ou a sede a 0 — mas as viagens grátis (ir para casa) fazem-se sempre.
 - Zonas bloqueadas (nível abaixo de `unlockLevel`) aparecem a cinzento com o nível pedido e não se pode viajar para lá (a zona onde se está fica sempre acessível).
 - Ícones de estado: zona segura/perigosa, recursos disponíveis, mochila caída, evento ativo.
@@ -589,6 +604,7 @@ IA: estados `idle → wander → chase → attack → return`. Perdem o interess
 - **Câmara sempre centrada no boneco** (sem limites; pedido do jogador): o que fica fora das zonas são montanhas. Só as zonas fora do mundo contínuo mais pequenas do que a vista ficam centradas.
 - **Nunca preto**: fora das zonas vê-se um campo de penhascos/montanhas (`src/display/cliffs.ts`, textura repetida presa ao mundo).
 - **Carregamento parcial**: só se desenham (chão, obstáculos, recursos, e na base as peças construídas) as zonas a `NEIGHBOR_MARGIN_TILES` (40) da atual; a lógica (recolha, colisões…) é só a da zona onde se está; os inimigos das vizinhas desenhadas também passeiam (§7.8, populações). Os limites da câmara são a união das zonas desenhadas.
+- Ao entrar numa zona com o jogador fora do mapa dela (save de um mapa que mudou de tamanho) ou numa zona que já não existe, o jogador passa para o ponto de chegada (a base, no segundo caso), para nunca ficar preso.
 - **Desenho do mundo**: a Casa a sudoeste; a leste dela sobe para norte uma estrada de **Caminhos** (`zone_route_1…10`, 20 tiles de largura, `hidden` no mapa-mundo, `npm run map:routes`), e cada zona encosta-se a leste do seu Caminho, **por ordem de dificuldade**: Pinhal, Quinta, Lago, Estrada, Aldeia, Floresta Profunda, Industrial, Hospital, Base Militar, Cidade. Cada Caminho tem barreiras de lado a lado com uma só passagem, alternada à esquerda e à direita (obriga a andar em ziguezague), inimigos do nível da zona ao lado, relva alta, árvores e pedras.
 - **Zonas maiores**: cada zona foi alargada 48 tiles para leste (`npm run map:extend`): a antiga borda leste é um muro com 3 portões e a área nova tem mais recursos, contentores e inimigos; o poste (com o técnico) fica ao fundo — é preciso atravessar a zona a pé antes de o poder usar.
 - **Dificuldade por ordem**: cada Caminho pede o nível da zona ao lado (`unlockLevel`); sem ele, a borda trava ("precisas de nível N para passar"). Zonas com `requiresItem` também travam na borda.
@@ -972,12 +988,12 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 **Objetivo:** ser agradável em telemóvel.
 
 - [ ] Revisão completa dos controlos touch (tamanho de botões, zonas mortas do joystick). *(Precisa de testes em telemóveis reais; o tamanho da interface já é ajustável nas definições.)*
-- [x] Tutorial curto e contextual (andar, primeira árvore, primeiro craft, primeira peça, comer, primeira zona): dica no topo com texto de teclado ou de toque e × para desligar (`core/Tutorial.ts`, save v13 `tutorial`). A dica de construir só aparece em casa.
+- [x] Tutorial curto e contextual (andar, primeira árvore, primeiro craft, primeira peça, comer, falar com o Sr. Tomé e a primeira zona): dica por cima da hotbar com texto de teclado ou de toque e × para desligar (`core/Tutorial.ts`, save v13 `tutorial`). As dicas do machado e da fogueira dizem primeiro o que falta juntar ("Madeira 2/3…"); a de construir só aparece em casa e o modo construção abre já com a fogueira escolhida. Com missões (aceites ou feitas), são elas que guiam: sem as dicas de falar e de viajar. Viajar conta também a pé (`zone:cross`), sem os Caminhos.
 - [x] Definições (menu de pausa): idioma, volume (barra deslizante), vibração, hordas, mostrar números de dano. *(O tamanho da interface saiu: o zoom com Ctrl + roda / pinça já serve para isso.)* Preferências do dispositivo no localStorage (`refugio.prefs`, `src/ui/preferences.ts`); as hordas no save.
 - [x] Raridade nos slots (contorno verde/azul/rosa) e modo daltónico (1–3 marcas no canto, além da cor).
 - [x] Menu de pausa (Esc / botão "II"; o tempo de jogo pára), estatísticas do jogador (save v12 `stats`), "Gravar e sair".
 - [ ] Testes em 3+ telemóveis Android de gamas diferentes.
-- [ ] Otimização: object pooling de inimigos/partículas, culling, atlas de texturas. *(Por fazer depois de medir num Android de gama média.)*
+- [ ] Otimização: culling das zonas e imagens fora da vista e menos passagens pelo ecrã (feito); Phaser num chunk à parte (fica em cache entre versões) e PeerJS sob demanda (feito); object pooling e atlas de texturas por fazer. *(Medido com Playwright + CPU 4× (GPU emulada): na base, de ~215 para ~125 ms/frame da GPU e de 1600 para ~120 objetos desenhados; arranque com latência de Android de 13,9 para 7,9 s. Falta medir num Android de gama média.)*
 
 **Aceitação:** 60 FPS num Android de gama média; tutorial concluído por quem nunca jogou sem ajuda.
 
@@ -1004,7 +1020,7 @@ Cada fase termina com uma **build jogável** e critérios de aceitação verific
 - [ ] Personagem com mais frames e peças de equipamento visíveis (camadas de sprite). *(Feito: as personagens em pixel art — rapaz e rapariga, `npm run characters` → `sprites/player.png` e `player_girl.png`, 10×4 frames; escolhe-se no menu inicial, "Personagem"; falta o equipamento visível.)*
 - [ ] Inimigos, recursos, estruturas, ícones finais.
 - [ ] UI final (moldura de madeira/tecido, fonte pixel legível com acentos portugueses).
-- [ ] Música por zona (loops curtos) e efeitos sonoros; tudo com licença registada. *(Efeitos sintetizados em `src/audio/sfx.ts` — golpes, recolha, dano, fabrico, construção, pesca, nível, alarme da horda, cliques. Música de fundo sintetizada em `src/audio/music.ts` (loop calmo em lá menor). Volumes separados nas definições, com barras deslizantes; falta música por zona.)*
+- [x] Música por zona e efeitos sonoros. *(Efeitos sintetizados em `src/audio/sfx.ts`. **Música por contexto** (`src/audio/music.ts`, composta por código em `soundtrack.ts`): menu, casa, natureza de dia, noite, zonas perigosas T3–T4, subúrbios e cavernas/masmorras; secções de 4 compassos geradas com seed (progressões, melodia A A' A B, arpejo, pad, baixo), cruzamento de 2 s ao mudar de contexto (atravessar bordas não recomeça a música se o contexto for o mesmo) e uma camada de **tensão** com inimigos a perseguir (ou horda). **Ambiente** (`ambience.ts`): vento, pássaros de dia, grilos à noite, água perto de tiles `water`/`waterfall`, pingos nas cavernas. Volumes separados (efeitos, música, ambiente — `ambientVolume`); a pausa baixa a música e o ambiente (não no co-op); com a página escondida o áudio fica suspenso. Em dev, `window.__soundtrack` mostra o contexto.)*
 - [ ] Partículas: folhas, pó, chuva; clima simples.
 
 **Aceitação:** nenhum placeholder no jogo; todos os assets com licença documentada em `LICENSES.md`.
@@ -1098,6 +1114,7 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. **Dificuldade** (def
 ## 13. Qualidade e testes
 
 - Testes unitários obrigatórios: inventário, crafting, loot (com seed), save/migrações, cálculo de XP, custo de viagem.
+- Testes de resistência da lógica em `tests/core/Stress.test.ts` (bot em zonas selvagens, subúrbios, aldeias e zonas à mão, hordas, ações ao acaso, saves antigos); `tests/helpers/gameContent.ts` enche o `content` global como o PreloadScene.
 - `validate-data`: verifica que todos os IDs referenciados em receitas, loot e zonas existem.
 - Checklist manual por fase (ver critérios de aceitação).
 - Modo debug (só em dev): dar itens, teleportar para zona, avançar tempo, invencibilidade, mostrar colisões.
@@ -1246,4 +1263,9 @@ Regra: qualquer ajuste de dificuldade faz-se aqui primeiro. **Dificuldade** (def
 | 2026-10-03 | v0.0.57: auditoria de UI/UX por uma equipa de agentes (desktop, telemóvel e tablet, ao alto e ao baixo) e correções: HUD acessório escondido com painéis, fundos no canto e na dica, conversa em baixo, nível em faixa, loja com "Tens N moedas", fila do fabrico só com o que tem, "Tu" no mapa, botão de ação sem tapar o Correr, toque rápido na Ação, tablets com mais mundo, interface mínima legível com toque | Pedido do jogador: "muitos bugs de visualização… muito cheio… pouca perceção do que é para fazer com tanta opção e escrita na tela" |
 | 2026-10-03 | v0.0.59: subúrbios (bioma `urban` no mundo selvagem) com o **RPG Urban Pack da Kenney (CC0)** como segundo tileset | Pedido do jogador (packs Kenney gratuitos). Só este encaixa: é pixel art de 16 px. O Map Pack e o UI Pack RPG Expansion são vetoriais/suaves (não pixel) e as personagens roguelike têm 16×16 (as nossas são 16×32), por isso ficaram de fora |
 | 2026-10-03 | v0.0.58: minimapa no HUD (estilo GTA) com seta para a missão ou para o NPC com missão mais perto; co-op como jogo próprio ligado a dois aparelhos, com espera, convites e fim para os dois (save v25 `coop`) | Pedidos do jogador: "sem missão ativa não tenho seta… quero um minimapa como no GTA"; "o co-op tem de começar sempre novo… fica bloqueado entre esses 2 dispositivos… se 1 jogador sair, grava e desliga-se para os 2" |
+| 2026-10-07 | v0.0.60 (preparar a publicação, 5 agentes em paralelo): primeira sessão (dica "falar com o Sr. Tomé", dicas com o que falta juntar, objetivo sempre à vista, mochila da morte no minimapa) | Depois do tutorial o jogador novo ficava sem saber o que fazer (o primeiro NPC está fora de casa) e a última dica ("mapa-mundo") nunca saía no mundo contínuo |
+| 2026-10-07 | Jogador fora do mapa ou numa zona inexistente vai para o ponto de chegada; saídas só contam depois de sair de cima delas; testes de resistência | QA antes de publicar: ficava preso para sempre, e recarregar com o mapa-mundo aberto reabria-o ao primeiro passo |
+| 2026-10-07 | Música por contexto composta por código com seed, cruzamento de 2 s, camada de tensão e sons de ambiente com volume próprio | Fase 12: "falta música por zona". Sintetizado no browser: sem ficheiros, sem licenças e sem aumentar o download |
+| 2026-10-07 | Culling com `cameraFilter`, sem fundo na câmara do mundo, montanhas só fora do chão; Phaser num chunk à parte e PeerJS importado sob demanda; loader com 32 pedidos e imagens por `<img>` | Desempenho para publicar: o Phaser desenhava ~1600 objetos por frame para ~120 visíveis, e no Android carregava os ~200 ficheiros 6 de cada vez |
+| 2026-10-07 | Publicação web: manifest (standalone), ícone em pixel art por código, service worker próprio com cache por build, ecrã de carregamento em DOM e "Sobre / Créditos / Privacidade" | Instalável, offline, partilhável, com créditos e privacidade verdadeiros; sem dependências novas (sem Workbox) |
 | 2026-09-24 | Jogador e inimigos posicionados em múltiplos de 1/zoom (píxel do ecrã), não de jogo | Pedido do jogador ("flicker" ao andar): a 80 px/s e 60 fps, passos inteiros de jogo (3–4 px no ecrã) davam soluços 1,1,2; o Phaser 4 não arredonda a câmara, por isso o mundo segue a mesma grelha |

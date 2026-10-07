@@ -15,8 +15,11 @@ import { UIScene } from './scenes/UIScene';
 import { installSaveOnHide } from './save';
 import { preferences } from './ui/preferences';
 import { installSfx } from './audio/sfx';
+import { installSoundtrack } from './audio/soundtrackDirector';
 import { installRuntimeErrors } from './ui/runtimeErrors';
 import { loadPixelFont } from './display/fonts';
+import { webGlMissing } from './display/loader';
+import { installServiceWorker } from './pwa/serviceWorker';
 
 installRuntimeErrors();
 
@@ -33,8 +36,9 @@ const host: HTMLElement = gameHost;
 // O jogo já nasce com a resolução certa para este ecrã (depois, installPixelScaling acompanha).
 const initial = measurePixelScale(host);
 
-// A fonte pixel tem de estar pronta antes do primeiro texto (medidas em cache).
-void loadPixelFont().then(start);
+// A fonte pixel tem de estar pronta antes do primeiro texto (medidas em cache). Sem WebGL o jogo
+// não arranca: a mensagem já está no ecrã de carregamento (index.html).
+if (!webGlMissing()) void loadPixelFont().then(start);
 
 function start(): void {
   const game = new Phaser.Game({
@@ -55,6 +59,13 @@ function start(): void {
       autoCenter: Phaser.Scale.NO_CENTER,
     },
     disableContextMenu: true,
+    loader: {
+      // O Phaser limita-se a 6 pedidos de cada vez no Android (por causa de browsers antigos):
+      // são ~200 ficheiros pequenos, por isso o arranque esperava por dezenas de idas e voltas.
+      maxParallelDownloads: 32,
+      // As imagens vão direto para um <img> (sem XHR + Blob + createObjectURL por ficheiro).
+      imageLoadType: 'HTMLImageElement',
+    },
     // Os sons são sintetizados à parte (src/audio/sfx.ts): o Phaser não precisa de áudio.
     audio: { noAudio: true },
     scene: [BootScene, PreloadScene, MainMenuScene, ZoneScene, WorldMapScene, UIScene],
@@ -64,9 +75,11 @@ function start(): void {
   if (import.meta.env.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game;
   installContextLossRecovery(game);
   installCoopInvites(game);
+  installSoundtrack(game);
   const scaling = installPixelScaling(game, host);
   installDebugOverlay(game, scaling, params.has(DEBUG_QUERY_PARAM));
 }
 
 installSaveOnHide();
 installSfx();
+installServiceWorker();

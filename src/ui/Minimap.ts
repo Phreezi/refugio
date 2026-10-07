@@ -31,7 +31,7 @@ type Cell = keyof typeof COLORS;
 interface Marker {
   x: number;
   y: number;
-  kind: 'goal' | 'offer' | 'ready' | 'enemy';
+  kind: 'goal' | 'offer' | 'ready' | 'enemy' | 'bag';
 }
 
 export class Minimap {
@@ -43,6 +43,8 @@ export class Minimap {
   private lastTerrain = 0;
   private terrainKey = '';
   private lastTargets = 0;
+  /** NPC com missão (para dar ou entregar) mais perto: o HUD diz "fala com…" sem missão ativa. */
+  nearestNpc: { npc: string; ready: boolean } | null = null;
   private markers: Marker[] = [];
   /** Para onde aponta a seta da borda (px do mundo), se o destino estiver fora do quadrado. */
   private pointer: { x: number; y: number; kind: Marker['kind'] } | null = null;
@@ -167,7 +169,7 @@ export class Minimap {
     }
     // NPCs com missões (para dar ou para entregar): marcas e, sem missão ativa, a seta para o
     // mais perto.
-    let nearest: { x: number; y: number; d: number; kind: Marker['kind'] } | null = null;
+    let nearest: { x: number; y: number; d: number; kind: Marker['kind']; npc: string } | null = null;
     for (const npc of Object.keys(content.npcs)) {
       const ready = quests.handIns(npc).some((q) => quests.ready(q.id));
       const offers = !ready && quests.offers(npc).length > 0;
@@ -177,9 +179,25 @@ export class Minimap {
       const kind = ready ? 'ready' : 'offer';
       markers.push({ ...point, kind });
       const d = Math.hypot(point.x - here.x, point.y - here.y);
-      if (!nearest || d < nearest.d) nearest = { ...point, d, kind };
+      if (!nearest || d < nearest.d) nearest = { ...point, d, kind, npc };
     }
+    this.nearestNpc = nearest ? { npc: nearest.npc, ready: nearest.kind === 'ready' } : null;
     if (!pointer && nearest) pointer = { x: nearest.x, y: nearest.y, kind: nearest.kind };
+    // A mochila da morte (no mundo contínuo): marca e, enquanto lá estiver, a seta vai para ela
+    // primeiro (é o que se quer depois de morrer; "nada se perde").
+    let bag: { x: number; y: number; d: number } | null = null;
+    for (const [zoneId, zone] of Object.entries(gameState.data.zones)) {
+      const rect = content.world.rect(zoneId);
+      if (!rect) continue;
+      for (const b of zone.bags) {
+        if (!b.death) continue;
+        const point = { x: rect.x * TILE_PX + b.x, y: rect.y * TILE_PX + b.y };
+        markers.push({ ...point, kind: 'bag' });
+        const d = Math.hypot(point.x - here.x, point.y - here.y);
+        if (!bag || d < bag.d) bag = { ...point, d };
+      }
+    }
+    if (bag) pointer = { x: bag.x, y: bag.y, kind: 'bag' };
     this.markers = markers;
     this.pointer = pointer;
   }
@@ -195,7 +213,15 @@ export class Minimap {
       return { x: ox + mx, y: oy + my, inside: Math.abs(mx) < half - 2 && Math.abs(my) < half - 2 };
     };
     const color = (kind: Marker['kind']): PaletteColor =>
-      kind === 'goal' ? 'gold' : kind === 'enemy' ? 'red' : kind === 'ready' ? 'lime' : 'wheat';
+      kind === 'goal'
+        ? 'gold'
+        : kind === 'enemy'
+          ? 'red'
+          : kind === 'ready'
+            ? 'lime'
+            : kind === 'bag'
+              ? 'orange'
+              : 'wheat';
     for (const marker of this.markers) {
       const p = toMap(marker);
       if (!p.inside) continue;

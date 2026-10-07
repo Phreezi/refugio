@@ -7,9 +7,10 @@
 // palavra) e recebe o estado. Ligação WebRTC com o PeerJS: o servidor de sinalização recusa ids
 // repetidos, por isso o código de 5 caracteres (o id) é único entre as sessões ativas.
 
-import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
+import type Peer from 'peerjs';
+import type { DataConnection, PeerOptions } from 'peerjs';
 import { deviceId } from './device';
-import { peerOptions } from './peer';
+import { loadPeer, peerOptions } from './peer';
 import { EventBus, eventBus, type GameEvents } from '../core/EventBus';
 import {
   BASE_ZONE_ID,
@@ -191,10 +192,12 @@ class Coop {
     throw new Error('taken');
   }
 
-  private openPeer(id?: string): Promise<Peer> {
+  private async openPeer(id?: string): Promise<Peer> {
+    // O PeerJS carrega-se só agora (ficheiro à parte, ver net/peer.ts).
+    const PeerClass = await loadPeer();
     return new Promise((resolve, reject) => {
       const options = peerOptions() as PeerOptions;
-      const peer = id ? new Peer(id, options) : new Peer(options);
+      const peer = id ? new PeerClass(id, options) : new PeerClass(options);
       peer.once('open', () => {
         resolve(peer);
       });

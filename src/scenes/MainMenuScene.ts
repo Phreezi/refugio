@@ -26,7 +26,9 @@ import { presence } from '../net/presence';
 import { autosave, loadSlotSummaries, saves, selectSlot } from '../save';
 import type { LoadedSave, LoadResult } from '../save/SaveManager';
 import { SaveError } from '../save/schema';
+import { AboutUI } from '../ui/AboutUI';
 import { Button } from '../ui/Button';
+import { applyUpdate, onUpdateReady, updateReady } from '../pwa/serviceWorker';
 import { downloadText, pickTextFile, saveFileName } from '../ui/fileTransfer';
 import { Label } from '../ui/text';
 import { createTextInput, type TextInput } from '../ui/textInput';
@@ -53,6 +55,8 @@ const WIDE_MENU = 420;
 /** Abaixo desta altura, o menu aperta-se (título mais pequeno, botões mais acima). */
 const SHORT_MENU = 250;
 const SLOT_BUTTON_WIDTH = 132;
+const ABOUT_BUTTON = { width: 44, height: 12, fontSize: 7, style: 'secondary' } as const;
+const UPDATE_BUTTON = { width: 136, height: 14, fontSize: 8, style: 'primary' } as const;
 const OVERLAY_DEPTH = 100;
 /** Tempo para confirmar uma ação destrutiva (segundo toque no mesmo botão). */
 const CONFIRM_MS = 3000;
@@ -82,6 +86,8 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   create(data: MainMenuData): void {
+    // Marca de desempenho (medir o arranque: performance.getEntriesByName).
+    performance.mark('refugio:menu');
     this.busy = false;
     this.overlayOpen = false;
     this.resizePending = false;
@@ -121,6 +127,30 @@ export class MainMenuScene extends Phaser.Scene {
       { size: 7, color: 'stone' },
       [1, 1],
     );
+    // "Sobre" (créditos, licenças, privacidade): discreto, no canto oposto ao da versão.
+    new Button(
+      this,
+      4 + ABOUT_BUTTON.width / 2 + 1,
+      height - 4 - ABOUT_BUTTON.height / 2 - 1,
+      t('menu.about'),
+      ABOUT_BUTTON,
+      () => {
+        this.openAbout();
+      },
+    );
+    // Versão nova do jogo já descarregada (service worker): recarregar ativa-a.
+    let updateButton: Button | null = null;
+    const showUpdate = (): void => {
+      if (updateButton) return;
+      const w = UPDATE_BUTTON.width;
+      updateButton = new Button(this, short ? 4 + w / 2 + 1 : cx, 11, t('menu.update'), UPDATE_BUTTON, () => {
+        if (this.busy) return;
+        this.busy = true;
+        applyUpdate();
+      });
+    };
+    if (updateReady()) showUpdate();
+    const offUpdate = onUpdateReady(showUpdate);
     const loading = new Label(
       this,
       cx,
@@ -167,6 +197,7 @@ export class MainMenuScene extends Phaser.Scene {
       for (const input of this.inputs) input.destroy();
       this.inputs = [];
       this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
+      offUpdate();
     });
 
     // Eventos nomeados (sem addKey) não capturam as teclas globalmente.
@@ -373,6 +404,22 @@ export class MainMenuScene extends Phaser.Scene {
         }
       },
     };
+  }
+
+  /** "Sobre / Créditos" por cima do menu (fechar devolve o menu como estava). */
+  private openAbout(): void {
+    if (this.busy || this.overlayOpen) return;
+    this.overlayOpen = true;
+    const previous = this.primaryAction;
+    this.primaryAction = null;
+    new AboutUI(this, OVERLAY_DEPTH, () => {
+      this.overlayOpen = false;
+      this.primaryAction = previous;
+      if (this.resizePending) {
+        this.resizePending = false;
+        this.scene.restart({});
+      }
+    });
   }
 
   /** Novo jogo: nome da personagem e rapaz/rapariga (o nome aparece no co-op e na lista). */
