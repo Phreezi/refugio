@@ -231,6 +231,8 @@ export class ZoneScene extends Phaser.Scene {
   }
 
   create(data: ZoneSceneData): void {
+    // Marca de desempenho (medir o arranque: performance.getEntriesByName).
+    performance.mark('refugio:zone');
     const zoneId = data.zoneId ?? gameState.data.player.zoneId;
     this.zoneId = content.zones[zoneId] ? zoneId : BASE_ZONE_ID;
     this.leaving = false;

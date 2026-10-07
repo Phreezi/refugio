@@ -82,6 +82,8 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   create(data: MainMenuData): void {
+    // Marca de desempenho (medir o arranque: performance.getEntriesByName).
+    performance.mark('refugio:menu');
     this.busy = false;
     this.overlayOpen = false;
     this.resizePending = false;
