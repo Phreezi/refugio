@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { paletteNumber } from '../assets/palette';
 import type { Simulation } from '../core/Simulation';
+import { TUTORIAL_STRUCTURE } from '../core/Tutorial';
 import { STRUCTURE_CATEGORIES, structureSprite, type StructureCategory } from '../data/types';
 import { itemName, t, tKey, type MessageKey } from '../i18n';
 import type { BuildProblem } from '../systems/building/building';
@@ -68,6 +69,12 @@ export class BuildUI {
     buildMode.active = true;
     buildMode.demolish = false;
     pickTile(null, 'mouse');
+    // A dica do tutorial pede a fogueira: já vem escolhida.
+    if (this.simulation.tutorial.current() === 'build' && content.structures[TUTORIAL_STRUCTURE]) {
+      buildMode.selected = TUTORIAL_STRUCTURE;
+      buildMode.category = content.structures[TUTORIAL_STRUCTURE].category;
+      buildMode.scroll = 0;
+    }
     this.build();
     this.onToggle(true);
   }
@@ -399,9 +406,11 @@ export class BuildUI {
       buildMode.category = category;
       buildMode.scroll = 0;
       if (content.structures[buildMode.selected]?.category !== category) {
-        const first = Object.keys(content.structures).find(
+        // A primeira que já se sabe construir (senão a primeira do tipo, bloqueada).
+        const ids = Object.keys(content.structures).filter(
           (id) => content.structures[id]?.category === category,
         );
+        const first = ids.find((id) => this.simulation.progression.isStructureUnlocked(id)) ?? ids[0];
         if (first) this.select(first);
       }
       if (this.isOpen) this.build();

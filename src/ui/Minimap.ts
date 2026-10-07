@@ -43,6 +43,8 @@ export class Minimap {
   private lastTerrain = 0;
   private terrainKey = '';
   private lastTargets = 0;
+  /** NPC com missão (para dar ou entregar) mais perto: o HUD diz "fala com…" sem missão ativa. */
+  nearestNpc: { npc: string; ready: boolean } | null = null;
   private markers: Marker[] = [];
   /** Para onde aponta a seta da borda (px do mundo), se o destino estiver fora do quadrado. */
   private pointer: { x: number; y: number; kind: Marker['kind'] } | null = null;
@@ -167,7 +169,7 @@ export class Minimap {
     }
     // NPCs com missões (para dar ou para entregar): marcas e, sem missão ativa, a seta para o
     // mais perto.
-    let nearest: { x: number; y: number; d: number; kind: Marker['kind'] } | null = null;
+    let nearest: { x: number; y: number; d: number; kind: Marker['kind']; npc: string } | null = null;
     for (const npc of Object.keys(content.npcs)) {
       const ready = quests.handIns(npc).some((q) => quests.ready(q.id));
       const offers = !ready && quests.offers(npc).length > 0;
@@ -177,8 +179,9 @@ export class Minimap {
       const kind = ready ? 'ready' : 'offer';
       markers.push({ ...point, kind });
       const d = Math.hypot(point.x - here.x, point.y - here.y);
-      if (!nearest || d < nearest.d) nearest = { ...point, d, kind };
+      if (!nearest || d < nearest.d) nearest = { ...point, d, kind, npc };
     }
+    this.nearestNpc = nearest ? { npc: nearest.npc, ready: nearest.kind === 'ready' } : null;
     if (!pointer && nearest) pointer = { x: nearest.x, y: nearest.y, kind: nearest.kind };
     this.markers = markers;
     this.pointer = pointer;

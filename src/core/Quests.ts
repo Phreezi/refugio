@@ -103,6 +103,20 @@ export class Quests {
     return this.content().quests.filter((q) => q.giver === npcId && questAvailable(q, this.quests, level));
   }
 
+  /**
+   * Nível em que aparece a próxima missão bloqueada só pelo nível (a anterior já feita).
+   * @returns null se não houver nenhuma à espera de nível.
+   */
+  nextLevel(): number | null {
+    const level = this.state.data.player.level;
+    let next: number | null = null;
+    for (const q of this.content().quests) {
+      if (q.level <= level || !questAvailable(q, this.quests, q.level)) continue;
+      if (next === null || q.level < next) next = q.level;
+    }
+    return next;
+  }
+
   /** Missões ativas que se entregam a este NPC (prontas ou não). */
   handIns(npcId: string): QuestDef[] {
     return this.content().quests.filter((q) => q.turnIn === npcId && q.id in this.quests.active);

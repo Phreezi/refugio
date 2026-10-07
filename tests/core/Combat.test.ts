@@ -677,16 +677,31 @@ describe('Tutorial (Fase 11)', () => {
     expect(tutorial.current()).toBe('gather');
     state.data.tutorial.done.push('gather', 'craft');
     // Construir só em casa: fora dela passa à dica seguinte.
-    expect(tutorial.current()).toBe('travel');
+    expect(tutorial.current()).toBe('talk');
     state.data.player.zoneId = BASE_ZONE_ID;
     expect(tutorial.current()).toBe('build');
     state.data.tutorial.done.push('build');
     // "Comer" só aparece com fome.
-    expect(tutorial.current()).toBe('travel');
+    expect(tutorial.current()).toBe('talk');
     state.data.player.hunger = 40;
     expect(tutorial.current()).toBe('eat');
+    state.data.tutorial.done.push('eat');
+    // Com uma missão, são as missões que guiam: sem "falar" nem "viajar".
+    state.data.player.quests.active.q_welcome = [0];
+    expect(tutorial.current()).toBeNull();
+    delete state.data.player.quests.active.q_welcome;
+    expect(tutorial.current()).toBe('talk');
     tutorial.dismiss();
     expect(tutorial.current()).toBeNull();
+  });
+
+  it('conta a primeira zona a pé (mundo contínuo), mas não os Caminhos', () => {
+    const { state, sim, bus } = setup(map([]));
+    sim.tutorial.playerMoved();
+    bus.emit('zone:cross', { from: BASE_ZONE_ID, to: 'zone_route_1', x: 0, y: 0 });
+    expect(state.data.tutorial.done).not.toContain('travel');
+    bus.emit('zone:cross', { from: 'zone_route_1', to: 'zone_pine_forest', x: 0, y: 0 });
+    expect(state.data.tutorial.done).toContain('travel');
   });
 });
 
