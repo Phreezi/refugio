@@ -43,6 +43,8 @@ export function installServiceWorker(): void {
           if (registration.waiting && navigator.serviceWorker.controller) notify(registration.waiting);
         };
         check();
+        // Procura já uma versão nova (o browser nem sempre o faz ao abrir a página).
+        void registration.update().catch(() => undefined);
         registration.addEventListener('updatefound', () => {
           const worker = registration.installing;
           worker?.addEventListener('statechange', () => {

@@ -71,6 +71,12 @@
         display: block;
         image-rendering: pixelated;
       }
+      /* A fonte do jogo também no ecrã de carregamento (a mesma que display/fonts.ts carrega). */
+      @font-face {
+        font-family: 'Jersey 10';
+        src: url('/assets/fonts/jersey-10-latin-400-normal.woff2') format('woff2');
+        font-display: swap;
+      }
       /* Ecrã de carregamento antes do JS (cores da paleta); o PreloadScene continua com a barra. */
       #loader {
         position: fixed;
