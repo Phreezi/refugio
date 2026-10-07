@@ -949,7 +949,15 @@ export class UIScene extends Phaser.Scene {
     const { width, height } = getView();
     // A conversa fica em baixo: o aviso vai por cima dela.
     const dialogTop = this.dialog?.isOpen ? this.dialog.top : null;
-    const noticeY = dialogTop !== null ? Math.max(24, dialogTop - 14) : Math.round(height * 0.28);
+    // Com um painel aberto (fabrico, mochila…), o aviso vai para baixo, entre o painel e a hotbar,
+    // em vez de tapar o meio do painel.
+    const hotbarTop = uiState.modalOpen ? this.inventory?.hotbarRect().y : undefined;
+    const noticeY =
+      dialogTop !== null
+        ? Math.max(24, dialogTop - 14)
+        : hotbarTop !== undefined
+          ? Math.round(hotbarTop - 6 - text.height / 2)
+          : Math.round(height * 0.28);
     if (this.noticeY !== noticeY) {
       this.noticeY = noticeY;
       this.notice.setPosition(Math.round(width / 2), noticeY);
