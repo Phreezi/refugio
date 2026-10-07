@@ -281,4 +281,24 @@ describe('Resistência da simulação', { timeout: 120_000 }, () => {
       expect(moved, zoneId).toBe(true);
     }
   });
+
+  it('aparecer em cima de uma saída (recarregar com o mapa-mundo aberto) não o reabre ao primeiro passo', () => {
+    const zoneId = 'zone_plane_crash';
+    const map = content.zoneMap(zoneId);
+    const exit = map.exits.find((e) => e.to === null);
+    if (!exit) throw new Error('sem saída para o mapa-mundo');
+    const { sim, state, log } = setup(zoneId, 4);
+    Object.assign(state.data.player, { x: exit.x, y: exit.y });
+    sim.setZone(buildZoneContext(zoneId));
+    sim.reset();
+    // Para dentro: sai de cima da saída sem abrir o mapa-mundo.
+    const inward = { x: Math.sign(map.width * 8 - exit.x), y: 0 };
+    sim.setMoveIntent(inward);
+    for (let i = 0; i < 20; i++) sim.update(FIXED_STEP_MS);
+    expect(log.filter((e) => e.startsWith('exit:'))).toEqual([]);
+    // Voltar a pisá-la já conta.
+    sim.setMoveIntent({ x: -inward.x, y: 0 });
+    for (let i = 0; i < 40; i++) sim.update(FIXED_STEP_MS);
+    expect(log.filter((e) => e.startsWith('exit:')).length).toBeGreaterThan(0);
+  });
 });

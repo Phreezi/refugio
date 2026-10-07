@@ -103,6 +103,8 @@ export class Simulation {
   private previous: Vec2 = ZERO;
   /** Mundo contínuo: não repetir o aviso "precisas de nível" a cada tick na borda. */
   private edgeWarnTick = 0;
+  /** As saídas só contam depois de o jogador estar fora do alcance delas (ver `checkExits`). */
+  private exitArmed = true;
   private moved = false;
   private zone: ZoneContext | null = null;
   /**
@@ -245,6 +247,8 @@ export class Simulation {
     }
     this.interaction.setZone(zone);
     if (zone && !seamless) this.keepInside(zone);
+    const player = this.state.hasGame ? this.state.data.player : null;
+    this.exitArmed = player?.zoneId !== zone?.zoneId || !player || !this.exitAt(player);
     this.syncLinks();
   }
 
@@ -737,13 +741,23 @@ export class Simulation {
     if (tick % secondsToTicks(BALANCE.bleedEverySec) === 0) player.hp = Math.max(0, player.hp - 1);
   }
 
+  private exitAt(at: Vec2): ZoneMap['exits'][number] | undefined {
+    return this.exits.find((e) => Math.hypot(e.x - at.x, e.y - at.y) <= BALANCE.exitReachPx);
+  }
+
   /** Pisar uma saída leva a outra zona (uma vez; a cena trata da transição). */
   private checkExits(): void {
     if (this.leavingTo !== null || !this.moved) return;
     if (this.checkEdges()) return;
     const player = this.state.data.player;
-    const exit = this.exits.find((e) => Math.hypot(e.x - player.x, e.y - player.y) <= BALANCE.exitReachPx);
-    if (!exit) return;
+    const exit = this.exitAt(player);
+    if (!exit) {
+      this.exitArmed = true;
+      return;
+    }
+    // Apareceu-se em cima da saída (ex.: recarregou-se o jogo com o mapa-mundo aberto): só conta
+    // depois de sair de cima dela, senão o primeiro passo reabria o mapa-mundo.
+    if (!this.exitArmed) return;
     // Sem destino, a saída abre o mapa-mundo (a cena decide para onde se vai).
     this.leavingTo = exit.to ?? 'world';
     this.bus.emit('zone:change', { from: player.zoneId, to: exit.to, exit: { x: exit.x, y: exit.y } });
