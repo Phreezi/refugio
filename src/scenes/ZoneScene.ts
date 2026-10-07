@@ -12,6 +12,7 @@ import { zoneMapKey } from '../config';
 import { BASE_ZONE_ID, CHARACTER_LOOKS, gameState, type CharacterLook } from '../core/GameState';
 import { simulation } from '../core/Simulation';
 import { getWorldView } from '../display/view';
+import { boxOutside, cullRect, pointOutside, setCulled } from '../display/culling';
 import { WeaponFx } from '../display/weaponFx';
 import { questKillTargets } from '../world/questGuide';
 import { onWorldZoomChange, stepWorldZoom, worldZoomFor } from '../display/worldZoom';
@@ -137,6 +138,12 @@ const NPC_MARK_DEPTH = 900_000;
 const VOID_DEPTH = -10;
 const VOID_TEXTURE = 'void_cliffs';
 
+/**
+ * Culling: o que tem os pés a mais disto (px) fora da vista não se desenha. Cobre o maior
+ * sprite do mundo (64 px) e as marcas por cima dos NPCs.
+ */
+const CULL_MARGIN_PX = 80;
+
 /** Mundo contínuo (Etapa E): desenham-se as zonas a menos disto (tiles) da zona atual. */
 const NEIGHBOR_MARGIN_TILES = 40;
 /** …e só se apagam quando ficam a mais disto (evita criar e apagar a andar junto a uma borda). */
@@ -146,6 +153,8 @@ const NEIGHBOR_DROP_TILES = 48;
 interface ZoneView {
   zoneId: string;
   tilemap: Phaser.Tilemaps.Tilemap;
+  /** As camadas de tiles (para as tirar da câmara quando a zona não se vê). */
+  layers: Phaser.GameObjects.GameObject[];
   objects: Phaser.GameObjects.GameObject[];
   resources: Map<number, Phaser.GameObjects.Image>;
   containers: Map<number, Phaser.GameObjects.Image>;
@@ -387,6 +396,7 @@ export class ZoneScene extends Phaser.Scene {
     this.renderHomestead();
     this.renderLighting();
     this.renderVoid();
+    this.cullWorld();
     // Com toque, andar volta a pôr a peça à frente do jogador.
     if (simulation.playerMoved && buildMode.pickedBy === 'touch') {
       buildMode.picked = null;
@@ -1281,10 +1291,13 @@ export class ZoneScene extends Phaser.Scene {
       ? tilemap.addTilesetImage(URBAN_TILESET_NAME, URBAN_TILESET_TEXTURE)
       : null;
     const tilesets = urban ? [tileset, urban] : tileset;
-    for (const name of TILE_LAYERS) tilemap.createLayer(name, tilesets, ox, oy).setDepth(LAYER_DEPTH[name]);
+    const layers: Phaser.GameObjects.GameObject[] = [];
+    for (const name of TILE_LAYERS)
+      layers.push(tilemap.createLayer(name, tilesets, ox, oy).setDepth(LAYER_DEPTH[name]));
     const view: ZoneView = {
       zoneId,
       tilemap,
+      layers,
       objects: [
         this.drawShore(tilemap, tileset.firstgid, ox, oy),
         ...this.drawFences(tilemap, tileset.firstgid, ox, oy),
@@ -1497,6 +1510,37 @@ export class ZoneScene extends Phaser.Scene {
       contexts.push(view.context);
     }
     simulation.combat.keepZones(contexts);
+  }
+
+  /**
+   * Tira da câmara o que está fora da vista (ver display/culling.ts): as zonas que não se veem
+   * inteiras (camadas, margens da água, imagens) e, nas que se veem, as imagens longe.
+   */
+  private cullWorld(): void {
+    const camera = this.cameras.main;
+    const area = cullRect(this.cameraView(), CULL_MARGIN_PX);
+    const cullPoint = (object: Phaser.GameObjects.GameObject, zoneOff: boolean): void => {
+      // A margem da água é um Graphics da zona inteira (posição = deslocamento do mundo).
+      const positioned = !(object instanceof Phaser.GameObjects.Graphics) && 'x' in object && 'y' in object;
+      const off =
+        zoneOff ||
+        (positioned && typeof object.x === 'number' && typeof object.y === 'number'
+          ? pointOutside(area, object.x, object.y)
+          : false);
+      setCulled(object, camera, off);
+    };
+    for (const view of this.views.values()) {
+      const map = content.zoneMap(view.zoneId);
+      const { x, y } = this.offsetOf(view.zoneId);
+      const size = map.tileSize;
+      const zoneOff = boxOutside(area, x, y, map.width * size, map.height * size);
+      for (const layer of view.layers) setCulled(layer, camera, zoneOff);
+      for (const object of view.objects) cullPoint(object, zoneOff);
+      for (const image of view.statics) cullPoint(image, zoneOff);
+    }
+    // Peças "vivas" da base (podem ser centenas).
+    for (const sprite of this.structureSprites.values()) cullPoint(sprite, false);
+    for (const sprite of this.cropSprites.values()) cullPoint(sprite, false);
   }
 
   /** Desenha a próxima zona vizinha da fila (uma por frame). */
