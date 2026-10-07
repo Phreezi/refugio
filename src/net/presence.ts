@@ -3,10 +3,10 @@
 // partilham, manda um convite ao outro aparelho; se o outro estiver noutro jogo, aparece-lhe um
 // aviso a perguntar se quer entrar (o jogo atual fica gravado).
 
-import Peer from 'peerjs';
+import type Peer from 'peerjs';
 import { deviceId } from './device';
 import { normalizeCode } from './protocol';
-import { peerOptions } from './peer';
+import { loadPeer, peerOptions, type PeerConstructor } from './peer';
 
 const PREFIX = 'refugio-dev-';
 /** Tempo para o convite chegar antes de fechar a ligação (ms). */
@@ -39,36 +39,49 @@ class Presence {
   start(): Promise<Peer | null> {
     if (this.peer) return Promise.resolve(this.peer);
     this.opening ??= new Promise((resolve) => {
-      let peer: Peer;
-      try {
-        peer = new Peer(PREFIX + deviceId(), peerOptions());
-      } catch {
-        resolve(null);
-        return;
-      }
-      peer.once('open', () => {
-        this.peer = peer;
-        resolve(peer);
-      });
-      peer.on('error', () => {
-        if (this.peer !== peer) {
-          peer.destroy();
+      loadPeer().then(
+        (PeerClass) => {
+          this.listen(PeerClass, resolve);
+        },
+        () => {
           this.opening = null;
           resolve(null);
-        }
-      });
-      peer.on('disconnected', () => {
-        if (!peer.destroyed) peer.reconnect();
-      });
-      peer.on('connection', (conn) => {
-        conn.on('data', (raw) => {
-          const invite = parseInvite(raw);
-          if (invite) this.onInvite?.(invite);
-          conn.close();
-        });
-      });
+        },
+      );
     });
     return this.opening;
+  }
+
+  /** Abre o id deste aparelho no servidor e escuta convites. */
+  private listen(PeerClass: PeerConstructor, resolve: (peer: Peer | null) => void): void {
+    let peer: Peer;
+    try {
+      peer = new PeerClass(PREFIX + deviceId(), peerOptions());
+    } catch {
+      resolve(null);
+      return;
+    }
+    peer.once('open', () => {
+      this.peer = peer;
+      resolve(peer);
+    });
+    peer.on('error', () => {
+      if (this.peer !== peer) {
+        peer.destroy();
+        this.opening = null;
+        resolve(null);
+      }
+    });
+    peer.on('disconnected', () => {
+      if (!peer.destroyed) peer.reconnect();
+    });
+    peer.on('connection', (conn) => {
+      conn.on('data', (raw) => {
+        const invite = parseInvite(raw);
+        if (invite) this.onInvite?.(invite);
+        conn.close();
+      });
+    });
   }
 
   /** Convida o aparelho `partner` (se estiver com o jogo aberto, aparece-lhe o aviso). */

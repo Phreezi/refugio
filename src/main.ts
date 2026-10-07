@@ -55,6 +55,13 @@ function start(): void {
       autoCenter: Phaser.Scale.NO_CENTER,
     },
     disableContextMenu: true,
+    loader: {
+      // O Phaser limita-se a 6 pedidos de cada vez no Android (por causa de browsers antigos):
+      // são ~200 ficheiros pequenos, por isso o arranque esperava por dezenas de idas e voltas.
+      maxParallelDownloads: 32,
+      // As imagens vão direto para um <img> (sem XHR + Blob + createObjectURL por ficheiro).
+      imageLoadType: 'HTMLImageElement',
+    },
     // Os sons são sintetizados à parte (src/audio/sfx.ts): o Phaser não precisa de áudio.
     audio: { noAudio: true },
     scene: [BootScene, PreloadScene, MainMenuScene, ZoneScene, WorldMapScene, UIScene],
