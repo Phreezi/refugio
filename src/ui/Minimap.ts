@@ -31,7 +31,7 @@ type Cell = keyof typeof COLORS;
 interface Marker {
   x: number;
   y: number;
-  kind: 'goal' | 'offer' | 'ready' | 'enemy';
+  kind: 'goal' | 'offer' | 'ready' | 'enemy' | 'bag';
 }
 
 export class Minimap {
@@ -183,6 +183,21 @@ export class Minimap {
     }
     this.nearestNpc = nearest ? { npc: nearest.npc, ready: nearest.kind === 'ready' } : null;
     if (!pointer && nearest) pointer = { x: nearest.x, y: nearest.y, kind: nearest.kind };
+    // A mochila da morte (no mundo contínuo): marca e, enquanto lá estiver, a seta vai para ela
+    // primeiro (é o que se quer depois de morrer; "nada se perde").
+    let bag: { x: number; y: number; d: number } | null = null;
+    for (const [zoneId, zone] of Object.entries(gameState.data.zones)) {
+      const rect = content.world.rect(zoneId);
+      if (!rect) continue;
+      for (const b of zone.bags) {
+        if (!b.death) continue;
+        const point = { x: rect.x * TILE_PX + b.x, y: rect.y * TILE_PX + b.y };
+        markers.push({ ...point, kind: 'bag' });
+        const d = Math.hypot(point.x - here.x, point.y - here.y);
+        if (!bag || d < bag.d) bag = { ...point, d };
+      }
+    }
+    if (bag) pointer = { x: bag.x, y: bag.y, kind: 'bag' };
     this.markers = markers;
     this.pointer = pointer;
   }
@@ -198,7 +213,15 @@ export class Minimap {
       return { x: ox + mx, y: oy + my, inside: Math.abs(mx) < half - 2 && Math.abs(my) < half - 2 };
     };
     const color = (kind: Marker['kind']): PaletteColor =>
-      kind === 'goal' ? 'gold' : kind === 'enemy' ? 'red' : kind === 'ready' ? 'lime' : 'wheat';
+      kind === 'goal'
+        ? 'gold'
+        : kind === 'enemy'
+          ? 'red'
+          : kind === 'ready'
+            ? 'lime'
+            : kind === 'bag'
+              ? 'orange'
+              : 'wheat';
     for (const marker of this.markers) {
       const p = toMap(marker);
       if (!p.inside) continue;
