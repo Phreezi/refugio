@@ -244,7 +244,24 @@ export class Simulation {
       this.quests.visit(zone.zoneId);
     }
     this.interaction.setZone(zone);
+    if (zone && !seamless) this.keepInside(zone);
     this.syncLinks();
+  }
+
+  /**
+   * Ao entrar numa zona, o jogador tem de estar dentro do mapa dela: fora (save de um mapa que
+   * mudou de tamanho, zona selvagem com outro plano) não havia como voltar — a borda repunha-o
+   * sempre na posição anterior, também fora — e ficava preso. Passa para o ponto de chegada.
+   */
+  private keepInside(zone: ZoneContext): void {
+    const player = this.state.data.player;
+    if (player.zoneId !== zone.zoneId) return;
+    const { width, height, tileSize, playerSpawn } = zone.map;
+    if (player.x >= 0 && player.y >= 0 && player.x < width * tileSize && player.y < height * tileSize) return;
+    player.x = playerSpawn.x;
+    player.y = playerSpawn.y;
+    this.previous = { x: player.x, y: player.y };
+    this.state.markDirty();
   }
 
   /** Zona atual (id), ou null. */

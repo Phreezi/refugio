@@ -233,6 +233,11 @@ export class ZoneScene extends Phaser.Scene {
   create(data: ZoneSceneData): void {
     const zoneId = data.zoneId ?? gameState.data.player.zoneId;
     this.zoneId = content.zones[zoneId] ? zoneId : BASE_ZONE_ID;
+    // Zona que já não existe (ex.: save de um plano do mundo selvagem antigo): o jogador passa
+    // para o ponto de partida da base, senão ficava com a posição (e o id) da zona perdida.
+    if (this.zoneId !== zoneId || !content.zones[gameState.data.player.zoneId]) {
+      simulation.enterZone(this.zoneId, content.zoneMap(this.zoneId));
+    }
     this.leaving = false;
     this.hurtUntil = 0;
     this.views = new Map();
