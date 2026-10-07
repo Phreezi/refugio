@@ -17,13 +17,14 @@ import { sfx } from '../audio/sfx';
 import { music } from '../audio/music';
 import { ambience } from '../audio/ambience';
 import { Label } from './text';
+import { AboutUI } from './AboutUI';
 import { uiState } from './uiState';
 
 const DEPTH = { dim: 80, panel: 82, content: 84 } as const;
 const W = 200;
 const ROW = 20;
 
-type View = 'main' | 'settings' | 'stats' | 'coop';
+type View = 'main' | 'settings' | 'stats' | 'coop' | 'about';
 
 interface Destroyable {
   destroy(): void;
@@ -106,10 +107,19 @@ export class PauseUI {
 
   private build(): void {
     this.clear();
+    if (this.view === 'about') {
+      // "Sobre e créditos": painel próprio (o mesmo do menu inicial); fechar volta à pausa.
+      this.add(
+        new AboutUI(this.scene, DEPTH.dim, () => {
+          this.go('main');
+        }),
+      );
+      return;
+    }
     const { width, height } = getView();
     const lines =
       this.view === 'main'
-        ? 6
+        ? 7
         : this.view === 'stats'
           ? 8 + this.skillRows().length
           : this.view === 'coop'
@@ -180,6 +190,12 @@ export class PauseUI {
         'pause.stats',
         () => {
           this.go('stats');
+        },
+      ],
+      [
+        'pause.about',
+        () => {
+          this.go('about');
         },
       ],
       [

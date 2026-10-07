@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import { PALETTE } from '../assets/palette';
+import { hideLoader } from '../display/loader';
 import { getView, setupFixedCamera } from '../display/view';
 import { t } from '../i18n';
 import { Label } from './text';
@@ -10,6 +11,7 @@ import { Label } from './text';
  */
 export function showFatalError(scene: Phaser.Scene, error: unknown): void {
   console.error(error);
+  hideLoader();
   const message = error instanceof Error ? error.message : String(error);
   setupFixedCamera(scene.cameras.main);
   scene.cameras.main.setBackgroundColor(PALETTE.blood);

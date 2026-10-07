@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { PALETTE } from '../assets/palette';
 import { EventBus } from '../core/EventBus';
 import { t } from '../i18n';
+import { loaderFail } from '../display/loader';
 
 /** Linhas da stack mostradas (o resto fica na consola). */
 const STACK_LINES = 4;
@@ -30,6 +31,8 @@ export function reportError(error: unknown, where = ''): void {
   const body = box.querySelector('pre');
   if (body) body.textContent = text.join('\n');
   box.style.display = 'block';
+  // Ainda no ecrã de carregamento: passa a "não foi possível carregar" (com Recarregar).
+  loaderFail(t('loader.failed'));
 }
 
 function createBox(): HTMLDivElement {

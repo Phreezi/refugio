@@ -22,6 +22,7 @@
     "tiles": "node scripts/generate-tiles.ts",
     "sprites": "node scripts/generate-sprites.ts",
     "characters": "node scripts/generate-characters.ts",
+    "icons": "node scripts/generate-icons.ts",
     "map:base": "node scripts/generate-base-map.ts",
     "map:pine": "node scripts/generate-pine-forest.ts",
     "map:farm": "node scripts/generate-farm.ts",

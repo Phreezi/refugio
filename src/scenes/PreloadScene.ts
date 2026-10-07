@@ -48,6 +48,7 @@ import { parseZoneMap, type ZoneMapRules } from '../world/zoneMap';
 import { installWilds } from '../world/wildContent';
 import { parseWildPlan } from '../world/wilds';
 import { showFatalError } from '../ui/fatalError';
+import { hideLoader } from '../display/loader';
 import { SceneKey } from './keys';
 
 export interface PreloadSceneData {
@@ -74,6 +75,8 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   preload(): void {
+    // A partir daqui a barra é a do jogo (a de index.html sai).
+    hideLoader();
     setupFixedCamera(this.cameras.main);
     const { width, height } = getView();
     const x = Math.round((width - BAR_WIDTH) / 2);

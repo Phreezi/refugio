@@ -714,5 +714,21 @@
   "zone.cave_pine": "Pinewood Cave",
   "zone.cave_lake": "Lake Cave",
   "zone.cave_deep": "Forest Cave",
-  "zone.cave_industrial": "Abandoned Mines"
+  "zone.cave_industrial": "Abandoned Mines",
+  "loader.loading": "Loading Refúgio…",
+  "loader.slow": "This is taking longer than usual. If it doesn't move on, reload the page.",
+  "loader.failed": "The game couldn't be loaded. Check your internet connection and try again.",
+  "loader.no_webgl": "This browser can't show the game (WebGL is missing).\nTry a recent version of Chrome, Firefox, Safari or Edge, or turn on hardware acceleration in the browser settings.",
+  "loader.reload": "Reload",
+  "menu.about": "About",
+  "menu.update": "New version — reload",
+  "pause.about": "About and credits",
+  "about.title": "About Refúgio",
+  "about.tab_credits": "Credits",
+  "about.tab_privacy": "Privacy",
+  "about.version": "Version {version} · {build}",
+  "about.tagline": "Pixel art survival game. Free, no ads.",
+  "about.credits": "Development: Phreezi, with help from Claude (Anthropic).\nPixel art and sounds: made in code for the game.\nJersey 10 font — The Soft Type Project Authors (SIL OFL 1.1).\nRPG Urban Pack — Kenney, kenney.nl (CC0).\nPhaser — Phaser Studio (MIT).\nPeerJS — PeerJS contributors (MIT).",
+  "about.privacy": "Your games are saved only on this device (the browser's IndexedDB and localStorage); nothing goes to any server.\nIn co-op, the two devices connect directly (WebRTC). To find each other they use the public PeerJS server (which sees the game code and the IP address) and a Google STUN server; on some networks, game data goes through a PeerJS relay (TURN) server.\nNo accounts, no ads, no data collection.",
+  "about.close": "Close"
 }

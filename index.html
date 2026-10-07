@@ -2,14 +2,51 @@
 <html lang="pt-PT">
   <head>
     <meta charset="UTF-8" />
+    <!-- Sem zoom da página: o zoom do jogo é com Ctrl + roda / pinça (§3.1). -->
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#1c1521" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="icon" href="data:," />
     <title>Refúgio</title>
+    <meta
+      name="description"
+      content="Jogo de sobrevivência em pixel art: recolhe, fabrica, constrói o teu refúgio e explora um mundo pós-apocalíptico acolhedor. Grátis, no browser, sem anúncios."
+    />
+    <meta name="theme-color" content="#1c1521" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Refúgio" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- Partilha do link (Open Graph / Twitter): a imagem tem de ter o endereço completo. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Refúgio" />
+    <meta property="og:title" content="Refúgio" />
+    <meta
+      property="og:description"
+      content="Sobrevivência em pixel art no browser: recolhe, fabrica e constrói o teu refúgio. Sozinho ou em co-op a dois."
+    />
+    <meta property="og:url" content="https://phreezi.github.io/refugio/" />
+    <meta property="og:image" content="https://phreezi.github.io/refugio/icons/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Uma cabana de madeira com a janela acesa, ao anoitecer, e o título Refúgio"
+    />
+    <meta property="og:locale" content="pt_PT" />
+    <meta property="og:locale:alternate" content="en_GB" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Refúgio" />
+    <meta
+      name="twitter:description"
+      content="Sobrevivência em pixel art no browser: recolhe, fabrica e constrói o teu refúgio."
+    />
+    <meta name="twitter:image" content="https://phreezi.github.io/refugio/icons/og-image.png" />
     <style>
       html,
       body {
@@ -34,10 +71,150 @@
         display: block;
         image-rendering: pixelated;
       }
+      /* A fonte do jogo também no ecrã de carregamento (a mesma que display/fonts.ts carrega). */
+      @font-face {
+        font-family: 'Jersey 10';
+        src: url('/assets/fonts/jersey-10-latin-400-normal.woff2') format('woff2');
+        font-display: swap;
+      }
+      /* Ecrã de carregamento antes do JS (cores da paleta); o PreloadScene continua com a barra. */
+      #loader {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 16px;
+        background: #2e2336; /* night */
+        color: #e4d6b8; /* parchment */
+        font:
+          24px 'Jersey 10',
+          ui-monospace,
+          monospace;
+        text-align: center;
+      }
+      #loader img {
+        width: 96px;
+        height: 96px;
+        image-rendering: pixelated;
+      }
+      #loader .bar {
+        position: relative;
+        width: 192px;
+        height: 8px;
+        overflow: hidden;
+        background: #4a3a4c; /* shadow */
+      }
+      #loader .bar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 48px;
+        background: #f0a445; /* amber */
+        animation: refugio-load 1.2s steps(12) infinite;
+      }
+      @keyframes refugio-load {
+        from {
+          left: -48px;
+        }
+        to {
+          left: 192px;
+        }
+      }
+      #loader.failed .bar {
+        display: none;
+      }
+      #loader .message {
+        max-width: 420px;
+        white-space: pre-line;
+      }
+      #loader button {
+        display: none;
+        font: inherit;
+        color: #fbf3de; /* cream */
+        background: #9a6440; /* wood */
+        border: 2px solid #43291f; /* bark_dark */
+        padding: 4px 20px;
+        cursor: pointer;
+      }
+      #loader.failed button {
+        display: block;
+      }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="loader" role="status" aria-live="polite">
+      <img src="/icons/icon-192.png" alt="" />
+      <div class="bar"></div>
+      <div class="message"></div>
+      <button type="button"></button>
+      <noscript>O Refúgio precisa de JavaScript. / Refúgio needs JavaScript.</noscript>
+    </div>
+    <script>
+      // Antes do jogo (sem módulos): textos do ecrã de carregamento (vêm de src/i18n, ver
+      // vite.config.ts), WebGL, e erros de carregamento. O jogo esconde-o (src/display/loader.ts).
+      (function () {
+        var texts = __LOADER_TEXTS__;
+        var lang = 'pt-PT';
+        try {
+          var prefs = JSON.parse(localStorage.getItem('refugio.prefs') || '{}');
+          if (prefs && texts[prefs.language]) lang = prefs.language;
+          else if (!/^pt/i.test(navigator.language || '')) lang = 'en';
+        } catch (e) {
+          /* sem localStorage: fica o pt-PT */
+        }
+        var forced = /[?&]lang=([\w-]+)/.exec(location.search);
+        if (forced && texts[forced[1]]) lang = forced[1];
+        var t = texts[lang];
+        var loader = document.getElementById('loader');
+        var message = loader.querySelector('.message');
+        var button = loader.querySelector('button');
+        message.textContent = t['loader.loading'];
+        button.textContent = t['loader.reload'];
+        button.onclick = function () {
+          location.reload();
+        };
+        function fail(text) {
+          if (!loader.isConnected) return;
+          loader.className = 'failed';
+          message.textContent = text;
+        }
+        window.__refugioLoaderFail = fail;
+        var canvas = document.createElement('canvas');
+        var gl = null;
+        try {
+          gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        } catch (e) {
+          gl = null;
+        }
+        if (!gl) {
+          window.__refugioNoWebGL = true;
+          fail(t['loader.no_webgl']);
+          return;
+        }
+        // Um script ou ficheiro que não carregou (rede, versão antiga em cache).
+        window.addEventListener(
+          'error',
+          function (event) {
+            var target = event.target;
+            if (target && target !== window && target.tagName === 'SCRIPT') fail(t['loader.failed']);
+          },
+          true,
+        );
+        // Ainda nada ao fim de 25 s: mostra o botão de recarregar (sem tirar a barra).
+        setTimeout(function () {
+          if (loader.isConnected && loader.className !== 'failed') {
+            message.textContent = t['loader.slow'];
+            button.style.display = 'block';
+          }
+        }, 25000);
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
