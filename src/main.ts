@@ -17,6 +17,8 @@ import { preferences } from './ui/preferences';
 import { installSfx } from './audio/sfx';
 import { installRuntimeErrors } from './ui/runtimeErrors';
 import { loadPixelFont } from './display/fonts';
+import { webGlMissing } from './display/loader';
+import { installServiceWorker } from './pwa/serviceWorker';
 
 installRuntimeErrors();
 
@@ -33,8 +35,9 @@ const host: HTMLElement = gameHost;
 // O jogo já nasce com a resolução certa para este ecrã (depois, installPixelScaling acompanha).
 const initial = measurePixelScale(host);
 
-// A fonte pixel tem de estar pronta antes do primeiro texto (medidas em cache).
-void loadPixelFont().then(start);
+// A fonte pixel tem de estar pronta antes do primeiro texto (medidas em cache). Sem WebGL o jogo
+// não arranca: a mensagem já está no ecrã de carregamento (index.html).
+if (!webGlMissing()) void loadPixelFont().then(start);
 
 function start(): void {
   const game = new Phaser.Game({
@@ -70,3 +73,4 @@ function start(): void {
 
 installSaveOnHide();
 installSfx();
+installServiceWorker();

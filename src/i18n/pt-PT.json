@@ -706,5 +706,21 @@
   "zone.cave_pine": "Gruta do Pinhal",
   "zone.cave_lake": "Gruta do Lago",
   "zone.cave_deep": "Gruta da Floresta",
-  "zone.cave_industrial": "Minas Abandonadas"
+  "zone.cave_industrial": "Minas Abandonadas",
+  "loader.loading": "A carregar o Refúgio…",
+  "loader.slow": "Está a demorar mais do que o costume. Se não avançar, recarrega a página.",
+  "loader.failed": "Não foi possível carregar o jogo. Verifica a ligação à internet e tenta outra vez.",
+  "loader.no_webgl": "Este browser não consegue mostrar o jogo (falta o WebGL).\nExperimenta uma versão recente do Chrome, Firefox, Safari ou Edge, ou liga a aceleração gráfica nas definições do browser.",
+  "loader.reload": "Recarregar",
+  "menu.about": "Sobre",
+  "menu.update": "Nova versão — recarregar",
+  "pause.about": "Sobre e créditos",
+  "about.title": "Sobre o Refúgio",
+  "about.tab_credits": "Créditos",
+  "about.tab_privacy": "Privacidade",
+  "about.version": "Versão {version} · {build}",
+  "about.tagline": "Jogo de sobrevivência em pixel art. Grátis, sem anúncios.",
+  "about.credits": "Desenvolvimento: Phreezi, com a ajuda do Claude (Anthropic).\nArte em pixel e sons: feitos por código para o jogo.\nFonte Jersey 10 — The Soft Type Project Authors (SIL OFL 1.1).\nRPG Urban Pack — Kenney, kenney.nl (CC0).\nPhaser — Phaser Studio (MIT).\nPeerJS — PeerJS contributors (MIT).",
+  "about.privacy": "Os teus jogos gravam-se só neste aparelho (IndexedDB e localStorage do browser); nada vai para nenhum servidor.\nNo co-op, os dois aparelhos ligam-se diretamente (WebRTC). Para se encontrarem usam o servidor público do PeerJS (que vê o código do jogo e o endereço IP) e um servidor STUN da Google; em algumas redes, os dados do jogo passam por um servidor de retransmissão (TURN) do PeerJS.\nSem contas, sem anúncios, sem recolha de dados.",
+  "about.close": "Fechar"
 }
